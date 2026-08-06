@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7
+    container_name: dentflow-mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: dentflow
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: dentflow-api
+    ports:
+      - '8000:8000'
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_URI=mongodb://mongodb:27017/dentflow
+      - API_PORT=8000
+      - JWT_ACCESS_SECRET=change-me-in-production
+      - JWT_REFRESH_SECRET=change-me-in-production-refresh
+      - JWT_ACCESS_EXPIRATION=1d
+      - JWT_REFRESH_EXPIRATION=7d
+      - MODE=DEV
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: dentflow-client
+    ports:
+      - '3000:3000'
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_BASE=http://localhost:8000/api
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+volumes:
+  mongo-data:
