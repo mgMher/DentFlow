@@ -59,6 +59,7 @@ const PatientSchema = new mongoose.Schema({
     email: String,
     address: { street: String, city: String, state: String, zipCode: String, country: String },
     medicalHistory: { conditions: [String], allergies: [String], medications: [String], notes: String },
+    status: { type: String, default: 'active' },
     isActive: { type: Boolean, default: true },
     lastVisit: Date,
 }, { timestamps: true });
@@ -315,6 +316,7 @@ async function seed() {
             ...p,
             address: { city: '\u0535\u0580\u0587\u0561\u0576', country: '\u0540\u0561\u0575\u0561\u057D\u057F\u0561\u0576' },
             medicalHistory: { conditions: [], allergies: [], medications: [], notes: '' },
+            status: 'active',
             isActive: true,
         });
     }

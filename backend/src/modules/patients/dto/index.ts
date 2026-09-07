@@ -1,3 +1,9 @@
-export { CreatePatientDto, AddressDto, EmergencyContactDto, MedicalHistoryDto, InsuranceDto } from './create-patient.dto';
-export { UpdatePatientDto } from './update-patient.dto';
-export { QueryPatientDto } from './query-patient.dto';
+export {
+    AddressDto,
+    CreatePatientDto,
+    EmergencyContactDto,
+    InsuranceDto,
+    MedicalHistoryDto,
+} from './create-patient.dto';
+export { UpdatePatientDto, UpdatePatientStatusDto } from './update-patient.dto';
+export { QueryPatientDto, PATIENT_SORT_FIELDS } from './query-patient.dto';

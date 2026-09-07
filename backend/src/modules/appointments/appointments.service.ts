@@ -12,12 +12,14 @@ import {
     AppointmentStatus,
 } from './appointment.schema';
 import { CreateAppointmentDto, QueryAppointmentDto, UpdateAppointmentDto } from './dto';
+import { PatientsService } from '../patients/patients.service';
 
 @Injectable()
 export class AppointmentsService {
     constructor(
         @InjectModel(Appointment.name)
         private readonly appointmentModel: Model<AppointmentDocument>,
+        private readonly patientsService: PatientsService,
     ) {}
 
     /**
@@ -249,6 +251,10 @@ export class AppointmentsService {
             throw new NotFoundException('Appointment not found');
         }
 
+        if (dto.status === AppointmentStatus.COMPLETED) {
+            await this.recordVisit(clinicId, updated);
+        }
+
         return updated;
     }
 
@@ -319,7 +325,31 @@ export class AppointmentsService {
             throw new NotFoundException('Appointment not found');
         }
 
+        if (status === AppointmentStatus.COMPLETED) {
+            await this.recordVisit(clinicId, updated);
+        }
+
         return updated;
+    }
+
+    /**
+     * Stamp the patient's `lastVisit` when an appointment is completed, so the
+     * patients list reflects real visit dates.
+     */
+    private async recordVisit(
+        clinicId: string,
+        appointment: AppointmentDocument,
+    ): Promise<void> {
+        const patientId =
+            appointment.patientId && typeof appointment.patientId === 'object'
+                ? (appointment.patientId as any)._id || appointment.patientId
+                : appointment.patientId;
+
+        await this.patientsService.touchLastVisit(
+            new Types.ObjectId(clinicId),
+            new Types.ObjectId(String(patientId)),
+            appointment.startTime,
+        );
     }
 
     /**

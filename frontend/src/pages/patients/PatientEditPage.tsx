@@ -13,7 +13,9 @@ import {
     FormControl,
     FormLabel,
     FormHelperText,
-    Chip,
+    InputLabel,
+    MenuItem,
+    Select,
     Typography,
 } from '@mui/material';
 import { ArrowBack as BackIcon } from '@mui/icons-material';
@@ -23,84 +25,21 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
-import { PageHeader, LoadingSpinner } from '../../components/ui';
+import { PageHeader, ChipInput, PhotoUpload, LoadingSpinner } from '../../components/ui';
 import { useHttpState } from '../../hooks';
+import { getInitials } from '../../utils/formatters';
+import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
+import { PATIENT_STATUSES, PatientStatus } from '../../types';
+import {
+    PatientFormData,
+    emptyPatientForm,
+    patientToForm,
+    toPatientPayload,
+} from './patientForm';
 
-interface PatientFormData {
-    firstName: string;
-    lastName: string;
-    patronymic: string;
-    dateOfBirth: string;
-    gender: 'male' | 'female' | 'other';
-    phone: string;
-    email: string;
-    street: string;
-    city: string;
-    state: string;
-    zipCode: string;
-    country: string;
-    emergencyName: string;
-    emergencyRelationship: string;
-    emergencyPhone: string;
-    conditions: string[];
-    allergies: string[];
-    medications: string[];
-    medicalNotes: string;
-    insuranceProvider: string;
-    policyNumber: string;
-    groupNumber: string;
-    expirationDate: string;
+interface PatientEditFormData extends PatientFormData {
+    status: PatientStatus;
 }
-
-const ChipInput: React.FC<{
-    value: string[];
-    onChange: (val: string[]) => void;
-    label: string;
-    placeholder?: string;
-}> = ({ value, onChange, label, placeholder }) => {
-    const [inputValue, setInputValue] = React.useState('');
-
-    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-        if (e.key === 'Enter' && inputValue.trim()) {
-            e.preventDefault();
-            if (!value.includes(inputValue.trim())) {
-                onChange([...value, inputValue.trim()]);
-            }
-            setInputValue('');
-        }
-    };
-
-    const handleDelete = (chipToDelete: string) => {
-        onChange(value.filter((chip) => chip !== chipToDelete));
-    };
-
-    return (
-        <Box>
-            <TextField
-                fullWidth
-                size="small"
-                label={label}
-                placeholder={placeholder || label}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyDown={handleKeyDown}
-                helperText="Press Enter to add"
-            />
-            {value.length > 0 && (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 1 }}>
-                    {value.map((chip) => (
-                        <Chip
-                            key={chip}
-                            label={chip}
-                            size="small"
-                            onDelete={() => handleDelete(chip)}
-                        />
-                    ))}
-                </Box>
-            )}
-        </Box>
-    );
-};
 
 const PatientEditPage: React.FC = () => {
     const { t } = useTranslation();
@@ -109,15 +48,23 @@ const PatientEditPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
 
     const patient = useSelector((state: RootState) => state.patients.current);
-    const patientLoading = useSelector((state: RootState) => state.http.loading.includes('GET_PATIENT'));
-    const { loading, success } = useHttpState('UPDATE_PATIENT');
+    const patientLoading = useSelector((state: RootState) =>
+        state.http.loading.includes('GET_PATIENT'),
+    );
+    const { loading, success, clearSuccess } = useHttpState('UPDATE_PATIENT');
 
     const {
         control,
         handleSubmit,
         reset,
+        watch,
         formState: { errors },
-    } = useForm<PatientFormData>();
+    } = useForm<PatientEditFormData>({
+        defaultValues: { ...emptyPatientForm, status: 'active' },
+    });
+
+    const firstName = watch('firstName');
+    const lastName = watch('lastName');
 
     useEffect(() => {
         if (id) {
@@ -126,96 +73,40 @@ const PatientEditPage: React.FC = () => {
     }, [id, dispatch]);
 
     useEffect(() => {
-        if (patient) {
-            reset({
-                firstName: patient.firstName || '',
-                lastName: patient.lastName || '',
-                patronymic: patient.patronymic || '',
-                dateOfBirth: patient.dateOfBirth ? patient.dateOfBirth.substring(0, 10) : '',
-                gender: patient.gender || 'male',
-                phone: patient.phone || '',
-                email: patient.email || '',
-                street: patient.address?.street || '',
-                city: patient.address?.city || '',
-                state: patient.address?.state || '',
-                zipCode: patient.address?.zipCode || '',
-                country: patient.address?.country || '',
-                emergencyName: patient.emergencyContact?.name || '',
-                emergencyRelationship: patient.emergencyContact?.relationship || '',
-                emergencyPhone: patient.emergencyContact?.phone || '',
-                conditions: patient.medicalHistory?.conditions || [],
-                allergies: patient.medicalHistory?.allergies || [],
-                medications: patient.medicalHistory?.medications || [],
-                medicalNotes: patient.medicalHistory?.notes || '',
-                insuranceProvider: patient.insurance?.provider || '',
-                policyNumber: patient.insurance?.policyNumber || '',
-                groupNumber: patient.insurance?.groupNumber || '',
-                expirationDate: patient.insurance?.expirationDate
-                    ? patient.insurance.expirationDate.substring(0, 10)
-                    : '',
-            });
+        if (patient?._id === id) {
+            reset({ ...patientToForm(patient), status: patient.status || 'active' });
         }
-    }, [patient, reset]);
+    }, [patient, id, reset]);
 
     useEffect(() => {
         if (success) {
+            clearSuccess();
             navigate(`/patients/${id}`);
         }
-    }, [success, id, navigate]);
+    }, [success, id, navigate, clearSuccess]);
 
-    const onSubmit = (data: PatientFormData) => {
+    const onSubmit = (data: PatientEditFormData) => {
         if (!id) return;
         dispatch(
             patientsActions.updatePatient({
                 id,
-                data: {
-                    firstName: data.firstName,
-                    lastName: data.lastName,
-                    patronymic: data.patronymic || undefined,
-                    dateOfBirth: data.dateOfBirth,
-                    gender: data.gender,
-                    phone: data.phone,
-                    email: data.email || undefined,
-                    address: {
-                        street: data.street || undefined,
-                        city: data.city || undefined,
-                        state: data.state || undefined,
-                        zipCode: data.zipCode || undefined,
-                        country: data.country || undefined,
-                    },
-                    emergencyContact: data.emergencyName
-                        ? {
-                              name: data.emergencyName,
-                              relationship: data.emergencyRelationship,
-                              phone: data.emergencyPhone,
-                          }
-                        : undefined,
-                    medicalHistory: {
-                        conditions: data.conditions,
-                        allergies: data.allergies,
-                        medications: data.medications,
-                        notes: data.medicalNotes || undefined,
-                    },
-                    insurance: data.insuranceProvider
-                        ? {
-                              provider: data.insuranceProvider,
-                              policyNumber: data.policyNumber,
-                              groupNumber: data.groupNumber || undefined,
-                              expirationDate: data.expirationDate || undefined,
-                          }
-                        : undefined,
-                },
+                data: { ...toPatientPayload(data), status: data.status } as any,
             }),
         );
     };
 
-    if (patientLoading || !patient) {
+    const today = new Date().toISOString().slice(0, 10);
+
+    if (patientLoading && !patient) {
         return <LoadingSpinner fullPage />;
     }
 
     return (
-        <Box>
-            <PageHeader title={`${t('common.edit')} - ${patient.firstName} ${patient.lastName}`}>
+        <Box sx={{ maxWidth: '100%', overflowX: 'hidden' }}>
+            <PageHeader
+                title={`${t('common.edit')} — ${firstName} ${lastName}`.trim()}
+                subtitle={t('common.requiredFieldsHint')}
+            >
                 <Button
                     variant="outlined"
                     startIcon={<BackIcon />}
@@ -225,7 +116,7 @@ const PatientEditPage: React.FC = () => {
                 </Button>
             </PageHeader>
 
-            <Box component="form" onSubmit={handleSubmit(onSubmit)}>
+            <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
                 {/* Personal Information */}
                 <Card sx={{ mb: 3 }}>
                     <CardHeader
@@ -237,6 +128,19 @@ const PatientEditPage: React.FC = () => {
                     />
                     <CardContent>
                         <Grid container spacing={2}>
+                            <Grid item xs={12}>
+                                <Controller
+                                    name="photo"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <PhotoUpload
+                                            value={field.value}
+                                            onChange={field.onChange}
+                                            initials={getInitials(firstName, lastName)}
+                                        />
+                                    )}
+                                />
+                            </Grid>
                             <Grid item xs={12} sm={4}>
                                 <Controller
                                     name="firstName"
@@ -245,6 +149,7 @@ const PatientEditPage: React.FC = () => {
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
+                                            required
                                             fullWidth
                                             size="small"
                                             label={t('patients.firstName')}
@@ -262,6 +167,7 @@ const PatientEditPage: React.FC = () => {
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
+                                            required
                                             fullWidth
                                             size="small"
                                             label={t('patients.lastName')}
@@ -289,14 +195,20 @@ const PatientEditPage: React.FC = () => {
                                 <Controller
                                     name="dateOfBirth"
                                     control={control}
-                                    rules={{ required: t('validation.required') }}
+                                    rules={{
+                                        required: t('validation.required'),
+                                        validate: (value) =>
+                                            !value || value <= today || t('validation.futureDate'),
+                                    }}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
+                                            required
                                             fullWidth
                                             size="small"
                                             label={t('patients.dateOfBirth')}
                                             type="date"
+                                            inputProps={{ max: today }}
                                             InputLabelProps={{ shrink: true }}
                                             error={!!errors.dateOfBirth}
                                             helperText={errors.dateOfBirth?.message}
@@ -308,15 +220,25 @@ const PatientEditPage: React.FC = () => {
                                 <Controller
                                     name="phone"
                                     control={control}
-                                    rules={{ required: t('validation.required') }}
+                                    rules={{
+                                        required: t('validation.required'),
+                                        validate: (value) =>
+                                            isArmenianPhone(value) ||
+                                            t('validation.invalidArmenianPhone'),
+                                    }}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
+                                            required
                                             fullWidth
                                             size="small"
                                             label={t('patients.phone')}
+                                            placeholder="+374 93 123456"
                                             error={!!errors.phone}
-                                            helperText={errors.phone?.message}
+                                            helperText={
+                                                errors.phone?.message ||
+                                                t('validation.invalidArmenianPhone')
+                                            }
                                         />
                                     )}
                                 />
@@ -327,7 +249,7 @@ const PatientEditPage: React.FC = () => {
                                     control={control}
                                     rules={{
                                         pattern: {
-                                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                            value: EMAIL_PATTERN,
                                             message: t('validation.invalidEmail'),
                                         },
                                     }}
@@ -344,6 +266,24 @@ const PatientEditPage: React.FC = () => {
                                     )}
                                 />
                             </Grid>
+                            <Grid item xs={12} sm={4}>
+                                <Controller
+                                    name="status"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <FormControl fullWidth size="small">
+                                            <InputLabel>{t('patients.status')}</InputLabel>
+                                            <Select {...field} label={t('patients.status')}>
+                                                {PATIENT_STATUSES.map((status) => (
+                                                    <MenuItem key={status} value={status}>
+                                                        {t(`patients.${status}`)}
+                                                    </MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    )}
+                                />
+                            </Grid>
                             <Grid item xs={12}>
                                 <Controller
                                     name="gender"
@@ -351,7 +291,7 @@ const PatientEditPage: React.FC = () => {
                                     rules={{ required: t('validation.required') }}
                                     render={({ field }) => (
                                         <FormControl error={!!errors.gender}>
-                                            <FormLabel>{t('patients.gender')}</FormLabel>
+                                            <FormLabel required>{t('patients.gender')}</FormLabel>
                                             <RadioGroup row {...field}>
                                                 <FormControlLabel
                                                     value="male"
@@ -400,44 +340,64 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label={t('patients.address')}
+                                            label={t('patients.street')}
                                         />
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Controller
                                     name="city"
                                     control={control}
                                     render={({ field }) => (
-                                        <TextField {...field} fullWidth size="small" label="City" />
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.city')}
+                                        />
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Controller
                                     name="state"
                                     control={control}
                                     render={({ field }) => (
-                                        <TextField {...field} fullWidth size="small" label="State / Province" />
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.state')}
+                                        />
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Controller
                                     name="zipCode"
                                     control={control}
                                     render={({ field }) => (
-                                        <TextField {...field} fullWidth size="small" label="Zip Code" />
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.zipCode')}
+                                        />
                                     )}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={12} sm={3}>
                                 <Controller
                                     name="country"
                                     control={control}
                                     render={({ field }) => (
-                                        <TextField {...field} fullWidth size="small" label="Country" />
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.country')}
+                                        />
                                     )}
                                 />
                             </Grid>
@@ -465,7 +425,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label={t('patients.firstName')}
+                                            label={t('patients.contactName')}
                                         />
                                     )}
                                 />
@@ -479,7 +439,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label="Relationship"
+                                            label={t('patients.relationship')}
                                         />
                                     )}
                                 />
@@ -488,12 +448,21 @@ const PatientEditPage: React.FC = () => {
                                 <Controller
                                     name="emergencyPhone"
                                     control={control}
+                                    rules={{
+                                        validate: (value) =>
+                                            !value ||
+                                            isArmenianPhone(value) ||
+                                            t('validation.invalidArmenianPhone'),
+                                    }}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             size="small"
                                             label={t('patients.phone')}
+                                            placeholder="+374 93 123456"
+                                            error={!!errors.emergencyPhone}
+                                            helperText={errors.emergencyPhone?.message}
                                         />
                                     )}
                                 />
@@ -521,8 +490,7 @@ const PatientEditPage: React.FC = () => {
                                         <ChipInput
                                             value={field.value}
                                             onChange={field.onChange}
-                                            label={t('patients.medicalHistory')}
-                                            placeholder="Conditions"
+                                            label={t('patients.conditions')}
                                         />
                                     )}
                                 />
@@ -562,7 +530,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label={t('patients.notes')}
+                                            label={t('patients.medicalNotes')}
                                             multiline
                                             rows={3}
                                         />
@@ -593,7 +561,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label="Provider"
+                                            label={t('patients.insuranceProvider')}
                                         />
                                     )}
                                 />
@@ -607,7 +575,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label="Policy Number"
+                                            label={t('patients.policyNumber')}
                                         />
                                     )}
                                 />
@@ -621,7 +589,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label="Group Number"
+                                            label={t('patients.groupNumber')}
                                         />
                                     )}
                                 />
@@ -635,7 +603,7 @@ const PatientEditPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             size="small"
-                                            label="Expiration Date"
+                                            label={t('patients.expirationDate')}
                                             type="date"
                                             InputLabelProps={{ shrink: true }}
                                         />

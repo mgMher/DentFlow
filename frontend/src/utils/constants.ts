@@ -11,6 +11,18 @@ export const APPOINTMENT_STATUS_COLORS: Record<string, string> = {
     no_show: '#A0AEC0',
 };
 
+export const PATIENT_STATUS_COLORS: Record<string, string> = {
+    active: '#38A169',
+    inactive: '#A0AEC0',
+    archived: '#805AD5',
+    deceased: '#4A5568',
+};
+
+export const TOOTH_SURFACES = [
+    'mesial', 'distal', 'occlusal', 'incisal',
+    'buccal', 'lingual', 'palatal', 'cervical',
+] as const;
+
 export const TOOTH_STATUS_COLORS: Record<string, string> = {
     healthy: '#38A169',
     filled: '#3182CE',
@@ -44,7 +56,7 @@ export const DAYS_OF_WEEK = [
 export const DEFAULT_PAGE_SIZE = 20;
 
 export const LANGUAGES = [
-    { code: 'hy', label: 'Հայerror', flag: '🇦🇲' },
+    { code: 'hy', label: 'Հայերեն', flag: '🇦🇲' },
     { code: 'ru', label: 'Русский', flag: '🇷🇺' },
     { code: 'en', label: 'English', flag: '🇺🇸' },
 ] as const;

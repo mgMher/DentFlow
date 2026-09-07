@@ -4,3 +4,5 @@ export { default as StatusChip } from './StatusChip';
 export { default as EmptyState } from './EmptyState';
 export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as StatCard } from './StatCard';
+export { default as ChipInput } from './ChipInput';
+export { default as PhotoUpload } from './PhotoUpload';

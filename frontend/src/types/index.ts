@@ -66,6 +66,16 @@ export interface WorkingHour {
 export type Currency = 'AMD' | 'USD' | 'RUB';
 
 // Patient types
+export type PatientStatus = 'active' | 'inactive' | 'archived' | 'deceased';
+
+export const PATIENT_STATUSES: PatientStatus[] = ['active', 'inactive', 'archived', 'deceased'];
+
+export interface EmergencyContact {
+    name: string;
+    relationship: string;
+    phone: string;
+}
+
 export interface Patient {
     _id: string;
     clinicId: string;
@@ -75,15 +85,25 @@ export interface Patient {
     dateOfBirth: string;
     gender: 'male' | 'female' | 'other';
     phone: string;
-    email?: string;
+    email?: string | null;
+    photo?: string | null;
     address?: Address;
-    emergencyContact?: { name: string; relationship: string; phone: string };
+    emergencyContact?: EmergencyContact;
     medicalHistory?: MedicalHistory;
     insurance?: Insurance;
     notes?: string;
+    status: PatientStatus;
     isActive: boolean;
     lastVisit?: string;
     createdAt: string;
+}
+
+export interface PatientStats {
+    totalPatients: number;
+    activePatients: number;
+    inactivePatients: number;
+    newPatientsThisMonth: number;
+    byStatus: Record<PatientStatus, number>;
 }
 
 export interface MedicalHistory {
@@ -149,12 +169,29 @@ export type ToothStatus =
     | 'healthy' | 'filled' | 'crown' | 'missing' | 'implant'
     | 'needs_treatment' | 'root_canal' | 'decayed' | 'bridge' | 'veneer';
 
+export type ToothSurface =
+    | 'mesial' | 'distal' | 'occlusal' | 'incisal'
+    | 'buccal' | 'lingual' | 'palatal' | 'cervical';
+
+export interface ToothStatusChange {
+    _id?: string;
+    previousStatus?: ToothStatus;
+    status: ToothStatus;
+    surfaces: ToothSurface[];
+    conditions: string[];
+    notes?: string;
+    changedBy?: string | UserProfile;
+    changedAt: string;
+}
+
 export interface ToothRecord {
     toothNumber: number;
     status: ToothStatus;
-    surfaces: string[];
+    surfaces: ToothSurface[];
     conditions: string[];
     notes?: string;
+    history?: ToothStatusChange[];
+    updatedAt?: string;
 }
 
 export interface DentalChart {
@@ -164,6 +201,19 @@ export interface DentalChart {
     teeth: ToothRecord[];
     chartType: 'adult' | 'pediatric';
     notes?: string;
+}
+
+export interface ToothHistory {
+    toothNumber: number;
+    current: {
+        status: ToothStatus;
+        surfaces: ToothSurface[];
+        conditions: string[];
+        notes?: string;
+        updatedAt?: string;
+    };
+    statusHistory: ToothStatusChange[];
+    treatments: TreatmentEntry[];
 }
 
 export interface TreatmentEntry {
@@ -176,7 +226,7 @@ export interface TreatmentEntry {
     dentistId: string;
     appointmentId?: string;
     date: string;
-    surfaces: string[];
+    surfaces: ToothSurface[];
     notes?: string;
     images: { url: string; description: string; uploadedAt: string }[];
     cost?: number;

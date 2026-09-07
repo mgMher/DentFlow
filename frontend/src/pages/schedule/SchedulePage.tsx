@@ -31,6 +31,7 @@ import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { scheduleActions } from '../../store/schedule';
+import { httpActions } from '../../store/http';
 import { PageHeader, EmptyState, LoadingSpinner } from '../../components/ui';
 import { formatDate } from '../../utils/formatters';
 
@@ -42,6 +43,12 @@ const SchedulePage: React.FC = () => {
     const blockedTimes = useSelector((state: RootState) => state.schedule.blockedTimes);
     const loading = useSelector((state: RootState) =>
         state.http.loading.includes('GET_ROOMS') || state.http.loading.includes('GET_BLOCKED'),
+    );
+    const roomCreateSuccess = useSelector((state: RootState) =>
+        state.http.successes.includes('CREATE_ROOM'),
+    );
+    const blockedCreateSuccess = useSelector((state: RootState) =>
+        state.http.successes.includes('CREATE_BLOCKED'),
     );
 
     const [roomDialogOpen, setRoomDialogOpen] = useState(false);
@@ -58,19 +65,33 @@ const SchedulePage: React.FC = () => {
         dispatch(scheduleActions.getBlocked());
     }, [dispatch]);
 
+    // Close room dialog on success
+    useEffect(() => {
+        if (roomCreateSuccess) {
+            setRoomDialogOpen(false);
+            setNewRoom({ name: '', description: '' });
+            dispatch(httpActions.removeSuccess('CREATE_ROOM'));
+        }
+    }, [roomCreateSuccess, dispatch]);
+
+    // Close blocked time dialog on success
+    useEffect(() => {
+        if (blockedCreateSuccess) {
+            setBlockedDialogOpen(false);
+            setNewBlocked({ startTime: '', endTime: '', reason: '' });
+            dispatch(httpActions.removeSuccess('CREATE_BLOCKED'));
+        }
+    }, [blockedCreateSuccess, dispatch]);
+
     const handleCreateRoom = () => {
         if (newRoom.name.trim()) {
             dispatch(scheduleActions.createRoom(newRoom));
-            setNewRoom({ name: '', description: '' });
-            setRoomDialogOpen(false);
         }
     };
 
     const handleCreateBlocked = () => {
         if (newBlocked.startTime && newBlocked.endTime) {
             dispatch(scheduleActions.createBlocked(newBlocked));
-            setNewBlocked({ startTime: '', endTime: '', reason: '' });
-            setBlockedDialogOpen(false);
         }
     };
 

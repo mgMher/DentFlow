@@ -33,9 +33,9 @@ import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
 import { dentalRecordsActions } from '../../store/dental-records';
 import { PageHeader, LoadingSpinner } from '../../components/ui';
-import { formatDate, getFullName } from '../../utils/formatters';
-import { TOOTH_STATUS_COLORS } from '../../utils/constants';
-import { ToothStatus, ToothRecord } from '../../types';
+import { formatDate, formatDateTime, getFullName } from '../../utils/formatters';
+import { TOOTH_STATUS_COLORS, TOOTH_SURFACES } from '../../utils/constants';
+import { ToothStatus, ToothSurface, ToothRecord } from '../../types';
 
 // ── Tooth layout constants ──────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ const ALL_TOOTH_STATUSES: ToothStatus[] = [
     'needs_treatment', 'root_canal', 'decayed', 'bridge', 'veneer',
 ];
 
-const SURFACE_OPTIONS = ['mesial', 'distal', 'occlusal', 'buccal', 'lingual'];
+const SURFACE_OPTIONS: ToothSurface[] = [...TOOTH_SURFACES];
 
 // Upper teeth: 1-16 (right to left in dentist's view), Lower teeth: 17-32
 const UPPER_TEETH = Array.from({ length: 16 }, (_, i) => i + 1);
@@ -300,7 +300,7 @@ const DentalChartPage: React.FC = () => {
 
     const patient = useSelector((state: RootState) => state.patients.current);
     const chart = useSelector((state: RootState) => state.dentalRecords.chart);
-    const history = useSelector((state: RootState) => state.dentalRecords.history);
+    const toothHistoryRecord = useSelector((state: RootState) => state.dentalRecords.toothHistory);
     const chartLoading = useSelector((state: RootState) => state.http.loading.includes('GET_CHART'));
     const updateLoading = useSelector((state: RootState) => state.http.loading.includes('UPDATE_TOOTH'));
 
@@ -309,7 +309,7 @@ const DentalChartPage: React.FC = () => {
 
     // Tooth editing state
     const [editStatus, setEditStatus] = useState<ToothStatus>('healthy');
-    const [editSurfaces, setEditSurfaces] = useState<string[]>([]);
+    const [editSurfaces, setEditSurfaces] = useState<ToothSurface[]>([]);
     const [editNotes, setEditNotes] = useState('');
 
     useEffect(() => {
@@ -330,15 +330,15 @@ const DentalChartPage: React.FC = () => {
         setEditSurfaces(toothRecord?.surfaces || []);
         setEditNotes(toothRecord?.notes || '');
 
-        // Load history for this tooth
+        // Load this tooth's timeline (status changes + treatments)
         if (patientId) {
-            dispatch(dentalRecordsActions.getHistory({ patientId, toothNumber }));
+            dispatch(dentalRecordsActions.getToothHistory({ patientId, toothNumber }));
         }
 
         setDrawerOpen(true);
     };
 
-    const handleSurfaceToggle = (surface: string) => {
+    const handleSurfaceToggle = (surface: ToothSurface) => {
         setEditSurfaces((prev) =>
             prev.includes(surface)
                 ? prev.filter((s) => s !== surface)
@@ -365,6 +365,7 @@ const DentalChartPage: React.FC = () => {
     const handleCloseDrawer = () => {
         setDrawerOpen(false);
         setSelectedTooth(null);
+        dispatch(dentalRecordsActions.clearToothHistory());
     };
 
     const patientName = patient
@@ -375,17 +376,22 @@ const DentalChartPage: React.FC = () => {
         return <LoadingSpinner fullPage />;
     }
 
-    // Filter history for the selected tooth
-    const toothHistory = selectedTooth
-        ? history.filter((entry) => entry.toothNumber === selectedTooth)
-        : [];
+    const activeToothHistory =
+        toothHistoryRecord && toothHistoryRecord.toothNumber === selectedTooth
+            ? toothHistoryRecord
+            : null;
+    const toothHistory = activeToothHistory?.treatments || [];
+    const statusHistory = activeToothHistory?.statusHistory || [];
 
     const surfaceTranslationMap: Record<string, string> = {
         mesial: 'dental.mesial',
         distal: 'dental.distal',
         occlusal: 'dental.occlusal',
+        incisal: 'dental.incisal',
         buccal: 'dental.buccal',
         lingual: 'dental.lingual',
+        palatal: 'dental.palatal',
+        cervical: 'dental.cervical',
     };
 
     const statusTranslationMap: Record<string, string> = {
@@ -535,6 +541,76 @@ const DentalChartPage: React.FC = () => {
                     {updateLoading ? t('common.loading') : t('common.save')}
                 </Button>
 
+                {/* Status History */}
+                <Divider sx={{ my: 3 }} />
+                <Typography variant="subtitle2" fontWeight={600} gutterBottom>
+                    {t('dental.statusHistory')}
+                </Typography>
+
+                {statusHistory.length === 0 ? (
+                    <Typography variant="body2" color="text.secondary">
+                        {t('dental.noHistory')}
+                    </Typography>
+                ) : (
+                    <List dense disablePadding>
+                        {statusHistory.map((change, index) => (
+                            <ListItem
+                                key={change._id || `${change.changedAt}-${index}`}
+                                sx={{ px: 0, borderBottom: '1px solid', borderColor: 'divider' }}
+                            >
+                                <ListItemText
+                                    disableTypography
+                                    primary={
+                                        <Box
+                                            sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                justifyContent: 'space-between',
+                                                gap: 1,
+                                            }}
+                                        >
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                {change.previousStatus &&
+                                                    change.previousStatus !== change.status && (
+                                                        <>
+                                                            <Typography
+                                                                variant="caption"
+                                                                color="text.secondary"
+                                                                sx={{ textDecoration: 'line-through' }}
+                                                            >
+                                                                {t(statusTranslationMap[change.previousStatus])}
+                                                            </Typography>
+                                                            <Typography variant="caption" color="text.secondary">
+                                                                →
+                                                            </Typography>
+                                                        </>
+                                                    )}
+                                                <Typography variant="body2" fontWeight={600}>
+                                                    {t(statusTranslationMap[change.status])}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="caption" color="text.secondary" noWrap>
+                                                {formatDateTime(change.changedAt)}
+                                            </Typography>
+                                        </Box>
+                                    }
+                                    secondary={
+                                        change.notes ? (
+                                            <Typography
+                                                variant="caption"
+                                                color="text.secondary"
+                                                sx={{ mt: 0.5, display: 'block', overflowWrap: 'anywhere' }}
+                                            >
+                                                {change.notes}
+                                            </Typography>
+                                        ) : null
+                                    }
+                                />
+                            </ListItem>
+                        ))}
+                    </List>
+                )}
+
                 {/* Treatment History */}
                 <Divider sx={{ my: 3 }} />
                 <Typography variant="subtitle2" fontWeight={600} gutterBottom>
@@ -557,6 +633,7 @@ const DentalChartPage: React.FC = () => {
                                 }}
                             >
                                 <ListItemText
+                                    disableTypography
                                     primary={
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                             <Typography variant="body2" fontWeight={600}>
@@ -569,10 +646,15 @@ const DentalChartPage: React.FC = () => {
                                     }
                                     secondary={
                                         <Box>
-                                            {entry.surfaces.length > 0 && (
-                                                <Box sx={{ display: 'flex', gap: 0.5, mt: 0.5 }}>
-                                                    {entry.surfaces.map((s) => (
-                                                        <Chip key={s} label={s} size="small" variant="outlined" />
+                                            {!!entry.surfaces?.length && (
+                                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
+                                                    {entry.surfaces.map((surface) => (
+                                                        <Chip
+                                                            key={surface}
+                                                            label={t(surfaceTranslationMap[surface] || surface)}
+                                                            size="small"
+                                                            variant="outlined"
+                                                        />
                                                     ))}
                                                 </Box>
                                             )}

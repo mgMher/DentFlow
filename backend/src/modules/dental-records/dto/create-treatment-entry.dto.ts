@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsArray, IsEnum, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
 import { Currency } from '../treatment-entry.schema';
+import { ToothSurface } from '../dental-record.schema';
 
 export class CreateTreatmentEntryDto {
     @ApiProperty({
@@ -27,13 +28,14 @@ export class CreateTreatmentEntryDto {
     appointmentId?: string;
 
     @ApiPropertyOptional({
-        example: ['mesial', 'occlusal'],
-        description: 'Treated surfaces: mesial, distal, occlusal, buccal, lingual',
+        enum: ToothSurface,
+        isArray: true,
+        example: [ToothSurface.MESIAL, ToothSurface.OCCLUSAL],
     })
     @IsOptional()
     @IsArray()
-    @IsString({ each: true })
-    surfaces?: string[];
+    @IsEnum(ToothSurface, { each: true })
+    surfaces?: ToothSurface[];
 
     @ApiPropertyOptional({ example: 'Patient tolerated procedure well' })
     @IsOptional()

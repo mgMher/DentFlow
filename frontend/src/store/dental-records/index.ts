@@ -1,7 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
-import { DentalChart, TreatmentEntry } from '../../types';
+import { DentalChart, ToothHistory, TreatmentEntry } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
 
@@ -14,6 +14,8 @@ const GET_HISTORY = 'GET_HISTORY';
 const GET_HISTORY_SUCCESS = 'GET_HISTORY_SUCCESS';
 const GET_SUMMARY = 'GET_SUMMARY';
 const GET_SUMMARY_SUCCESS = 'GET_SUMMARY_SUCCESS';
+const GET_TOOTH_HISTORY = 'GET_TOOTH_HISTORY';
+const GET_TOOTH_HISTORY_SUCCESS = 'GET_TOOTH_HISTORY_SUCCESS';
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
@@ -33,6 +35,15 @@ export const dentalRecordsActions = {
     getHistorySuccess: (payload: TreatmentEntry[]) => ({ type: GET_HISTORY_SUCCESS, payload }),
     getSummary: (payload: string) => ({ type: GET_SUMMARY, payload }),
     getSummarySuccess: (payload: any) => ({ type: GET_SUMMARY_SUCCESS, payload }),
+    getToothHistory: (payload: { patientId: string; toothNumber: number }) => ({
+        type: GET_TOOTH_HISTORY,
+        payload,
+    }),
+    getToothHistorySuccess: (payload: ToothHistory) => ({
+        type: GET_TOOTH_HISTORY_SUCCESS,
+        payload,
+    }),
+    clearToothHistory: () => ({ type: GET_TOOTH_HISTORY_SUCCESS, payload: null }),
 };
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -44,9 +55,13 @@ const service = {
     updateTeeth: (patientId: string, teeth: any[]) =>
         api.patch(`/dental-records/${patientId}/teeth`, { teeth }),
     addEntry: (patientId: string, data: Partial<TreatmentEntry>) =>
-        api.post(`/dental-records/${patientId}/entries`, data),
+        api.post(`/dental-records/${patientId}/treatment-entry`, data),
     getHistory: (patientId: string, toothNumber?: number) =>
-        api.get(`/dental-records/${patientId}/history`, { params: toothNumber ? { toothNumber } : {} }),
+        api.get(`/dental-records/${patientId}/treatment-history`, {
+            params: toothNumber !== undefined ? { toothNumber } : {},
+        }),
+    getToothHistory: (patientId: string, toothNumber: number) =>
+        api.get(`/dental-records/${patientId}/tooth/${toothNumber}/history`),
     getSummary: (patientId: string) => api.get(`/dental-records/${patientId}/summary`),
 };
 
@@ -73,6 +88,15 @@ function* updateToothSaga(action: any) {
         yield put({ type: GET_CHART_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
+        if (action.payload.data?.toothNumber !== undefined) {
+            yield put({
+                type: GET_TOOTH_HISTORY,
+                payload: {
+                    patientId: action.payload.patientId,
+                    toothNumber: action.payload.data.toothNumber,
+                },
+            });
+        }
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update tooth'));
@@ -117,11 +141,34 @@ function* getHistorySaga(action: any) {
             action.payload.patientId,
             action.payload.toothNumber,
         );
-        yield put({ type: GET_HISTORY_SUCCESS, payload: res.data?.data || res.data });
+        const payload = res.data?.data || res.data;
+        yield put({
+            type: GET_HISTORY_SUCCESS,
+            payload: Array.isArray(payload) ? payload : payload?.data || [],
+        });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load history'));
+    }
+}
+
+function* getToothHistorySaga(action: any) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        const res: any = yield call(
+            service.getToothHistory,
+            action.payload.patientId,
+            action.payload.toothNumber,
+        );
+        yield put({ type: GET_TOOTH_HISTORY_SUCCESS, payload: res.data?.data || res.data });
+        yield put(httpActions.removeLoading(action.type));
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(
+            httpActions.appendError(action.type, err?.data?.message || 'Failed to load tooth history'),
+        );
     }
 }
 
@@ -144,6 +191,7 @@ export function* watchDentalRecords() {
     yield takeLatest(UPDATE_TEETH, updateTeethSaga);
     yield takeLatest(ADD_ENTRY, addEntrySaga);
     yield takeLatest(GET_HISTORY, getHistorySaga);
+    yield takeLatest(GET_TOOTH_HISTORY, getToothHistorySaga);
     yield takeLatest(GET_SUMMARY, getSummarySaga);
 }
 
@@ -152,12 +200,14 @@ export function* watchDentalRecords() {
 interface DentalRecordsState {
     chart: DentalChart | null;
     history: TreatmentEntry[];
+    toothHistory: ToothHistory | null;
     summary: any;
 }
 
 const initialState: DentalRecordsState = {
     chart: null,
     history: [],
+    toothHistory: null,
     summary: null,
 };
 
@@ -166,7 +216,9 @@ export const dentalRecordsReducer = (state = initialState, action: any): DentalR
         case GET_CHART_SUCCESS:
             return { ...state, chart: action.payload };
         case GET_HISTORY_SUCCESS:
-            return { ...state, history: action.payload };
+            return { ...state, history: action.payload || [] };
+        case GET_TOOTH_HISTORY_SUCCESS:
+            return { ...state, toothHistory: action.payload };
         case GET_SUMMARY_SUCCESS:
             return { ...state, summary: action.payload };
         default:

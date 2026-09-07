@@ -1,7 +1,15 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { Gender } from '../patient.schema';
+import { Transform, Type } from 'class-transformer';
+import { IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Gender, PatientStatus } from '../patient.schema';
+
+export const PATIENT_SORT_FIELDS = [
+    'lastName',
+    'firstName',
+    'createdAt',
+    'lastVisit',
+    'dateOfBirth',
+] as const;
 
 export class QueryPatientDto {
     @ApiPropertyOptional({ description: 'Page number', default: 1, minimum: 1 })
@@ -19,7 +27,9 @@ export class QueryPatientDto {
     @Max(100)
     limit?: number = 20;
 
-    @ApiPropertyOptional({ description: 'Search by first name, last name, or phone' })
+    @ApiPropertyOptional({
+        description: 'Search by name, patronymic, phone or email',
+    })
     @IsOptional()
     @IsString()
     search?: string;
@@ -29,9 +39,28 @@ export class QueryPatientDto {
     @IsEnum(Gender)
     gender?: Gender;
 
-    @ApiPropertyOptional({ description: 'Filter by active status', default: true })
+    @ApiPropertyOptional({ enum: PatientStatus, description: 'Filter by patient status' })
     @IsOptional()
-    @Type(() => Boolean)
+    @IsEnum(PatientStatus)
+    status?: PatientStatus;
+
+    @ApiPropertyOptional({ description: 'Legacy filter by active status' })
+    @IsOptional()
+    @Transform(({ value }) => {
+        if (value === true || value === 'true') return true;
+        if (value === false || value === 'false') return false;
+        return undefined;
+    })
     @IsBoolean()
     isActive?: boolean;
+
+    @ApiPropertyOptional({ enum: PATIENT_SORT_FIELDS, default: 'lastName' })
+    @IsOptional()
+    @IsIn(PATIENT_SORT_FIELDS as unknown as string[])
+    sortBy?: string = 'lastName';
+
+    @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'asc' })
+    @IsOptional()
+    @IsIn(['asc', 'desc'])
+    sortOrder?: 'asc' | 'desc' = 'asc';
 }

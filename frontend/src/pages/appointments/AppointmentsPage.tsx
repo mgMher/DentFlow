@@ -43,6 +43,8 @@ import { appointmentsActions } from '../../store/appointments';
 import { staffActions } from '../../store/staff';
 import { patientsActions } from '../../store/patients';
 import { treatmentsActions } from '../../store/treatments';
+import { scheduleActions } from '../../store/schedule';
+import { httpActions } from '../../store/http';
 import { PageHeader, StatusChip, EmptyState, LoadingSpinner } from '../../components/ui';
 import { formatDate, formatTime } from '../../utils/formatters';
 import { APPOINTMENT_STATUS_COLORS } from '../../utils/constants';
@@ -67,6 +69,7 @@ const getDentistName = (dentist: string | UserProfile | null): string => {
 interface NewAppointmentForm {
     patientId: string;
     dentistId: string;
+    treatmentRoomId: string;
     date: string;
     startTime: string;
     endTime: string;
@@ -114,9 +117,12 @@ const AppointmentsPage: React.FC = () => {
     const { dentists } = useSelector((state: RootState) => state.staff);
     const { list: patients } = useSelector((state: RootState) => state.patients);
     const { list: treatments } = useSelector((state: RootState) => state.treatments);
-    const { loading } = useSelector((state: RootState) => state.http);
+    const { rooms } = useSelector((state: RootState) => state.schedule);
+    const { loading, successes } = useSelector((state: RootState) => state.http);
 
     const isLoading = loading.includes('GET_APPOINTMENTS') || loading.includes('GET_CALENDAR');
+    const isCreating = loading.includes('CREATE_APPOINTMENT');
+    const createSuccess = successes.includes('CREATE_APPOINTMENT');
 
     // ── Local state ─────────────────────────────────────────────────────────
 
@@ -139,6 +145,7 @@ const AppointmentsPage: React.FC = () => {
         defaultValues: {
             patientId: '',
             dentistId: '',
+            treatmentRoomId: '',
             date: new Date().toISOString().slice(0, 10),
             startTime: '09:00',
             endTime: '10:00',
@@ -171,6 +178,7 @@ const AppointmentsPage: React.FC = () => {
         dispatch(staffActions.getDentists());
         dispatch(patientsActions.getPatients());
         dispatch(treatmentsActions.getTreatments());
+        dispatch(scheduleActions.getRooms());
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     useEffect(() => {
@@ -181,6 +189,15 @@ const AppointmentsPage: React.FC = () => {
             endDate: new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString(),
         }));
     }, [calendarDate]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Close dialog on success
+    useEffect(() => {
+        if (createSuccess) {
+            setDialogOpen(false);
+            reset();
+            dispatch(httpActions.removeSuccess('CREATE_APPOINTMENT'));
+        }
+    }, [createSuccess, reset, dispatch]);
 
     // ── Filtered list ───────────────────────────────────────────────────────
 
@@ -255,6 +272,7 @@ const AppointmentsPage: React.FC = () => {
         dispatch(appointmentsActions.createAppointment({
             patientId: data.patientId,
             dentistId: data.dentistId,
+            treatmentRoomId: data.treatmentRoomId || undefined,
             startTime,
             endTime,
             duration: calculatedDuration,
@@ -263,7 +281,6 @@ const AppointmentsPage: React.FC = () => {
             status: 'scheduled',
             title: data.treatmentType || 'Appointment',
         }));
-        handleCloseDialog();
     };
 
     // ── Calendar grid render ────────────────────────────────────────────────
@@ -683,6 +700,29 @@ const AppointmentsPage: React.FC = () => {
                                 />
                             </Grid>
 
+                            {/* Treatment Room selector */}
+                            <Grid item xs={12}>
+                                <Controller
+                                    name="treatmentRoomId"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            fullWidth
+                                            label={t('schedule.treatmentRoom')}
+                                        >
+                                            <MenuItem value="">-</MenuItem>
+                                            {rooms.filter((r) => r.isActive).map((room) => (
+                                                <MenuItem key={room._id} value={room._id}>
+                                                    {room.name}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                            </Grid>
+
                             {/* Date */}
                             <Grid item xs={12} sm={4}>
                                 <Controller
@@ -808,8 +848,8 @@ const AppointmentsPage: React.FC = () => {
                         <Button onClick={handleCloseDialog} color="inherit">
                             {t('common.cancel')}
                         </Button>
-                        <Button type="submit" variant="contained">
-                            {t('common.save')}
+                        <Button type="submit" variant="contained" disabled={isCreating}>
+                            {isCreating ? t('common.loading') : t('common.save')}
                         </Button>
                     </DialogActions>
                 </form>

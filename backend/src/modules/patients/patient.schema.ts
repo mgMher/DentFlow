@@ -77,6 +77,16 @@ export enum Gender {
     OTHER = 'other',
 }
 
+export enum PatientStatus {
+    ACTIVE = 'active',
+    INACTIVE = 'inactive',
+    ARCHIVED = 'archived',
+    DECEASED = 'deceased',
+}
+
+/** Statuses that still count the patient as an active client of the clinic. */
+export const ACTIVE_PATIENT_STATUSES: PatientStatus[] = [PatientStatus.ACTIVE];
+
 @Schema({ timestamps: true })
 export class Patient {
     @Prop({
@@ -108,6 +118,10 @@ export class Patient {
     @Prop({ trim: true, lowercase: true })
     email: string;
 
+    /** Patient photo, stored as a resized `data:image/...;base64,` URL. */
+    @Prop({ trim: true })
+    photo: string;
+
     @Prop({ type: AddressSchema })
     address: Address;
 
@@ -123,6 +137,15 @@ export class Patient {
     @Prop({ trim: true })
     notes: string;
 
+    @Prop({
+        required: true,
+        enum: PatientStatus,
+        default: PatientStatus.ACTIVE,
+        index: true,
+    })
+    status: PatientStatus;
+
+    /** Kept in sync with `status` so legacy queries on `isActive` keep working. */
     @Prop({ default: true })
     isActive: boolean;
 
@@ -133,3 +156,16 @@ export class Patient {
 export const PatientSchema = SchemaFactory.createForClass(Patient);
 
 PatientSchema.index({ clinicId: 1, lastName: 1, firstName: 1 });
+
+// One patient per email *inside a clinic* — the clinic is the tenant boundary,
+// so two clinics may each have a patient with the same address.
+// The partial filter keeps patients with no email (and legacy empty strings)
+// out of the index, so they are never duplicates of each other.
+PatientSchema.index(
+    { clinicId: 1, email: 1 },
+    {
+        unique: true,
+        name: 'clinicId_1_email_1_unique',
+        partialFilterExpression: { email: { $type: 'string', $gt: '' } },
+    },
+);

@@ -28,10 +28,12 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { billingActions } from '../../store/billing';
 import { patientsActions } from '../../store/patients';
+import { appointmentsActions } from '../../store/appointments';
+import { httpActions } from '../../store/http';
 import { PageHeader } from '../../components/ui';
-import { formatCurrency } from '../../utils/formatters';
+import { formatCurrency, formatDate, formatTime } from '../../utils/formatters';
 import { CURRENCY_SYMBOLS } from '../../utils/constants';
-import { Currency, InvoiceItem } from '../../types';
+import { Currency, Appointment, Patient } from '../../types';
 
 interface LineItem {
     description: string;
@@ -55,10 +57,12 @@ const InvoiceCreatePage: React.FC = () => {
     const dispatch = useDispatch();
 
     const { list: patients } = useSelector((state: RootState) => state.patients);
+    const { list: allAppointments } = useSelector((state: RootState) => state.appointments);
     const loading = useSelector((state: RootState) => state.http.loading.includes('CREATE_INVOICE'));
     const success = useSelector((state: RootState) => state.http.successes.includes('CREATE_INVOICE'));
 
     const [selectedPatient, setSelectedPatient] = useState<string | null>(null);
+    const [selectedAppointment, setSelectedAppointment] = useState<string | null>(null);
     const [currency, setCurrency] = useState<Currency>('AMD');
     const [dueDate, setDueDate] = useState('');
     const [notes, setNotes] = useState('');
@@ -66,13 +70,29 @@ const InvoiceCreatePage: React.FC = () => {
 
     useEffect(() => {
         dispatch(patientsActions.getPatients({ limit: 1000 }));
+        dispatch(appointmentsActions.getAppointments({ limit: 1000 }));
     }, [dispatch]);
 
     useEffect(() => {
         if (success) {
+            dispatch(httpActions.removeSuccess('CREATE_INVOICE'));
             navigate('/billing');
         }
-    }, [success, navigate]);
+    }, [success, navigate, dispatch]);
+
+    // Filter appointments by selected patient
+    const patientAppointments = useMemo(() => {
+        if (!selectedPatient) return [];
+        return allAppointments.filter((appt) => {
+            const patientId = typeof appt.patientId === 'string' ? appt.patientId : (appt.patientId as Patient)?._id;
+            return patientId === selectedPatient;
+        });
+    }, [allAppointments, selectedPatient]);
+
+    const appointmentOptions = patientAppointments.map((appt) => ({
+        label: `${formatDate(appt.startTime, 'dd.MM.yyyy')} ${formatTime(appt.startTime)} - ${appt.title || appt.treatmentType || 'Appointment'}`,
+        value: appt._id,
+    }));
 
     const handleAddLineItem = () => {
         setLineItems([...lineItems, { ...EMPTY_LINE_ITEM }]);
@@ -94,12 +114,14 @@ const InvoiceCreatePage: React.FC = () => {
     };
 
     const getLineTotal = (item: LineItem): number => {
-        return item.quantity * item.unitPrice - item.discount;
+        return item.quantity * item.unitPrice * (1 - item.discount / 100);
     };
 
     const calculations = useMemo(() => {
         const subtotal = lineItems.reduce((sum, item) => sum + item.quantity * item.unitPrice, 0);
-        const discountTotal = lineItems.reduce((sum, item) => sum + item.discount, 0);
+        const discountTotal = lineItems.reduce(
+            (sum, item) => sum + item.quantity * item.unitPrice * (item.discount / 100), 0,
+        );
         const total = subtotal - discountTotal;
         return { subtotal, discountTotal, total };
     }, [lineItems]);
@@ -107,25 +129,19 @@ const InvoiceCreatePage: React.FC = () => {
     const handleSubmit = () => {
         if (!selectedPatient || lineItems.length === 0) return;
 
-        const items: InvoiceItem[] = lineItems.map((item) => ({
+        const items = lineItems.map((item) => ({
             description: item.description,
             quantity: item.quantity,
             unitPrice: item.unitPrice,
             discount: item.discount,
-            total: getLineTotal(item),
         }));
 
         dispatch(
             billingActions.createInvoice({
                 patientId: selectedPatient,
-                items,
-                subtotal: calculations.subtotal,
-                discountTotal: calculations.discountTotal,
-                taxAmount: 0,
-                totalAmount: calculations.total,
-                paidAmount: 0,
+                appointmentId: selectedAppointment || undefined,
+                items: items as any,
                 currency,
-                status: 'pending',
                 dueDate: dueDate || undefined,
                 notes: notes || undefined,
             }),
@@ -159,6 +175,7 @@ const InvoiceCreatePage: React.FC = () => {
                             getOptionLabel={(option) => option.label}
                             onChange={(_event, newValue) => {
                                 setSelectedPatient(newValue?.value || null);
+                                setSelectedAppointment(null);
                             }}
                             renderInput={(params) => (
                                 <TextField
@@ -166,6 +183,25 @@ const InvoiceCreatePage: React.FC = () => {
                                     label={t('billing.patient')}
                                     required
                                     fullWidth
+                                />
+                            )}
+                        />
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                        <Autocomplete
+                            options={appointmentOptions}
+                            getOptionLabel={(option) => option.label}
+                            value={appointmentOptions.find((o) => o.value === selectedAppointment) || null}
+                            onChange={(_event, newValue) => {
+                                setSelectedAppointment(newValue?.value || null);
+                            }}
+                            disabled={!selectedPatient}
+                            renderInput={(params) => (
+                                <TextField
+                                    {...params}
+                                    label={t('billing.appointment')}
+                                    fullWidth
+                                    placeholder={selectedPatient ? '' : t('billing.selectPatientFirst')}
                                 />
                             )}
                         />
@@ -218,7 +254,7 @@ const InvoiceCreatePage: React.FC = () => {
                                     {t('treatments.price')}
                                 </TableCell>
                                 <TableCell align="right" sx={{ width: '15%' }}>
-                                    {t('billing.discount')}
+                                    {t('billing.discount')} (%)
                                 </TableCell>
                                 <TableCell align="right" sx={{ width: '12%' }}>
                                     {t('billing.totalAmount')}
@@ -273,7 +309,8 @@ const InvoiceCreatePage: React.FC = () => {
                                             onChange={(e) =>
                                                 handleLineItemChange(index, 'discount', e.target.value)
                                             }
-                                            inputProps={{ min: 0, step: 0.01 }}
+                                            inputProps={{ min: 0, max: 100, step: 1 }}
+                                            placeholder="%"
                                         />
                                     </TableCell>
                                     <TableCell align="right">

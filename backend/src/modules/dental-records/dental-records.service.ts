@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { DentalRecord, DentalRecordDocument, ToothStatus } from './dental-record.schema';
+import {
+    DentalRecord,
+    DentalRecordDocument,
+    ToothRecord,
+    ToothStatus,
+} from './dental-record.schema';
 import { TreatmentEntry, TreatmentEntryDocument } from './treatment-entry.schema';
 import { UpdateToothDto, CreateTreatmentEntryDto, QueryRecordsDto } from './dto';
 
@@ -71,28 +76,7 @@ export class DentalRecordsService {
     ): Promise<DentalRecordDocument> {
         const chart = await this.getOrCreateChart(clinicId, patientId);
 
-        const toothIndex = chart.teeth.findIndex(
-            (t) => t.toothNumber === dto.toothNumber,
-        );
-
-        if (toothIndex === -1) {
-            throw new NotFoundException(
-                `Tooth number ${dto.toothNumber} not found in chart`,
-            );
-        }
-
-        if (dto.status !== undefined) {
-            chart.teeth[toothIndex].status = dto.status;
-        }
-        if (dto.surfaces !== undefined) {
-            chart.teeth[toothIndex].surfaces = dto.surfaces;
-        }
-        if (dto.conditions !== undefined) {
-            chart.teeth[toothIndex].conditions = dto.conditions;
-        }
-        if (dto.notes !== undefined) {
-            chart.teeth[toothIndex].notes = dto.notes;
-        }
+        this.applyToothUpdate(chart, dto, userId);
 
         chart.lastUpdatedBy = userId;
 
@@ -109,36 +93,116 @@ export class DentalRecordsService {
         teeth: UpdateToothDto[],
         userId: Types.ObjectId,
     ): Promise<DentalRecordDocument> {
+        if (!teeth?.length) {
+            throw new BadRequestException('At least one tooth must be provided');
+        }
+
         const chart = await this.getOrCreateChart(clinicId, patientId);
 
-        for (const dto of teeth) {
-            const toothIndex = chart.teeth.findIndex(
-                (t) => t.toothNumber === dto.toothNumber,
-            );
-
-            if (toothIndex === -1) {
-                throw new NotFoundException(
-                    `Tooth number ${dto.toothNumber} not found in chart`,
-                );
-            }
-
-            if (dto.status !== undefined) {
-                chart.teeth[toothIndex].status = dto.status;
-            }
-            if (dto.surfaces !== undefined) {
-                chart.teeth[toothIndex].surfaces = dto.surfaces;
-            }
-            if (dto.conditions !== undefined) {
-                chart.teeth[toothIndex].conditions = dto.conditions;
-            }
-            if (dto.notes !== undefined) {
-                chart.teeth[toothIndex].notes = dto.notes;
-            }
-        }
+        teeth.forEach((dto) => this.applyToothUpdate(chart, dto, userId));
 
         chart.lastUpdatedBy = userId;
 
         return chart.save();
+    }
+
+    /**
+     * Apply one tooth update in place and append a history entry whenever the
+     * status, surfaces, conditions or notes actually change, so the previous
+     * state stays visible in the tooth's timeline.
+     */
+    private applyToothUpdate(
+        chart: DentalRecordDocument,
+        dto: UpdateToothDto,
+        userId: Types.ObjectId,
+    ): void {
+        const tooth = chart.teeth.find((t) => t.toothNumber === dto.toothNumber);
+
+        if (!tooth) {
+            throw new NotFoundException(
+                `Tooth number ${dto.toothNumber} not found in chart`,
+            );
+        }
+
+        const previousStatus = tooth.status;
+        const nextStatus = dto.status ?? tooth.status;
+        const nextSurfaces = dto.surfaces ?? tooth.surfaces ?? [];
+        const nextConditions = dto.conditions ?? tooth.conditions ?? [];
+        const nextNotes = dto.notes ?? tooth.notes ?? '';
+
+        const changed =
+            nextStatus !== previousStatus ||
+            nextNotes !== (tooth.notes ?? '') ||
+            !this.sameMembers(nextSurfaces, tooth.surfaces ?? []) ||
+            !this.sameMembers(nextConditions, tooth.conditions ?? []);
+
+        if (!changed) {
+            return;
+        }
+
+        tooth.status = nextStatus;
+        tooth.surfaces = nextSurfaces;
+        tooth.conditions = nextConditions;
+        tooth.notes = nextNotes;
+        tooth.updatedAt = new Date();
+
+        tooth.history = [
+            ...(tooth.history || []),
+            {
+                previousStatus,
+                status: nextStatus,
+                surfaces: [...nextSurfaces],
+                conditions: [...nextConditions],
+                notes: nextNotes,
+                changedBy: userId,
+                changedAt: new Date(),
+            } as ToothRecord['history'][number],
+        ];
+
+        chart.markModified('teeth');
+    }
+
+    private sameMembers(a: string[], b: string[]): boolean {
+        return a.length === b.length && a.every((value) => b.includes(value));
+    }
+
+    /**
+     * The full timeline of a single tooth: status changes from the chart plus
+     * the treatment entries recorded against that tooth.
+     */
+    async getToothHistory(
+        clinicId: Types.ObjectId,
+        patientId: Types.ObjectId,
+        toothNumber: number,
+    ) {
+        const chart = await this.getOrCreateChart(clinicId, patientId);
+        const tooth = chart.teeth.find((t) => t.toothNumber === toothNumber);
+
+        if (!tooth) {
+            throw new NotFoundException(`Tooth number ${toothNumber} not found in chart`);
+        }
+
+        const treatments = await this.treatmentEntryModel
+            .find({ clinicId, patientId, toothNumber })
+            .sort({ date: -1 })
+            .populate('dentistId', 'firstName lastName')
+            .populate('treatmentId', 'name')
+            .lean();
+
+        return {
+            toothNumber,
+            current: {
+                status: tooth.status,
+                surfaces: tooth.surfaces,
+                conditions: tooth.conditions,
+                notes: tooth.notes,
+                updatedAt: tooth.updatedAt,
+            },
+            statusHistory: [...(tooth.history || [])].sort(
+                (a, b) => new Date(b.changedAt).getTime() - new Date(a.changedAt).getTime(),
+            ),
+            treatments,
+        };
     }
 
     /**
@@ -151,6 +215,14 @@ export class DentalRecordsService {
         dentistId: Types.ObjectId,
         dto: CreateTreatmentEntryDto,
     ): Promise<TreatmentEntryDocument> {
+        const chart = await this.getOrCreateChart(clinicId, patientId);
+
+        if (!chart.teeth.some((t) => t.toothNumber === dto.toothNumber)) {
+            throw new NotFoundException(
+                `Tooth number ${dto.toothNumber} not found in chart`,
+            );
+        }
+
         const entry = await this.treatmentEntryModel.create({
             clinicId,
             patientId,
@@ -184,7 +256,7 @@ export class DentalRecordsService {
     ) {
         const filter: any = { clinicId, patientId };
 
-        if (query.toothNumber) {
+        if (query.toothNumber !== undefined) {
             filter.toothNumber = query.toothNumber;
         }
 
@@ -289,6 +361,7 @@ export class DentalRecordsService {
                 surfaces: [],
                 conditions: [],
                 notes: '',
+                history: [],
             }));
         }
 
@@ -298,6 +371,7 @@ export class DentalRecordsService {
             surfaces: [],
             conditions: [],
             notes: '',
+            history: [],
         }));
     }
 }

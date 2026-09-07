@@ -3,6 +3,7 @@ import {
     Controller,
     Get,
     Param,
+    ParseIntPipe,
     Patch,
     Post,
     Query,
@@ -12,7 +13,12 @@ import { Types } from 'mongoose';
 import { CurrentUser } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { DentalRecordsService } from './dental-records.service';
-import { UpdateToothDto, CreateTreatmentEntryDto, QueryRecordsDto } from './dto';
+import {
+    UpdateToothDto,
+    UpdateTeethDto,
+    CreateTreatmentEntryDto,
+    QueryRecordsDto,
+} from './dto';
 
 @ApiTags('Dental Records')
 @ApiBearerAuth()
@@ -59,15 +65,33 @@ export class DentalRecordsController {
     @ApiResponse({ status: 404, description: 'One or more tooth numbers not found in chart' })
     async updateMultipleTeeth(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
-        @Body() teeth: UpdateToothDto[],
+        @Body() dto: UpdateTeethDto,
         @CurrentUser('clinicId') clinicId: string,
         @CurrentUser('userId') userId: string,
     ) {
         return this.dentalRecordsService.updateMultipleTeeth(
             new Types.ObjectId(clinicId),
             patientId,
-            teeth,
+            dto.teeth,
             new Types.ObjectId(userId),
+        );
+    }
+
+    @Get(':patientId/tooth/:toothNumber/history')
+    @ApiOperation({
+        summary: 'Get the full timeline of one tooth (status changes + treatments)',
+    })
+    @ApiResponse({ status: 200, description: 'Tooth history returned' })
+    @ApiResponse({ status: 404, description: 'Tooth number not found in chart' })
+    async getToothHistory(
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
+        @Param('toothNumber', ParseIntPipe) toothNumber: number,
+        @CurrentUser('clinicId') clinicId: string,
+    ) {
+        return this.dentalRecordsService.getToothHistory(
+            new Types.ObjectId(clinicId),
+            patientId,
+            toothNumber,
         );
     }
 

@@ -1,64 +1,137 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    OnModuleInit,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, Types } from 'mongoose';
-import { Patient, PatientDocument } from './patient.schema';
-import { CreatePatientDto, QueryPatientDto, UpdatePatientDto } from './dto';
-import { MedicalHistoryDto } from './dto/create-patient.dto';
+import { FilterQuery, Model, Types, UpdateQuery } from 'mongoose';
+import { Patient, PatientDocument, PatientStatus } from './patient.schema';
+import {
+    CreatePatientDto,
+    MedicalHistoryDto,
+    QueryPatientDto,
+    UpdatePatientDto,
+} from './dto';
+
+/** Escapes a user-supplied search term so it can be used inside a RegExp. */
+const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+export interface PaginatedPatients {
+    data: PatientDocument[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+}
 
 @Injectable()
-export class PatientsService {
+export class PatientsService implements OnModuleInit {
+    private readonly logger = new Logger(PatientsService.name);
+
     constructor(
         @InjectModel(Patient.name)
         private readonly patientModel: Model<PatientDocument>,
     ) {}
 
-    async create(clinicId: Types.ObjectId, dto: CreatePatientDto): Promise<PatientDocument> {
-        const patient = new this.patientModel({
-            ...dto,
-            clinicId,
-        });
-        return patient.save();
+    /**
+     * Backfill `status` for patients created before the field existed, so that
+     * filtering and reporting by status covers every document. Idempotent.
+     */
+    async onModuleInit(): Promise<void> {
+        try {
+            const [activated, deactivated] = await Promise.all([
+                this.patientModel
+                    .updateMany(
+                        { status: { $exists: false }, isActive: { $ne: false } },
+                        { $set: { status: PatientStatus.ACTIVE } },
+                    )
+                    .exec(),
+                this.patientModel
+                    .updateMany(
+                        { status: { $exists: false }, isActive: false },
+                        { $set: { status: PatientStatus.INACTIVE } },
+                    )
+                    .exec(),
+            ]);
+
+            const migrated = activated.modifiedCount + deactivated.modifiedCount;
+            if (migrated) {
+                this.logger.log(`Backfilled status for ${migrated} patient(s)`);
+            }
+        } catch (err) {
+            this.logger.warn(`Could not backfill patient status: ${(err as Error).message}`);
+        }
     }
 
-    async findAll(
-        clinicId: Types.ObjectId,
-        query: QueryPatientDto,
-    ): Promise<{
-        data: PatientDocument[];
-        total: number;
-        page: number;
-        limit: number;
-        totalPages: number;
-    }> {
-        const { page, limit, search, gender, isActive } = query;
+    async create(clinicId: Types.ObjectId, dto: CreatePatientDto): Promise<PatientDocument> {
+        this.assertValidDateOfBirth(dto.dateOfBirth);
+        await this.assertEmailIsFree(clinicId, dto.email);
+
+        // `null` from the client means "not provided" on create; don't persist it.
+        const { email, photo, ...rest } = dto;
+
+        try {
+            const patient = new this.patientModel({
+                ...rest,
+                ...(email ? { email } : {}),
+                ...(photo ? { photo } : {}),
+                clinicId,
+                status: PatientStatus.ACTIVE,
+                isActive: true,
+            });
+            return await patient.save();
+        } catch (err) {
+            throw this.translateDuplicateKey(err, dto.email);
+        }
+    }
+
+    async findAll(clinicId: Types.ObjectId, query: QueryPatientDto): Promise<PaginatedPatients> {
+        const page = query.page && query.page > 0 ? query.page : 1;
+        const limit = query.limit && query.limit > 0 ? query.limit : 20;
         const skip = (page - 1) * limit;
 
         const filter: FilterQuery<PatientDocument> = { clinicId };
 
-        if (search) {
-            const searchRegex = new RegExp(search, 'i');
+        if (query.search) {
+            const searchRegex = new RegExp(escapeRegex(query.search.trim()), 'i');
+            const digits = query.search.replace(/\D/g, '');
+
             filter.$or = [
                 { firstName: searchRegex },
                 { lastName: searchRegex },
+                { patronymic: searchRegex },
+                { email: searchRegex },
                 { phone: searchRegex },
             ];
+
+            // Let "093 12 34 56" or "93123456" match the stored +374XXXXXXXX form.
+            if (digits.length >= 3) {
+                filter.$or.push({ phone: new RegExp(`${digits.replace(/^(?:374|0)/, '')}`, 'i') });
+            }
         }
 
-        if (gender) {
-            filter.gender = gender;
+        if (query.gender) {
+            filter.gender = query.gender;
         }
 
-        if (isActive !== undefined) {
-            filter.isActive = isActive;
+        if (query.status) {
+            filter.status = query.status;
+        } else if (query.isActive !== undefined) {
+            filter.isActive = query.isActive;
         }
+
+        const sortField = query.sortBy || 'lastName';
+        const sortDirection = query.sortOrder === 'desc' ? -1 : 1;
+        const sort: Record<string, 1 | -1> =
+            sortField === 'lastName'
+                ? { lastName: sortDirection, firstName: sortDirection }
+                : { [sortField]: sortDirection };
 
         const [data, total] = await Promise.all([
-            this.patientModel
-                .find(filter)
-                .sort({ lastName: 1, firstName: 1 })
-                .skip(skip)
-                .limit(limit)
-                .exec(),
+            this.patientModel.find(filter).sort(sort).skip(skip).limit(limit).exec(),
             this.patientModel.countDocuments(filter).exec(),
         ]);
 
@@ -67,14 +140,12 @@ export class PatientsService {
             total,
             page,
             limit,
-            totalPages: Math.ceil(total / limit),
+            totalPages: Math.max(1, Math.ceil(total / limit)),
         };
     }
 
     async findById(clinicId: Types.ObjectId, patientId: Types.ObjectId): Promise<PatientDocument> {
-        const patient = await this.patientModel
-            .findOne({ _id: patientId, clinicId })
-            .exec();
+        const patient = await this.patientModel.findOne({ _id: patientId, clinicId }).exec();
 
         if (!patient) {
             throw new NotFoundException(`Patient with ID "${patientId}" not found`);
@@ -88,11 +159,78 @@ export class PatientsService {
         patientId: Types.ObjectId,
         dto: UpdatePatientDto,
     ): Promise<PatientDocument> {
+        if (dto.dateOfBirth) {
+            this.assertValidDateOfBirth(dto.dateOfBirth);
+        }
+
+        if (dto.email) {
+            await this.assertEmailIsFree(clinicId, dto.email, patientId);
+        }
+
+        const { photo, status, isActive, email, ...rest } = dto;
+        const set: Record<string, unknown> = { ...rest };
+        const unset: Record<string, ''> = {};
+
+        // An explicit `null` means "clear this field"; `undefined` means "leave it".
+        if (photo === null) {
+            unset.photo = '';
+        } else if (photo !== undefined) {
+            set.photo = photo;
+        }
+
+        if (email === null) {
+            unset.email = '';
+        } else if (email !== undefined) {
+            set.email = email;
+        }
+
+        const resolvedStatus = this.resolveStatus(status, isActive);
+        if (resolvedStatus) {
+            set.status = resolvedStatus;
+            set.isActive = resolvedStatus === PatientStatus.ACTIVE;
+        }
+
+        const updateQuery: UpdateQuery<PatientDocument> = {};
+        if (Object.keys(set).length) updateQuery.$set = set;
+        if (Object.keys(unset).length) updateQuery.$unset = unset;
+
+        if (!Object.keys(updateQuery).length) {
+            return this.findById(clinicId, patientId);
+        }
+
+        let patient: PatientDocument | null;
+        try {
+            patient = await this.patientModel
+                .findOneAndUpdate({ _id: patientId, clinicId }, updateQuery, {
+                    new: true,
+                    runValidators: true,
+                })
+                .exec();
+        } catch (err) {
+            throw this.translateDuplicateKey(err, dto.email);
+        }
+
+        if (!patient) {
+            throw new NotFoundException(`Patient with ID "${patientId}" not found`);
+        }
+
+        return patient;
+    }
+
+    /**
+     * Move a patient between lifecycle statuses (active / inactive / archived /
+     * deceased). `isActive` is kept in sync for the reports that still read it.
+     */
+    async updateStatus(
+        clinicId: Types.ObjectId,
+        patientId: Types.ObjectId,
+        status: PatientStatus,
+    ): Promise<PatientDocument> {
         const patient = await this.patientModel
             .findOneAndUpdate(
                 { _id: patientId, clinicId },
-                { $set: dto },
-                { new: true, runValidators: true },
+                { $set: { status, isActive: status === PatientStatus.ACTIVE } },
+                { new: true },
             )
             .exec();
 
@@ -104,19 +242,7 @@ export class PatientsService {
     }
 
     async deactivate(clinicId: Types.ObjectId, patientId: Types.ObjectId): Promise<PatientDocument> {
-        const patient = await this.patientModel
-            .findOneAndUpdate(
-                { _id: patientId, clinicId },
-                { $set: { isActive: false } },
-                { new: true },
-            )
-            .exec();
-
-        if (!patient) {
-            throw new NotFoundException(`Patient with ID "${patientId}" not found`);
-        }
-
-        return patient;
+        return this.updateStatus(clinicId, patientId, PatientStatus.INACTIVE);
     }
 
     async updateMedicalHistory(
@@ -139,22 +265,126 @@ export class PatientsService {
         return patient;
     }
 
-    async getPatientStats(
+    /** Records a completed visit so the patients list can show "last visit". */
+    async touchLastVisit(
         clinicId: Types.ObjectId,
-    ): Promise<{ activePatients: number; newPatientsThisMonth: number }> {
+        patientId: Types.ObjectId,
+        visitedAt: Date = new Date(),
+    ): Promise<void> {
+        await this.patientModel
+            .updateOne(
+                { _id: patientId, clinicId },
+                { $max: { lastVisit: visitedAt } },
+            )
+            .exec();
+    }
+
+    async getPatientStats(clinicId: Types.ObjectId): Promise<{
+        totalPatients: number;
+        activePatients: number;
+        inactivePatients: number;
+        newPatientsThisMonth: number;
+        byStatus: Record<string, number>;
+    }> {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 
-        const [activePatients, newPatientsThisMonth] = await Promise.all([
-            this.patientModel.countDocuments({ clinicId, isActive: true }).exec(),
+        const [totalPatients, newPatientsThisMonth, grouped] = await Promise.all([
+            this.patientModel.countDocuments({ clinicId }).exec(),
             this.patientModel
-                .countDocuments({
-                    clinicId,
-                    createdAt: { $gte: startOfMonth },
-                })
+                .countDocuments({ clinicId, createdAt: { $gte: startOfMonth } })
+                .exec(),
+            this.patientModel
+                .aggregate<{ _id: string | null; count: number }>([
+                    { $match: { clinicId } },
+                    { $group: { _id: '$status', count: { $sum: 1 } } },
+                ])
                 .exec(),
         ]);
 
-        return { activePatients, newPatientsThisMonth };
+        const byStatus = Object.values(PatientStatus).reduce<Record<string, number>>(
+            (acc, status) => ({ ...acc, [status]: 0 }),
+            {},
+        );
+
+        grouped.forEach(({ _id, count }) => {
+            // Documents created before `status` existed count as active.
+            const key = _id && _id in byStatus ? _id : PatientStatus.ACTIVE;
+            byStatus[key] += count;
+        });
+
+        return {
+            totalPatients,
+            activePatients: byStatus[PatientStatus.ACTIVE],
+            inactivePatients: totalPatients - byStatus[PatientStatus.ACTIVE],
+            newPatientsThisMonth,
+            byStatus,
+        };
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private resolveStatus(
+        status?: PatientStatus,
+        isActive?: boolean,
+    ): PatientStatus | undefined {
+        if (status) {
+            return status;
+        }
+        if (isActive === undefined) {
+            return undefined;
+        }
+        return isActive ? PatientStatus.ACTIVE : PatientStatus.INACTIVE;
+    }
+
+    private assertValidDateOfBirth(dateOfBirth: string): void {
+        const date = new Date(dateOfBirth);
+
+        if (Number.isNaN(date.getTime())) {
+            throw new BadRequestException('dateOfBirth is not a valid date');
+        }
+        if (date.getTime() > Date.now()) {
+            throw new BadRequestException('dateOfBirth cannot be in the future');
+        }
+        if (date.getFullYear() < 1900) {
+            throw new BadRequestException('dateOfBirth must be after 1900');
+        }
+    }
+
+    private async assertEmailIsFree(
+        clinicId: Types.ObjectId,
+        email: string | null | undefined,
+        excludePatientId?: Types.ObjectId,
+    ): Promise<void> {
+        if (!email) {
+            return;
+        }
+
+        const filter: FilterQuery<PatientDocument> = {
+            clinicId,
+            email: email.trim().toLowerCase(),
+        };
+
+        if (excludePatientId) {
+            filter._id = { $ne: excludePatientId };
+        }
+
+        const existing = await this.patientModel.exists(filter).exec();
+
+        if (existing) {
+            throw new ConflictException(`A patient with email "${email}" already exists`);
+        }
+    }
+
+    /** Turns the unique-index violation into a 409 instead of a 500. */
+    private translateDuplicateKey(err: unknown, email?: string | null): unknown {
+        if ((err as { code?: number })?.code === 11000) {
+            return new ConflictException(
+                email
+                    ? `A patient with email "${email}" already exists`
+                    : 'A patient with these details already exists',
+            );
+        }
+        return err;
     }
 }
