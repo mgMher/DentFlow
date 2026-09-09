@@ -21,7 +21,12 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import { patientsActions } from '../../store/patients';
-import { PageHeader, ChipInput, PhotoUpload } from '../../components/ui';
+import {
+    PageHeader,
+    ChipInput,
+    PhotoUpload,
+    DuplicatePatientWarning,
+} from '../../components/ui';
 import { useHttpState } from '../../hooks';
 import { getInitials } from '../../utils/formatters';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
@@ -43,6 +48,7 @@ const PatientCreatePage: React.FC = () => {
 
     const firstName = watch('firstName');
     const lastName = watch('lastName');
+    const dateOfBirth = watch('dateOfBirth');
 
     useEffect(() => {
         if (success) {
@@ -73,6 +79,13 @@ const PatientCreatePage: React.FC = () => {
             </PageHeader>
 
             <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+                <DuplicatePatientWarning
+                    firstName={firstName}
+                    lastName={lastName}
+                    dateOfBirth={dateOfBirth}
+                    onOpen={(patientId) => navigate(`/patients/${patientId}`)}
+                />
+
                 {/* Personal Information */}
                 <Card sx={{ mb: 3 }}>
                     <CardHeader
@@ -549,6 +562,34 @@ const PatientCreatePage: React.FC = () => {
                                 />
                             </Grid>
                         </Grid>
+                    </CardContent>
+                </Card>
+
+                {/* Internal notes */}
+                <Card sx={{ mb: 3 }}>
+                    <CardHeader
+                        title={
+                            <Typography variant="h6" fontWeight={600}>
+                                {t('patients.internalNotes')}
+                            </Typography>
+                        }
+                        subheader={t('patients.internalNotesHint')}
+                    />
+                    <CardContent>
+                        <Controller
+                            name="notes"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    {...field}
+                                    fullWidth
+                                    size="small"
+                                    label={t('patients.notes')}
+                                    multiline
+                                    rows={3}
+                                />
+                            )}
+                        />
                     </CardContent>
                 </Card>
 

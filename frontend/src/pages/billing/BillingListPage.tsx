@@ -26,9 +26,10 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { billingActions } from '../../store/billing';
 import { PageHeader, StatusChip, EmptyState, LoadingSpinner } from '../../components/ui';
-import { formatDate, formatCurrency, getFullName } from '../../utils/formatters';
+import { formatDate, formatCurrency } from '../../utils/formatters';
+import { patientName } from '../../utils/references';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
-import { InvoiceStatus, Patient } from '../../types';
+import { InvoiceStatus } from '../../types';
 
 const STATUS_TABS: Array<InvoiceStatus | 'all'> = ['all', 'pending', 'partial', 'paid', 'overdue'];
 
@@ -111,13 +112,6 @@ const BillingListPage: React.FC = () => {
         navigate('/billing/new');
     };
 
-    const getPatientName = (patientId: string | Patient): string => {
-        if (typeof patientId === 'string') {
-            return patientId;
-        }
-        return getFullName(patientId.firstName, patientId.lastName, patientId.patronymic);
-    };
-
     if (loading && invoices.length === 0) {
         return <LoadingSpinner fullPage />;
     }
@@ -197,7 +191,7 @@ const BillingListPage: React.FC = () => {
                                                 {invoice.invoiceNumber}
                                             </TableCell>
                                             <TableCell>
-                                                {getPatientName(invoice.patientId)}
+                                                {patientName(invoice.patientId)}
                                             </TableCell>
                                             <TableCell>
                                                 {formatDate(invoice.createdAt)}

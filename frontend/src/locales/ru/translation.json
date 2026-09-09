@@ -152,7 +152,19 @@
     "totalPatients": "Всего пациентов",
     "insuranceProvider": "Страховая компания",
     "medicalNotes": "Медицинские заметки",
-    "fullName": "ФИО"
+    "fullName": "ФИО",
+    "notFound": "Пациент не найден",
+    "noMatches": "Нет пациентов, соответствующих фильтрам",
+    "tryDifferentFilters": "Попробуйте другой поиск или статус",
+    "internalNotes": "Внутренние заметки",
+    "internalNotesHint": "Видно только сотрудникам клиники",
+    "newThisMonth": "Новых за месяц",
+    "possibleDuplicate": "Возможный дубликат",
+    "possibleDuplicateHint": "Пациент с таким же именем и датой рождения уже существует. Вы всё равно можете сохранить, если это другой человек.",
+    "statusHistory": "История статусов",
+    "statusReason": "Причина (необязательно)",
+    "statusReasonHint": "напр. переехал в другой город",
+    "registered": "Зарегистрирован"
   },
   "appointments": {
     "title": "Записи",
@@ -220,7 +232,18 @@
     "palatal": "Палатальная",
     "cervical": "Пришеечная",
     "conditions": "Состояния",
-    "currentState": "Текущее состояние"
+    "currentState": "Текущее состояние",
+    "recordTreatment": "Записать лечение",
+    "selectTreatment": "Выбрать из каталога",
+    "treatmentName": "Лечение",
+    "customTreatment": "Другое (ввести вручную)",
+    "treatmentDate": "Дата выполнения",
+    "cost": "Стоимость",
+    "treatmentAdded": "Лечение записано",
+    "noTreatmentsYet": "Для этого зуба лечение не записано",
+    "toothCondition": "Состояние зуба",
+    "changeChartType": "Изменить тип карты",
+    "confirmChartTypeChange": "Переключиться на {{type}}? Две системы нумерации не имеют общих зубов, поэтому статусы зубов и их история будут сброшены. Записанные лечения сохранятся."
   },
   "treatments": {
     "title": "Лечение",
@@ -354,7 +377,18 @@
     "reason": "Причина",
     "addRoom": "Добавить кабинет",
     "addBlockedTime": "Добавить блокировку",
-    "treatmentRoom": "Кабинет"
+    "treatmentRoom": "Кабинет",
+    "break": "Перерыв",
+    "lunch": "Обед",
+    "vacation": "Отпуск",
+    "personal": "Личное",
+    "meeting": "Встреча",
+    "other": "Другое",
+    "note": "Примечание",
+    "noBlockedTimes": "Нет заблокированного времени",
+    "selectDentist": "Выберите врача",
+    "noDentists": "В этой клинике пока нет врачей",
+    "endAfterStart": "Время окончания должно быть позже начала"
   },
   "notifications": {
     "markAllRead": "Отметить все как прочитанные",
@@ -370,5 +404,18 @@
       "USD": "$",
       "RUB": "₽"
     }
+  },
+  "errors": {
+    "patientEmailTaken": "Этот email уже используется другим пациентом",
+    "patientNotFound": "Пациент не найден",
+    "invalidDateOfBirth": "Неверная дата рождения",
+    "futureDateOfBirth": "Дата рождения не может быть в будущем",
+    "dateOfBirthTooOld": "Дата рождения должна быть после 1900",
+    "loadPatients": "Не удалось загрузить пациентов",
+    "loadPatient": "Не удалось загрузить пациента",
+    "createPatient": "Не удалось создать пациента",
+    "updatePatient": "Не удалось сохранить пациента",
+    "updatePatientStatus": "Не удалось изменить статус",
+    "loadPatientStats": "Не удалось загрузить статистику"
   }
 }

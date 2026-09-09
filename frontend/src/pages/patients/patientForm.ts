@@ -27,6 +27,7 @@ export interface PatientFormData {
     policyNumber: string;
     groupNumber: string;
     expirationDate: string;
+    notes: string;
 }
 
 export const emptyPatientForm: PatientFormData = {
@@ -54,6 +55,7 @@ export const emptyPatientForm: PatientFormData = {
     policyNumber: '',
     groupNumber: '',
     expirationDate: '',
+    notes: '',
 };
 
 /** Fills the form from a loaded patient, never leaving a field `undefined`. */
@@ -85,17 +87,21 @@ export const patientToForm = (patient: Patient): PatientFormData => ({
     expirationDate: patient.insurance?.expirationDate
         ? patient.insurance.expirationDate.substring(0, 10)
         : '',
+    notes: patient.notes || '',
 });
 
 /**
- * Shapes the flat form state into the API payload. `null` means "clear this
- * field" server-side, `undefined` means "leave it untouched", so optional
- * blocks are only sent when they hold something.
+ * Shapes the flat form state into the API payload.
+ *
+ * Anything the user cleared is sent as `null`, which the API treats as "remove
+ * this field". Sending `undefined` would drop the key from the JSON body
+ * entirely, which the API reads as "leave it untouched" — so a cleared field
+ * would silently keep its old value.
  */
 export const toPatientPayload = (data: PatientFormData) => ({
     firstName: data.firstName.trim(),
     lastName: data.lastName.trim(),
-    patronymic: data.patronymic?.trim() || undefined,
+    patronymic: data.patronymic?.trim() || null,
     dateOfBirth: data.dateOfBirth,
     gender: data.gender,
     phone: normalizeArmenianPhone(data.phone),
@@ -116,7 +122,7 @@ export const toPatientPayload = (data: PatientFormData) => ({
                   ? normalizeArmenianPhone(data.emergencyPhone)
                   : undefined,
           }
-        : undefined,
+        : null,
     medicalHistory: {
         conditions: data.conditions || [],
         allergies: data.allergies || [],
@@ -130,5 +136,6 @@ export const toPatientPayload = (data: PatientFormData) => ({
               groupNumber: data.groupNumber?.trim() || undefined,
               expirationDate: data.expirationDate || undefined,
           }
-        : undefined,
+        : null,
+    notes: data.notes?.trim() || null,
 });

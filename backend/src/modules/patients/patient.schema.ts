@@ -87,6 +87,34 @@ export enum PatientStatus {
 /** Statuses that still count the patient as an active client of the clinic. */
 export const ACTIVE_PATIENT_STATUSES: PatientStatus[] = [PatientStatus.ACTIVE];
 
+/**
+ * One entry per status transition, newest last. The first entry records the
+ * registration itself and has no `from`.
+ *
+ * Kept on the patient rather than in its own collection: a patient accumulates
+ * a handful of these over its lifetime, and they are only ever read together
+ * with the patient.
+ */
+@Schema({ timestamps: false })
+export class PatientStatusChange {
+    @Prop({ enum: PatientStatus })
+    from: PatientStatus;
+
+    @Prop({ required: true, enum: PatientStatus })
+    to: PatientStatus;
+
+    @Prop({ trim: true })
+    reason: string;
+
+    @Prop({ type: Types.ObjectId, ref: 'User' })
+    changedBy: Types.ObjectId;
+
+    @Prop({ required: true, default: () => new Date() })
+    changedAt: Date;
+}
+
+export const PatientStatusChangeSchema = SchemaFactory.createForClass(PatientStatusChange);
+
 @Schema({ timestamps: true })
 export class Patient {
     @Prop({
@@ -148,6 +176,10 @@ export class Patient {
     /** Kept in sync with `status` so legacy queries on `isActive` keep working. */
     @Prop({ default: true })
     isActive: boolean;
+
+    /** Audit trail of every status transition, including registration. */
+    @Prop({ type: [PatientStatusChangeSchema], default: [] })
+    statusHistory: PatientStatusChange[];
 
     @Prop()
     lastVisit: Date;

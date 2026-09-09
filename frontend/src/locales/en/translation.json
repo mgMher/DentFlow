@@ -152,7 +152,19 @@
     "totalPatients": "Total patients",
     "insuranceProvider": "Insurance Provider",
     "medicalNotes": "Medical Notes",
-    "fullName": "Full Name"
+    "fullName": "Full Name",
+    "notFound": "Patient not found",
+    "noMatches": "No patients match your filters",
+    "tryDifferentFilters": "Try a different search or status",
+    "internalNotes": "Internal Notes",
+    "internalNotesHint": "Only visible to clinic staff",
+    "newThisMonth": "New this month",
+    "possibleDuplicate": "Possible duplicate",
+    "possibleDuplicateHint": "A patient with the same name and date of birth already exists. You can still save if this is a different person.",
+    "statusHistory": "Status History",
+    "statusReason": "Reason (optional)",
+    "statusReasonHint": "e.g. moved to another city",
+    "registered": "Registered"
   },
   "appointments": {
     "title": "Appointments",
@@ -220,7 +232,18 @@
     "palatal": "Palatal",
     "cervical": "Cervical",
     "conditions": "Conditions",
-    "currentState": "Current state"
+    "currentState": "Current state",
+    "recordTreatment": "Record Treatment",
+    "selectTreatment": "Select from catalogue",
+    "treatmentName": "Treatment",
+    "customTreatment": "Other (type manually)",
+    "treatmentDate": "Date performed",
+    "cost": "Cost",
+    "treatmentAdded": "Treatment recorded",
+    "noTreatmentsYet": "No treatments recorded for this tooth",
+    "toothCondition": "Tooth condition",
+    "changeChartType": "Change chart type",
+    "confirmChartTypeChange": "Switch to the {{type}}? The two numbering systems share no teeth, so tooth statuses and their history will be reset. Recorded treatments are kept."
   },
   "treatments": {
     "title": "Treatments",
@@ -354,7 +377,18 @@
     "reason": "Reason",
     "addRoom": "Add Room",
     "addBlockedTime": "Add Blocked Time",
-    "treatmentRoom": "Treatment Room"
+    "treatmentRoom": "Treatment Room",
+    "break": "Break",
+    "lunch": "Lunch",
+    "vacation": "Vacation",
+    "personal": "Personal",
+    "meeting": "Meeting",
+    "other": "Other",
+    "note": "Note",
+    "noBlockedTimes": "No blocked times",
+    "selectDentist": "Select a dentist",
+    "noDentists": "No dentists in this clinic yet",
+    "endAfterStart": "End time must be after start time"
   },
   "notifications": {
     "markAllRead": "Mark All Read",
@@ -370,5 +404,18 @@
       "USD": "$",
       "RUB": "₽"
     }
+  },
+  "errors": {
+    "patientEmailTaken": "This email is already used by another patient",
+    "patientNotFound": "Patient not found",
+    "invalidDateOfBirth": "Date of birth is not valid",
+    "futureDateOfBirth": "Date of birth cannot be in the future",
+    "dateOfBirthTooOld": "Date of birth must be after 1900",
+    "loadPatients": "Could not load patients",
+    "loadPatient": "Could not load the patient",
+    "createPatient": "Could not create the patient",
+    "updatePatient": "Could not save the patient",
+    "updatePatientStatus": "Could not change the status",
+    "loadPatientStats": "Could not load statistics"
   }
 }

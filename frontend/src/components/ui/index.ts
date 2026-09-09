@@ -6,3 +6,6 @@ export { default as ConfirmDialog } from './ConfirmDialog';
 export { default as StatCard } from './StatCard';
 export { default as ChipInput } from './ChipInput';
 export { default as PhotoUpload } from './PhotoUpload';
+export { default as ToothTreatmentForm } from './ToothTreatmentForm';
+export { default as DuplicatePatientWarning } from './DuplicatePatientWarning';
+export { default as Odontogram } from './Odontogram';

@@ -33,7 +33,7 @@ import { httpActions } from '../../store/http';
 import { PageHeader } from '../../components/ui';
 import { formatCurrency, formatDate, formatTime } from '../../utils/formatters';
 import { CURRENCY_SYMBOLS } from '../../utils/constants';
-import { Currency, Appointment, Patient } from '../../types';
+import { Currency, Patient } from '../../types';
 
 interface LineItem {
     description: string;

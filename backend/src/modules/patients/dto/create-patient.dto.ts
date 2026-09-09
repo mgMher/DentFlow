@@ -157,11 +157,15 @@ export class CreatePatientDto {
     @MaxLength(100)
     lastName: string;
 
-    @ApiPropertyOptional({ example: 'Gevorgovich' })
+    @ApiPropertyOptional({
+        example: 'Gevorgovich',
+        description: 'Send `null` on update to clear it.',
+        nullable: true,
+    })
     @IsOptional()
     @IsString()
     @MaxLength(100)
-    patronymic?: string;
+    patronymic?: string | null;
 
     @ApiProperty({ example: '1990-05-15' })
     @IsNotEmpty()
@@ -215,11 +219,15 @@ export class CreatePatientDto {
     @Type(() => AddressDto)
     address?: AddressDto;
 
-    @ApiPropertyOptional({ type: EmergencyContactDto })
+    @ApiPropertyOptional({
+        type: EmergencyContactDto,
+        description: 'Send `null` on update to remove the contact.',
+        nullable: true,
+    })
     @IsOptional()
     @ValidateNested()
     @Type(() => EmergencyContactDto)
-    emergencyContact?: EmergencyContactDto;
+    emergencyContact?: EmergencyContactDto | null;
 
     @ApiPropertyOptional({ type: MedicalHistoryDto })
     @IsOptional()
@@ -227,11 +235,15 @@ export class CreatePatientDto {
     @Type(() => MedicalHistoryDto)
     medicalHistory?: MedicalHistoryDto;
 
-    @ApiPropertyOptional({ type: InsuranceDto })
+    @ApiPropertyOptional({
+        type: InsuranceDto,
+        description: 'Send `null` on update to remove the insurance block.',
+        nullable: true,
+    })
     @IsOptional()
     @ValidateNested()
     @Type(() => InsuranceDto)
-    insurance?: InsuranceDto;
+    insurance?: InsuranceDto | null;
 
     @ApiPropertyOptional({ example: 'Referred by Dr. Petrosyan' })
     @IsOptional()

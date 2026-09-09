@@ -5,6 +5,32 @@ import { useTranslation } from 'react-i18next';
 import { RootState } from '../store';
 import { httpActions } from '../store/http';
 
+/** Auth screens show their own feedback. */
+const SKIP_ACTIONS = new Set(['LOGIN', 'REGISTER', 'REFRESH_TOKEN']);
+
+/**
+ * Actions that get a success toast, mapped to their translation *key* rather
+ * than the translated string — so the map is a module constant and the toast
+ * is rendered in whatever language is active when it fires.
+ */
+const SUCCESS_TOAST_KEYS: Record<string, string> = {
+    CREATE_APPOINTMENT: 'toast.saveSuccess',
+    UPDATE_APPOINTMENT: 'toast.updateSuccess',
+    CANCEL_APPOINTMENT: 'toast.updateSuccess',
+    UPDATE_STATUS: 'toast.updateSuccess',
+    CREATE_PATIENT: 'toast.saveSuccess',
+    UPDATE_PATIENT: 'toast.updateSuccess',
+    UPDATE_PATIENT_STATUS: 'toast.updateSuccess',
+    CREATE_INVOICE: 'toast.saveSuccess',
+    CREATE_ROOM: 'toast.saveSuccess',
+    CREATE_BLOCKED: 'toast.saveSuccess',
+    DELETE_BLOCKED: 'toast.deleteSuccess',
+    UPDATE_TOOTH: 'toast.saveSuccess',
+    SET_CHART_TYPE: 'toast.updateSuccess',
+    UPDATE_TEETH: 'toast.saveSuccess',
+    ADD_ENTRY: 'toast.saveSuccess',
+};
+
 /**
  * Global component that watches Redux http state and shows toast notifications
  * for API errors and successes. Mounted once in App.tsx.
@@ -19,28 +45,6 @@ const HttpToastHandler: React.FC = () => {
     // Track which errors/successes we've already shown toasts for
     const shownErrors = useRef<Set<string>>(new Set());
     const shownSuccesses = useRef<Set<string>>(new Set());
-
-    // Action types that should show success toasts
-    const SUCCESS_TOAST_MAP: Record<string, string> = {
-        CREATE_APPOINTMENT: t('toast.saveSuccess'),
-        UPDATE_APPOINTMENT: t('toast.updateSuccess'),
-        CANCEL_APPOINTMENT: t('toast.updateSuccess'),
-        UPDATE_STATUS: t('toast.updateSuccess'),
-        CREATE_PATIENT: t('toast.saveSuccess'),
-        UPDATE_PATIENT: t('toast.updateSuccess'),
-        UPDATE_PATIENT_STATUS: t('toast.updateSuccess'),
-        DELETE_PATIENT: t('toast.deleteSuccess'),
-        CREATE_INVOICE: t('toast.saveSuccess'),
-        CREATE_ROOM: t('toast.saveSuccess'),
-        CREATE_BLOCKED: t('toast.saveSuccess'),
-        DELETE_BLOCKED: t('toast.deleteSuccess'),
-        UPDATE_TOOTH: t('toast.saveSuccess'),
-        UPDATE_TEETH: t('toast.saveSuccess'),
-        ADD_ENTRY: t('toast.saveSuccess'),
-    };
-
-    // Action types to skip (auth handles its own UI)
-    const SKIP_ACTIONS = new Set(['LOGIN', 'REGISTER', 'REFRESH_TOKEN']);
 
     // Show error toasts
     useEffect(() => {
@@ -63,15 +67,16 @@ const HttpToastHandler: React.FC = () => {
     useEffect(() => {
         successes.forEach((type) => {
             if (SKIP_ACTIONS.has(type)) return;
-            if (!shownSuccesses.current.has(type) && SUCCESS_TOAST_MAP[type]) {
+            const messageKey = SUCCESS_TOAST_KEYS[type];
+            if (messageKey && !shownSuccesses.current.has(type)) {
                 shownSuccesses.current.add(type);
-                toast.success(SUCCESS_TOAST_MAP[type]);
+                toast.success(t(messageKey));
                 setTimeout(() => {
                     shownSuccesses.current.delete(type);
                 }, 100);
             }
         });
-    }, [successes]);
+    }, [successes, t]);
 
     return null;
 };

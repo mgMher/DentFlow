@@ -4,6 +4,7 @@ import {
     ArrayMaxSize,
     IsArray,
     IsEnum,
+    IsIn,
     IsInt,
     IsNotEmpty,
     IsOptional,
@@ -59,4 +60,11 @@ export class UpdateTeethDto {
     @ValidateNested({ each: true })
     @Type(() => UpdateToothDto)
     teeth: UpdateToothDto[];
+}
+
+export class SetChartTypeDto {
+    @ApiProperty({ enum: ['adult', 'pediatric'], example: 'pediatric' })
+    @IsNotEmpty()
+    @IsIn(['adult', 'pediatric'])
+    chartType: 'adult' | 'pediatric';
 }

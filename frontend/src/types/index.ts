@@ -70,6 +70,17 @@ export type PatientStatus = 'active' | 'inactive' | 'archived' | 'deceased';
 
 export const PATIENT_STATUSES: PatientStatus[] = ['active', 'inactive', 'archived', 'deceased'];
 
+export interface PatientStatusChange {
+    _id?: string;
+    /** Absent on the first entry, which records the registration. */
+    from?: PatientStatus;
+    to: PatientStatus;
+    reason?: string;
+    /** Populated by the API on read. */
+    changedBy?: string | UserProfile;
+    changedAt: string;
+}
+
 export interface EmergencyContact {
     name: string;
     relationship: string;
@@ -94,6 +105,8 @@ export interface Patient {
     notes?: string;
     status: PatientStatus;
     isActive: boolean;
+    /** Only returned when fetching a single patient, not in list responses. */
+    statusHistory?: PatientStatusChange[];
     lastVisit?: string;
     createdAt: string;
 }
@@ -128,14 +141,15 @@ export interface Appointment {
     clinicId: string;
     patientId: string | Patient;
     dentistId: string | UserProfile;
-    treatmentRoomId?: string;
+    // Populated by the API on findById/findAll — string only before it is sent.
+    treatmentRoomId?: string | TreatmentRoom;
     title: string;
     startTime: string;
     endTime: string;
     duration: number;
     status: AppointmentStatus;
     treatmentType?: string;
-    treatmentIds?: string[];
+    treatmentIds?: (string | Treatment)[];
     notes?: string;
     cancelReason?: string;
     isRecurring: boolean;
@@ -221,10 +235,11 @@ export interface TreatmentEntry {
     clinicId: string;
     patientId: string;
     toothNumber: number;
-    treatmentId?: string;
+    // These three are populated by the API on read — plain ids on write.
+    treatmentId?: string | Treatment;
     treatmentName: string;
-    dentistId: string;
-    appointmentId?: string;
+    dentistId: string | UserProfile;
+    appointmentId?: string | Appointment;
     date: string;
     surfaces: ToothSurface[];
     notes?: string;
@@ -238,7 +253,8 @@ export type InvoiceStatus = 'draft' | 'pending' | 'partial' | 'paid' | 'overdue'
 export type PaymentMethod = 'cash' | 'card' | 'bank_transfer';
 
 export interface InvoiceItem {
-    treatmentId?: string;
+    /** Populated by the API on read — a plain id on write. */
+    treatmentId?: string | Treatment;
     description: string;
     quantity: number;
     unitPrice: number;
@@ -250,7 +266,8 @@ export interface Invoice {
     _id: string;
     clinicId: string;
     patientId: string | Patient;
-    appointmentId?: string;
+    /** Populated by the API on read — a plain id on write. */
+    appointmentId?: string | Appointment;
     invoiceNumber: string;
     items: InvoiceItem[];
     subtotal: number;
@@ -288,13 +305,21 @@ export interface TreatmentRoom {
     isActive: boolean;
 }
 
+export type BlockedTimeReason =
+    | 'break' | 'lunch' | 'vacation' | 'personal' | 'meeting' | 'other';
+
+export const BLOCKED_TIME_REASONS: BlockedTimeReason[] = [
+    'break', 'lunch', 'vacation', 'personal', 'meeting', 'other',
+];
+
 export interface BlockedTime {
     _id: string;
     clinicId: string;
-    dentistId: string;
+    // Populated by the API on read — an auth User id on write.
+    dentistId: string | UserProfile;
     startTime: string;
     endTime: string;
-    reason: string;
+    reason: BlockedTimeReason;
     title?: string;
     isRecurring: boolean;
 }

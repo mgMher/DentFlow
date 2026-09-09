@@ -134,9 +134,24 @@ export class ScheduleService {
             throw new BadRequestException('endTime must be after startTime');
         }
 
+        // Never let one clinic block another clinic's dentist.
+        const dentistObjectId = new Types.ObjectId(dto.dentistId);
+        const dentist = await this.userProfileModel
+            .findOne({
+                clinicId: new Types.ObjectId(clinicId),
+                $or: [{ authId: dentistObjectId }, { _id: dentistObjectId }],
+            })
+            .exec();
+
+        if (!dentist) {
+            throw new NotFoundException(
+                `Dentist with ID "${dto.dentistId}" not found in this clinic`,
+            );
+        }
+
         const blockedTime = new this.blockedTimeModel({
             clinicId: new Types.ObjectId(clinicId),
-            dentistId: new Types.ObjectId(dto.dentistId),
+            dentistId: dentist.authId || dentist._id,
             startTime,
             endTime,
             reason: dto.reason,
@@ -170,18 +185,25 @@ export class ScheduleService {
         const targetDate = new Date(date);
         const dayOfWeek = targetDate.getDay();
 
-        // Get dentist profile with schedule
+        // `dentistId` is an auth User id — the same identity stored on
+        // appointments and blocked times. The working-hours schedule lives on
+        // the matching UserProfile, which is linked by `authId`. Accept a
+        // profile id too, so older links keep working.
+        const dentistObjectId = new Types.ObjectId(dentistId);
         const dentist = await this.userProfileModel
             .findOne({
                 clinicId: new Types.ObjectId(clinicId),
-                _id: new Types.ObjectId(dentistId),
                 isActive: true,
+                $or: [{ authId: dentistObjectId }, { _id: dentistObjectId }],
             })
             .exec();
 
         if (!dentist) {
             throw new NotFoundException(`Dentist with ID "${dentistId}" not found`);
         }
+
+        // Appointments and blocked times are keyed by the auth User id.
+        const dentistRefId = dentist.authId || dentist._id;
 
         // Find working hours for the given day of week
         const dayAvailability = dentist.schedule?.defaultAvailability?.find(
@@ -214,7 +236,7 @@ export class ScheduleService {
             this.blockedTimeModel
                 .find({
                     clinicId: new Types.ObjectId(clinicId),
-                    dentistId: new Types.ObjectId(dentistId),
+                    dentistId: dentistRefId,
                     startTime: { $lt: dayEnd },
                     endTime: { $gt: dayStart },
                 })
@@ -223,7 +245,7 @@ export class ScheduleService {
             this.appointmentModel
                 .find({
                     clinicId: new Types.ObjectId(clinicId),
-                    dentistId: new Types.ObjectId(dentistId),
+                    dentistId: dentistRefId,
                     startTime: { $lt: dayEnd },
                     endTime: { $gt: dayStart },
                     status: {
