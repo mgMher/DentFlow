@@ -38,9 +38,9 @@ const service = {
     getRooms: () => api.get('/schedule/rooms'),
     createRoom: (data: Partial<TreatmentRoom>) => api.post('/schedule/rooms', data),
     updateRoom: (id: string, data: Partial<TreatmentRoom>) => api.patch(`/schedule/rooms/${id}`, data),
-    getBlocked: (params?: any) => api.get('/schedule/blocked', { params }),
-    createBlocked: (data: Partial<BlockedTime>) => api.post('/schedule/blocked', data),
-    deleteBlocked: (id: string) => api.delete(`/schedule/blocked/${id}`),
+    getBlocked: (params?: any) => api.get('/schedule/blocked-times', { params }),
+    createBlocked: (data: Partial<BlockedTime>) => api.post('/schedule/blocked-times', data),
+    deleteBlocked: (id: string) => api.delete(`/schedule/blocked-times/${id}`),
     getAvailability: (dentistId: string, date: string) =>
         api.get(`/schedule/availability/${dentistId}`, { params: { date } }),
 };

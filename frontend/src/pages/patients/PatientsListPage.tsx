@@ -19,6 +19,7 @@ import {
     Menu,
     ListItemIcon,
     ListItemText,
+    Grid,
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -27,13 +28,23 @@ import {
     MoreVert as MoreIcon,
     ToggleOn as ActivateIcon,
     ToggleOff as DeactivateIcon,
+    People as PeopleIcon,
+    CheckCircle as CheckIcon,
+    PersonAdd as PersonAddIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
-import { PageHeader, StatusChip, EmptyState, LoadingSpinner, ConfirmDialog } from '../../components/ui';
+import {
+    PageHeader,
+    StatusChip,
+    EmptyState,
+    LoadingSpinner,
+    ConfirmDialog,
+    StatCard,
+} from '../../components/ui';
 import { formatDate, getFullName, getInitials } from '../../utils/formatters';
 import { formatArmenianPhone } from '../../utils/validators';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
@@ -44,7 +55,7 @@ const PatientsListPage: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    const { list: patients, total } = useSelector((state: RootState) => state.patients);
+    const { list: patients, total, stats } = useSelector((state: RootState) => state.patients);
     const loading = useSelector((state: RootState) => state.http.loading.includes('GET_PATIENTS'));
 
     const [search, setSearch] = useState('');
@@ -57,6 +68,7 @@ const PatientsListPage: React.FC = () => {
         patient: Patient;
         status: PatientStatus;
     } | null>(null);
+    const [statusReason, setStatusReason] = useState('');
 
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -77,6 +89,10 @@ const PatientsListPage: React.FC = () => {
     useEffect(() => {
         fetchPatients(search, page, rowsPerPage, statusFilter);
     }, [page, rowsPerPage, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    useEffect(() => {
+        dispatch(patientsActions.getPatientStats());
+    }, [dispatch]);
 
     // Clear the pending debounce when leaving the page.
     useEffect(() => () => {
@@ -119,6 +135,7 @@ const PatientsListPage: React.FC = () => {
 
     const requestStatusChange = (patient: Patient, status: PatientStatus) => {
         closeMenu();
+        setStatusReason('');
         setPendingStatus({ patient, status });
     };
 
@@ -128,9 +145,26 @@ const PatientsListPage: React.FC = () => {
             patientsActions.updatePatientStatus({
                 id: pendingStatus.patient._id,
                 status: pendingStatus.status,
+                reason: statusReason.trim() || undefined,
             }),
         );
         setPendingStatus(null);
+        setStatusReason('');
+    };
+
+    const cancelStatusChange = () => {
+        setPendingStatus(null);
+        setStatusReason('');
+    };
+
+    const isFiltered = search.trim() !== '' || statusFilter !== 'all';
+
+    const clearFilters = () => {
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        setSearch('');
+        setStatusFilter('all');
+        setPage(0);
+        fetchPatients('', 0, rowsPerPage, 'all');
     };
 
     const statusOptions = useMemo(
@@ -156,6 +190,32 @@ const PatientsListPage: React.FC = () => {
                 actionLabel={t('patients.addPatient')}
                 onAction={() => navigate('/patients/new')}
             />
+
+            <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid item xs={12} sm={4}>
+                    <StatCard
+                        title={t('patients.totalPatients')}
+                        value={stats?.totalPatients ?? total}
+                        icon={<PeopleIcon />}
+                    />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                    <StatCard
+                        title={t('patients.active')}
+                        value={stats?.activePatients ?? 0}
+                        icon={<CheckIcon />}
+                        color="#38A169"
+                    />
+                </Grid>
+                <Grid item xs={12} sm={4}>
+                    <StatCard
+                        title={t('patients.newThisMonth')}
+                        value={stats?.newPatientsThisMonth ?? 0}
+                        icon={<PersonAddIcon />}
+                        color="#3182CE"
+                    />
+                </Grid>
+            </Grid>
 
             <Paper sx={{ mb: 2, p: 2 }}>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -194,12 +254,21 @@ const PatientsListPage: React.FC = () => {
             </Paper>
 
             {patients.length === 0 && !loading ? (
-                <EmptyState
-                    title={t('patients.noPatients')}
-                    description={search ? undefined : t('patients.addPatient')}
-                    actionLabel={search ? undefined : t('patients.addPatient')}
-                    onAction={search ? undefined : () => navigate('/patients/new')}
-                />
+                isFiltered ? (
+                    <EmptyState
+                        title={t('patients.noMatches')}
+                        description={t('patients.tryDifferentFilters')}
+                        actionLabel={t('common.reset')}
+                        onAction={clearFilters}
+                    />
+                ) : (
+                    <EmptyState
+                        title={t('patients.noPatients')}
+                        description={t('patients.addPatient')}
+                        actionLabel={t('patients.addPatient')}
+                        onAction={() => navigate('/patients/new')}
+                    />
+                )
             ) : (
                 <Paper>
                     <TableContainer sx={{ overflowX: 'auto' }}>
@@ -350,8 +419,20 @@ const PatientsListPage: React.FC = () => {
                 }
                 variant={pendingStatus?.status === 'active' ? 'default' : 'danger'}
                 onConfirm={confirmStatusChange}
-                onCancel={() => setPendingStatus(null)}
-            />
+                onCancel={cancelStatusChange}
+            >
+                <TextField
+                    fullWidth
+                    size="small"
+                    label={t('patients.statusReason')}
+                    placeholder={t('patients.statusReasonHint')}
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                    multiline
+                    rows={2}
+                    sx={{ mt: 2 }}
+                />
+            </ConfirmDialog>
         </Box>
     );
 };

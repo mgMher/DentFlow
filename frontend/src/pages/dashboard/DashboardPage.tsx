@@ -33,8 +33,9 @@ import { RootState } from '../../store';
 import { reportsActions } from '../../store/reports';
 import { StatCard, PageHeader } from '../../components/ui';
 import StatusChip from '../../components/ui/StatusChip';
-import { formatCurrency, formatTime, getFullName, getInitials } from '../../utils/formatters';
-import { Appointment, Patient, UserProfile, DashboardSummary } from '../../types';
+import { formatCurrency, formatTime, getInitials } from '../../utils/formatters';
+import { patientName, staffName } from '../../utils/references';
+import { Appointment, Patient, DashboardSummary } from '../../types';
 
 const DashboardPage: React.FC = () => {
     const { t } = useTranslation();
@@ -50,22 +51,6 @@ const DashboardPage: React.FC = () => {
     useEffect(() => {
         dispatch(reportsActions.getDashboard());
     }, [dispatch]);
-
-    const getPatientName = (appointment: Appointment): string => {
-        if (typeof appointment.patientId === 'object' && appointment.patientId !== null) {
-            const patient = appointment.patientId as Patient;
-            return getFullName(patient.firstName, patient.lastName, patient.patronymic);
-        }
-        return String(appointment.patientId);
-    };
-
-    const getDentistName = (appointment: Appointment): string => {
-        if (typeof appointment.dentistId === 'object' && appointment.dentistId !== null) {
-            const dentist = appointment.dentistId as UserProfile;
-            return getFullName(dentist.firstName, dentist.lastName);
-        }
-        return String(appointment.dentistId);
-    };
 
     const getPatientInitials = (appointment: Appointment): string => {
         if (typeof appointment.patientId === 'object' && appointment.patientId !== null) {
@@ -211,7 +196,7 @@ const DashboardPage: React.FC = () => {
                                                 <ListItemText
                                                     primary={
                                                         <Typography variant="body2" fontWeight={600}>
-                                                            {getPatientName(appointment)}
+                                                            {patientName(appointment.patientId)}
                                                         </Typography>
                                                     }
                                                     secondary={
@@ -227,7 +212,7 @@ const DashboardPage: React.FC = () => {
                                                                 &middot;
                                                             </Typography>
                                                             <Typography variant="caption" color="text.secondary">
-                                                                {getDentistName(appointment)}
+                                                                {staffName(appointment.dentistId)}
                                                             </Typography>
                                                         </Box>
                                                     }

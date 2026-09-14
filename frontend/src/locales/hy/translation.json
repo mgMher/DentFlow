@@ -152,7 +152,19 @@
     "totalPatients": "Ընդհանուր հիվանդներ",
     "insuranceProvider": "Ապահովագրական ընկերություն",
     "medicalNotes": "Բժշկական նշումներ",
-    "fullName": "Անուն, ազգանուն"
+    "fullName": "Անուն, ազգանուն",
+    "notFound": "Հիվանդը չի գտնվել",
+    "noMatches": "Ձեր զտիչներին համապատասխան հիվանդներ չկան",
+    "tryDifferentFilters": "Փորձեք այլ որոնում կամ կարգավիճակ",
+    "internalNotes": "Ներքին նշումներ",
+    "internalNotesHint": "Տեսանելի է միայն կլինիկայի աշխատակիցներին",
+    "newThisMonth": "Նոր՝ այս ամիս",
+    "possibleDuplicate": "Հնարավոր կրկնօրինակ",
+    "possibleDuplicateHint": "Նույն անունով և ծննդյան թվականով հիվանդ արդեն կա։ Կարող եք պահպանել, եթե սա այլ անձ է։",
+    "statusHistory": "Կարգավիճակի պատմություն",
+    "statusReason": "Պատճառ (ըստ ցանկության)",
+    "statusReasonHint": "օր. տեղափոխվել է այլ քաղաք",
+    "registered": "Գրանցվել է"
   },
   "appointments": {
     "title": "Այցելություններ",
@@ -220,7 +232,18 @@
     "palatal": "Քմային",
     "cervical": "Պարանոցային",
     "conditions": "Վիճակներ",
-    "currentState": "Ընթացիկ վիճակ"
+    "currentState": "Ընթացիկ վիճակ",
+    "recordTreatment": "Գրանցել բուժում",
+    "selectTreatment": "Ընտրել կատալոգից",
+    "treatmentName": "Բուժում",
+    "customTreatment": "Այլ (մուտքագրել ձեռքով)",
+    "treatmentDate": "Կատարման ամսաթիվ",
+    "cost": "Արժեք",
+    "treatmentAdded": "Բուժումը գրանցվեց",
+    "noTreatmentsYet": "Այս ատամի համար բուժում գրանցված չէ",
+    "toothCondition": "Ատամի վիճակ",
+    "changeChartType": "Փոխել քարտեզի տեսակը",
+    "confirmChartTypeChange": "Անցնե՞լ {{type}}-ի: Երկու համարակալման համակարգերը ընդհանուր ատամներ չունեն, ուստի ատամների կարգավիճակները և պատմությունը կվերականգնվեն։ Գրանցված բուժումները կպահպանվեն։"
   },
   "treatments": {
     "title": "Բուժումներ",
@@ -354,7 +377,18 @@
     "reason": "Պատճառ",
     "addRoom": "Ավելացնել սենյակ",
     "addBlockedTime": "Ավելացնել արգելափակում",
-    "treatmentRoom": "Բուժասենյակ"
+    "treatmentRoom": "Բուժասենյակ",
+    "break": "Ընդմիջում",
+    "lunch": "Ճաշ",
+    "vacation": "Արձակուրդ",
+    "personal": "Անձնական",
+    "meeting": "Հանդիպում",
+    "other": "Այլ",
+    "note": "Նշում",
+    "noBlockedTimes": "Արգելափակված ժամեր չկան",
+    "selectDentist": "Ընտրեք բժիշկ",
+    "noDentists": "Այս կլինիկայում բժիշկներ դեռ չկան",
+    "endAfterStart": "Ավարտը պետք է լինի սկզբից հետո"
   },
   "notifications": {
     "markAllRead": "Նշել բոլորը կարդացված",
@@ -370,5 +404,18 @@
       "USD": "$",
       "RUB": "₽"
     }
+  },
+  "errors": {
+    "patientEmailTaken": "Այս էլ. հասցեն արդեն օգտագործվում է այլ հիվանդի կողմից",
+    "patientNotFound": "Հիվանդը չի գտնվել",
+    "invalidDateOfBirth": "Ծննդյան թվականը սխալ է",
+    "futureDateOfBirth": "Ծննդյան թվականը չի կարող լինել ապագայում",
+    "dateOfBirthTooOld": "Ծննդյան թվականը պետք է լինի 1900-ից հետո",
+    "loadPatients": "Հիվանդները չհաջողվեց բեռնել",
+    "loadPatient": "Հիվանդը չհաջողվեց բեռնել",
+    "createPatient": "Հիվանդը չհաջողվեց ստեղծել",
+    "updatePatient": "Հիվանդը չհաջողվեց պահպանել",
+    "updatePatientStatus": "Կարգավիճակը չհաջողվեց փոխել",
+    "loadPatientStats": "Վիճակագրությունը չհաջողվեց բեռնել"
   }
 }

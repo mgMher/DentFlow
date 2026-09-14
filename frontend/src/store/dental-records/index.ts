@@ -16,11 +16,19 @@ const GET_SUMMARY = 'GET_SUMMARY';
 const GET_SUMMARY_SUCCESS = 'GET_SUMMARY_SUCCESS';
 const GET_TOOTH_HISTORY = 'GET_TOOTH_HISTORY';
 const GET_TOOTH_HISTORY_SUCCESS = 'GET_TOOTH_HISTORY_SUCCESS';
+const SET_CHART_TYPE = 'SET_CHART_TYPE';
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 export const dentalRecordsActions = {
-    getChart: (payload: string) => ({ type: GET_CHART, payload }),
+    getChart: (payload: string | { patientId: string; chartType?: 'adult' | 'pediatric' }) => ({
+        type: GET_CHART,
+        payload,
+    }),
+    setChartType: (payload: { patientId: string; chartType: 'adult' | 'pediatric' }) => ({
+        type: SET_CHART_TYPE,
+        payload,
+    }),
     getChartSuccess: (payload: DentalChart) => ({ type: GET_CHART_SUCCESS, payload }),
     updateTooth: (payload: { patientId: string; data: any }) => ({ type: UPDATE_TOOTH, payload }),
     updateTeeth: (payload: { patientId: string; teeth: any[] }) => ({ type: UPDATE_TEETH, payload }),
@@ -49,7 +57,12 @@ export const dentalRecordsActions = {
 // ── Service ───────────────────────────────────────────────────────────────────
 
 const service = {
-    getChart: (patientId: string) => api.get(`/dental-records/${patientId}/chart`),
+    getChart: (patientId: string, chartType?: 'adult' | 'pediatric') =>
+        api.get(`/dental-records/${patientId}/chart`, {
+            params: chartType ? { chartType } : {},
+        }),
+    setChartType: (patientId: string, chartType: 'adult' | 'pediatric') =>
+        api.patch(`/dental-records/${patientId}/chart-type`, { chartType }),
     updateTooth: (patientId: string, data: any) =>
         api.patch(`/dental-records/${patientId}/tooth`, data),
     updateTeeth: (patientId: string, teeth: any[]) =>
@@ -71,7 +84,11 @@ function* getChartSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getChart, action.payload);
+        const patientId =
+            typeof action.payload === 'string' ? action.payload : action.payload?.patientId;
+        const chartType =
+            typeof action.payload === 'string' ? undefined : action.payload?.chartType;
+        const res: any = yield call(service.getChart, patientId, chartType);
         yield put({ type: GET_CHART_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -126,6 +143,16 @@ function* addEntrySaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
         yield put({ type: GET_CHART, payload: action.payload.patientId });
         yield put({ type: GET_HISTORY, payload: { patientId: action.payload.patientId } });
+        // Refresh the open tooth drawer so the new entry shows immediately.
+        if (action.payload.data?.toothNumber !== undefined) {
+            yield put({
+                type: GET_TOOTH_HISTORY,
+                payload: {
+                    patientId: action.payload.patientId,
+                    toothNumber: action.payload.data.toothNumber,
+                },
+            });
+        }
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to add entry'));
@@ -150,6 +177,28 @@ function* getHistorySaga(action: any) {
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load history'));
+    }
+}
+
+function* setChartTypeSaga(action: any) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        const res: any = yield call(
+            service.setChartType,
+            action.payload.patientId,
+            action.payload.chartType,
+        );
+        yield put({ type: GET_CHART_SUCCESS, payload: res.data?.data || res.data });
+        // The old tooth's timeline no longer applies to the new numbering.
+        yield put({ type: GET_TOOTH_HISTORY_SUCCESS, payload: null });
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(
+            httpActions.appendError(action.type, err?.data?.message || 'Failed to change chart type'),
+        );
     }
 }
 
@@ -192,6 +241,7 @@ export function* watchDentalRecords() {
     yield takeLatest(ADD_ENTRY, addEntrySaga);
     yield takeLatest(GET_HISTORY, getHistorySaga);
     yield takeLatest(GET_TOOTH_HISTORY, getToothHistorySaga);
+    yield takeLatest(SET_CHART_TYPE, setChartTypeSaga);
     yield takeLatest(GET_SUMMARY, getSummarySaga);
 }
 

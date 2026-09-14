@@ -2,6 +2,7 @@ import { call, put, select, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { Patient, PatientStats, PatientStatus } from '../../types';
+import { apiErrorMessage } from '../../utils/apiError';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
 
@@ -12,7 +13,6 @@ const GET_PATIENT_SUCCESS = 'GET_PATIENT_SUCCESS';
 const CREATE_PATIENT = 'CREATE_PATIENT';
 const UPDATE_PATIENT = 'UPDATE_PATIENT';
 const UPDATE_PATIENT_STATUS = 'UPDATE_PATIENT_STATUS';
-const DELETE_PATIENT = 'DELETE_PATIENT';
 const GET_PATIENT_STATS = 'GET_PATIENT_STATS';
 const GET_PATIENT_STATS_SUCCESS = 'GET_PATIENT_STATS_SUCCESS';
 
@@ -47,11 +47,10 @@ export const patientsActions = {
         type: UPDATE_PATIENT,
         payload,
     }),
-    updatePatientStatus: (payload: { id: string; status: PatientStatus }) => ({
+    updatePatientStatus: (payload: { id: string; status: PatientStatus; reason?: string }) => ({
         type: UPDATE_PATIENT_STATUS,
         payload,
     }),
-    deletePatient: (payload: string) => ({ type: DELETE_PATIENT, payload }),
     getPatientStats: () => ({ type: GET_PATIENT_STATS }),
     getPatientStatsSuccess: (payload: PatientStats) => ({
         type: GET_PATIENT_STATS_SUCCESS,
@@ -66,16 +65,14 @@ const service = {
     getById: (id: string) => api.get(`/patients/${id}`),
     create: (data: Partial<Patient>) => api.post('/patients', data),
     update: (id: string, data: Partial<Patient>) => api.patch(`/patients/${id}`, data),
-    updateStatus: (id: string, status: PatientStatus) =>
-        api.patch(`/patients/${id}/status`, { status }),
-    remove: (id: string) => api.delete(`/patients/${id}`),
+    updateStatus: (id: string, status: PatientStatus, reason?: string) =>
+        api.patch(`/patients/${id}/status`, reason ? { status, reason } : { status }),
     getStats: () => api.get('/patients/stats'),
 };
 
 // ── Sagas ─────────────────────────────────────────────────────────────────────
 
-const errorMessage = (err: any, fallback: string) =>
-    err?.data?.message || err?.response?.data?.message || err?.message || fallback;
+const errorMessage = (err: any, fallbackKey: string) => apiErrorMessage(err, fallbackKey);
 
 /** Re-runs the last list request so mutations don't reset filters or paging. */
 function* refreshList() {
@@ -106,7 +103,7 @@ function* getPatientsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, errorMessage(err, 'Failed to load patients')));
+        yield put(httpActions.appendError(action.type, errorMessage(err, 'errors.loadPatients')));
     }
 }
 
@@ -119,7 +116,7 @@ function* getPatientSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, errorMessage(err, 'Failed to load patient')));
+        yield put(httpActions.appendError(action.type, errorMessage(err, 'errors.loadPatient')));
     }
 }
 
@@ -134,7 +131,7 @@ function* createPatientSaga(action: any) {
         yield call(refreshList);
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, errorMessage(err, 'Failed to create patient')));
+        yield put(httpActions.appendError(action.type, errorMessage(err, 'errors.createPatient')));
     }
 }
 
@@ -148,7 +145,7 @@ function* updatePatientSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, errorMessage(err, 'Failed to update patient')));
+        yield put(httpActions.appendError(action.type, errorMessage(err, 'errors.updatePatient')));
     }
 }
 
@@ -156,7 +153,12 @@ function* updatePatientStatusSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.updateStatus, action.payload.id, action.payload.status);
+        const res: any = yield call(
+            service.updateStatus,
+            action.payload.id,
+            action.payload.status,
+            action.payload.reason,
+        );
         yield put({ type: GET_PATIENT_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
@@ -164,22 +166,8 @@ function* updatePatientStatusSaga(action: any) {
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(
-            httpActions.appendError(action.type, errorMessage(err, 'Failed to update patient status')),
+            httpActions.appendError(action.type, errorMessage(err, 'errors.updatePatientStatus')),
         );
-    }
-}
-
-function* deletePatientSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        yield call(service.remove, action.payload);
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendSuccess(action.type));
-        yield call(refreshList);
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, errorMessage(err, 'Failed to delete patient')));
     }
 }
 
@@ -193,7 +181,7 @@ function* getPatientStatsSaga(action: any) {
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(
-            httpActions.appendError(action.type, errorMessage(err, 'Failed to load patient stats')),
+            httpActions.appendError(action.type, errorMessage(err, 'errors.loadPatientStats')),
         );
     }
 }
@@ -204,7 +192,6 @@ export function* watchPatients() {
     yield takeLatest(CREATE_PATIENT, createPatientSaga);
     yield takeLatest(UPDATE_PATIENT, updatePatientSaga);
     yield takeLatest(UPDATE_PATIENT_STATUS, updatePatientStatusSaga);
-    yield takeLatest(DELETE_PATIENT, deletePatientSaga);
     yield takeLatest(GET_PATIENT_STATS, getPatientStatsSaga);
 }
 

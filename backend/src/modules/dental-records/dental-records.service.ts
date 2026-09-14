@@ -51,6 +51,34 @@ export class DentalRecordsService {
     }
 
     /**
+     * Switch a chart between adult (teeth 1-32) and pediatric (51-70).
+     *
+     * The two numbering schemes share no tooth numbers, so the teeth array is
+     * rebuilt from scratch — per-tooth status and history for the old scheme
+     * cannot be carried over. Recorded treatment entries live in their own
+     * collection and are left untouched.
+     */
+    async setChartType(
+        clinicId: Types.ObjectId,
+        patientId: Types.ObjectId,
+        chartType: 'adult' | 'pediatric',
+        userId: Types.ObjectId,
+    ): Promise<DentalRecordDocument> {
+        const chart = await this.getOrCreateChart(clinicId, patientId, chartType);
+
+        if (chart.chartType === chartType) {
+            return chart;
+        }
+
+        chart.chartType = chartType;
+        chart.teeth = this.generateDefaultTeeth(chartType) as ToothRecord[];
+        chart.lastUpdatedBy = userId;
+        chart.markModified('teeth');
+
+        return chart.save();
+    }
+
+    /**
      * Get an existing dental chart for a patient.
      * Returns null if no chart exists.
      */
@@ -226,7 +254,9 @@ export class DentalRecordsService {
         const entry = await this.treatmentEntryModel.create({
             clinicId,
             patientId,
-            dentistId,
+            // The caller may attribute the treatment to another dentist (e.g. a
+            // receptionist recording it); otherwise it is the current user.
+            dentistId: dto.dentistId ? new Types.ObjectId(dto.dentistId) : dentistId,
             toothNumber: dto.toothNumber,
             treatmentName: dto.treatmentName,
             treatmentId: dto.treatmentId
@@ -239,10 +269,13 @@ export class DentalRecordsService {
             notes: dto.notes,
             cost: dto.cost,
             currency: dto.currency,
-            date: new Date(),
+            date: dto.date ? new Date(dto.date) : new Date(),
         });
 
-        return entry;
+        return entry.populate([
+            { path: 'dentistId', select: 'firstName lastName' },
+            { path: 'treatmentId', select: 'name' },
+        ]);
     }
 
     /**

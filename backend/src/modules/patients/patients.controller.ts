@@ -15,7 +15,6 @@ import { ParseObjectIdPipe } from 'src/common/pipes';
 import { PatientsService } from './patients.service';
 import {
     CreatePatientDto,
-    MedicalHistoryDto,
     QueryPatientDto,
     UpdatePatientDto,
     UpdatePatientStatusDto,
@@ -33,9 +32,10 @@ export class PatientsController {
     @ApiResponse({ status: 409, description: 'Email already used by another patient' })
     create(
         @CurrentUser('clinicId') clinicId: Types.ObjectId,
+        @CurrentUser('userId') userId: string,
         @Body() dto: CreatePatientDto,
     ) {
-        return this.patientsService.create(clinicId, dto);
+        return this.patientsService.create(clinicId, dto, new Types.ObjectId(userId));
     }
 
     @Get()
@@ -67,10 +67,11 @@ export class PatientsController {
     @ApiResponse({ status: 409, description: 'Email already used by another patient' })
     update(
         @CurrentUser('clinicId') clinicId: Types.ObjectId,
+        @CurrentUser('userId') userId: string,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdatePatientDto,
     ) {
-        return this.patientsService.update(clinicId, id, dto);
+        return this.patientsService.update(clinicId, id, dto, new Types.ObjectId(userId));
     }
 
     @Patch(':id/status')
@@ -79,37 +80,41 @@ export class PatientsController {
     })
     updateStatus(
         @CurrentUser('clinicId') clinicId: Types.ObjectId,
+        @CurrentUser('userId') userId: string,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdatePatientStatusDto,
     ) {
-        return this.patientsService.updateStatus(clinicId, id, dto.status);
+        return this.patientsService.updateStatus(
+            clinicId,
+            id,
+            dto.status,
+            new Types.ObjectId(userId),
+            dto.reason,
+        );
     }
 
     @Patch(':id/restore')
     @ApiOperation({ summary: 'Reactivate a patient' })
     restore(
         @CurrentUser('clinicId') clinicId: Types.ObjectId,
+        @CurrentUser('userId') userId: string,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
-        return this.patientsService.updateStatus(clinicId, id, PatientStatus.ACTIVE);
+        return this.patientsService.updateStatus(
+            clinicId,
+            id,
+            PatientStatus.ACTIVE,
+            new Types.ObjectId(userId),
+        );
     }
 
     @Delete(':id')
     @ApiOperation({ summary: 'Deactivate patient (soft delete)' })
     deactivate(
         @CurrentUser('clinicId') clinicId: Types.ObjectId,
+        @CurrentUser('userId') userId: string,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
-        return this.patientsService.deactivate(clinicId, id);
-    }
-
-    @Patch(':id/medical-history')
-    @ApiOperation({ summary: 'Update patient medical history' })
-    updateMedicalHistory(
-        @CurrentUser('clinicId') clinicId: Types.ObjectId,
-        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-        @Body() dto: MedicalHistoryDto,
-    ) {
-        return this.patientsService.updateMedicalHistory(clinicId, id, dto);
+        return this.patientsService.deactivate(clinicId, id, new Types.ObjectId(userId));
     }
 }

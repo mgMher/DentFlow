@@ -2,7 +2,9 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    Logger,
     NotFoundException,
+    OnModuleInit,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
@@ -13,14 +15,74 @@ import {
 } from './appointment.schema';
 import { CreateAppointmentDto, QueryAppointmentDto, UpdateAppointmentDto } from './dto';
 import { PatientsService } from '../patients/patients.service';
+import { UserProfile, UserProfileDocument } from '../users/user.schema';
 
 @Injectable()
-export class AppointmentsService {
+export class AppointmentsService implements OnModuleInit {
+    private readonly logger = new Logger(AppointmentsService.name);
+
     constructor(
         @InjectModel(Appointment.name)
         private readonly appointmentModel: Model<AppointmentDocument>,
+        @InjectModel(UserProfile.name)
+        private readonly userProfileModel: Model<UserProfileDocument>,
         private readonly patientsService: PatientsService,
     ) {}
+
+    /**
+     * `Appointment.dentistId` references the auth `User` collection, but the UI
+     * used to send the dentist's `UserProfile` id, which resolves to nothing on
+     * populate (so the dentist showed as "-"). Convert those rows to the
+     * matching `authId`.
+     *
+     * Safe and idempotent: ObjectIds are unique across collections, so a stored
+     * value that matches a `UserProfile._id` can only be a profile id, and once
+     * rewritten to an `authId` it no longer matches anything here.
+     */
+    async onModuleInit(): Promise<void> {
+        try {
+            const dentistIds: Types.ObjectId[] =
+                await this.appointmentModel.distinct('dentistId');
+
+            if (!dentistIds.length) {
+                return;
+            }
+
+            const profiles = await this.userProfileModel
+                .find({ _id: { $in: dentistIds } }, { _id: 1, authId: 1 })
+                .lean();
+
+            let migrated = 0;
+
+            for (const profile of profiles) {
+                if (!profile.authId) {
+                    this.logger.warn(
+                        `UserProfile ${profile._id} has no authId; appointments referencing it were left unchanged`,
+                    );
+                    continue;
+                }
+
+                const result = await this.appointmentModel
+                    .updateMany(
+                        { dentistId: profile._id },
+                        { $set: { dentistId: profile.authId } },
+                    )
+                    .exec();
+
+                migrated += result.modifiedCount;
+            }
+
+            if (migrated) {
+                this.logger.log(
+                    `Repointed dentistId on ${migrated} appointment(s) from UserProfile to auth User`,
+                );
+            }
+        } catch (err) {
+            this.logger.warn(
+                `Could not migrate appointment dentist references: ${(err as Error).message}`,
+            );
+        }
+    }
 
     /**
      * Create a new appointment after checking for scheduling conflicts.

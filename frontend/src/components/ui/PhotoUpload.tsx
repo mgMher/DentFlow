@@ -8,7 +8,9 @@ import { useTranslation } from 'react-i18next';
 
 const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 const MAX_SOURCE_BYTES = 8 * 1024 * 1024;
-const OUTPUT_SIZE = 320;
+// Large enough for the biggest avatar we render (72px) on a 2x display, and
+// small enough that photos can ride along in list responses (~8KB each).
+const OUTPUT_SIZE = 192;
 
 /**
  * Downscale and re-encode the picked file to a square JPEG data URL, so photos

@@ -16,6 +16,7 @@ import { DentalRecordsService } from './dental-records.service';
 import {
     UpdateToothDto,
     UpdateTeethDto,
+    SetChartTypeDto,
     CreateTreatmentEntryDto,
     QueryRecordsDto,
 } from './dto';
@@ -38,6 +39,27 @@ export class DentalRecordsController {
             new Types.ObjectId(clinicId),
             patientId,
             chartType,
+        );
+    }
+
+    @Patch(':patientId/chart-type')
+    @ApiOperation({
+        summary: 'Switch a chart between adult and pediatric numbering',
+        description:
+            'Rebuilds the teeth array for the new numbering. Per-tooth status and history do not carry over; treatment entries are preserved.',
+    })
+    @ApiResponse({ status: 200, description: 'Chart type updated' })
+    async setChartType(
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
+        @Body() dto: SetChartTypeDto,
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') userId: string,
+    ) {
+        return this.dentalRecordsService.setChartType(
+            new Types.ObjectId(clinicId),
+            patientId,
+            dto.chartType,
+            new Types.ObjectId(userId),
         );
     }
 

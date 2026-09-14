@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Box,
     Card,
@@ -32,17 +32,17 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
 import { dentalRecordsActions } from '../../store/dental-records';
-import { PageHeader, LoadingSpinner } from '../../components/ui';
-import { formatDate, formatDateTime, getFullName } from '../../utils/formatters';
+import {
+    PageHeader,
+    LoadingSpinner,
+    ToothTreatmentForm,
+    Odontogram,
+} from '../../components/ui';
+import { formatCurrency, formatDate, formatDateTime, getFullName } from '../../utils/formatters';
 import { TOOTH_STATUS_COLORS, TOOTH_SURFACES } from '../../utils/constants';
-import { ToothStatus, ToothSurface, ToothRecord } from '../../types';
+import { ToothStatus, ToothSurface } from '../../types';
 
 // ── Tooth layout constants ──────────────────────────────────────────────────────
-
-const TOOTH_WIDTH = 34;
-const TOOTH_HEIGHT = 44;
-const TOOTH_GAP = 4;
-const TOOTH_RX = 6;
 
 const ALL_TOOTH_STATUSES: ToothStatus[] = [
     'healthy', 'filled', 'crown', 'missing', 'implant',
@@ -51,222 +51,21 @@ const ALL_TOOTH_STATUSES: ToothStatus[] = [
 
 const SURFACE_OPTIONS: ToothSurface[] = [...TOOTH_SURFACES];
 
-// Upper teeth: 1-16 (right to left in dentist's view), Lower teeth: 17-32
-const UPPER_TEETH = Array.from({ length: 16 }, (_, i) => i + 1);
-const LOWER_TEETH = Array.from({ length: 16 }, (_, i) => i + 17);
-
-// ── Arch layout calculation ─────────────────────────────────────────────────────
-// Creates a dental arch shape for the teeth
-
-interface ToothPosition {
-    x: number;
-    y: number;
-    toothNumber: number;
-}
-
-const buildArchPositions = (
-    teeth: number[],
-    centerX: number,
-    baseY: number,
-    isUpper: boolean,
-): ToothPosition[] => {
-    const totalWidth = teeth.length * (TOOTH_WIDTH + TOOTH_GAP) - TOOTH_GAP;
-    const startX = centerX - totalWidth / 2;
-
-    return teeth.map((toothNumber, idx) => {
-        const x = startX + idx * (TOOTH_WIDTH + TOOTH_GAP);
-        // Create arch curve: teeth at the edges are lower (upper) or higher (lower)
-        const normalized = (idx - (teeth.length - 1) / 2) / ((teeth.length - 1) / 2); // -1 to 1
-        const archOffset = normalized * normalized * 30; // parabolic curve
-        const y = isUpper ? baseY + archOffset : baseY - archOffset;
-
-        return { x, y, toothNumber };
-    });
+const statusTranslationKeys: Record<string, string> = {
+    healthy: 'dental.healthy',
+    filled: 'dental.filled',
+    crown: 'dental.crown',
+    missing: 'dental.missing',
+    implant: 'dental.implant',
+    needs_treatment: 'dental.needsTreatment',
+    root_canal: 'dental.rootCanal',
+    decayed: 'dental.decayed',
+    bridge: 'dental.bridge',
+    veneer: 'dental.veneer',
 };
-
-// ── Odontogram SVG Component ────────────────────────────────────────────────────
-
-interface OdontogramProps {
-    teeth: ToothRecord[];
-    selectedTooth: number | null;
-    onToothClick: (toothNumber: number) => void;
-}
-
-const Odontogram: React.FC<OdontogramProps> = ({ teeth, selectedTooth, onToothClick }) => {
-    const { t } = useTranslation();
-
-    const svgWidth = 700;
-    const svgHeight = 340;
-    const centerX = svgWidth / 2;
-
-    const upperPositions = buildArchPositions(UPPER_TEETH, centerX, 50, true);
-    const lowerPositions = buildArchPositions(LOWER_TEETH, centerX, 220, false);
-
-    const toothStatusMap = useMemo(() => {
-        const map: Record<number, ToothStatus> = {};
-        teeth.forEach((tooth) => {
-            map[tooth.toothNumber] = tooth.status;
-        });
-        return map;
-    }, [teeth]);
-
-    const renderTooth = (pos: ToothPosition) => {
-        const status = toothStatusMap[pos.toothNumber] || 'healthy';
-        const fillColor = TOOTH_STATUS_COLORS[status] || TOOTH_STATUS_COLORS.healthy;
-        const isSelected = selectedTooth === pos.toothNumber;
-
-        return (
-            <g
-                key={pos.toothNumber}
-                onClick={() => onToothClick(pos.toothNumber)}
-                style={{ cursor: 'pointer' }}
-            >
-                <rect
-                    x={pos.x}
-                    y={pos.y}
-                    width={TOOTH_WIDTH}
-                    height={TOOTH_HEIGHT}
-                    rx={TOOTH_RX}
-                    ry={TOOTH_RX}
-                    fill={fillColor}
-                    stroke={isSelected ? '#1A202C' : '#E2E8F0'}
-                    strokeWidth={isSelected ? 2.5 : 1.5}
-                    opacity={status === 'missing' ? 0.4 : 1}
-                />
-                {/* Hover overlay */}
-                <rect
-                    x={pos.x}
-                    y={pos.y}
-                    width={TOOTH_WIDTH}
-                    height={TOOTH_HEIGHT}
-                    rx={TOOTH_RX}
-                    ry={TOOTH_RX}
-                    fill="transparent"
-                    stroke="transparent"
-                    strokeWidth={0}
-                >
-                    <animate
-                        attributeName="fill"
-                        from="transparent"
-                        to="rgba(0,0,0,0.08)"
-                        dur="0.15s"
-                        begin="mouseover"
-                        fill="freeze"
-                    />
-                    <animate
-                        attributeName="fill"
-                        from="rgba(0,0,0,0.08)"
-                        to="transparent"
-                        dur="0.15s"
-                        begin="mouseout"
-                        fill="freeze"
-                    />
-                </rect>
-                {/* Tooth number label */}
-                <text
-                    x={pos.x + TOOTH_WIDTH / 2}
-                    y={pos.y + TOOTH_HEIGHT / 2 + 1}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={12}
-                    fontWeight={600}
-                    fill="#fff"
-                    style={{ pointerEvents: 'none', userSelect: 'none' }}
-                >
-                    {pos.toothNumber}
-                </text>
-            </g>
-        );
-    };
-
-    return (
-        <svg
-            viewBox={`0 0 ${svgWidth} ${svgHeight}`}
-            width="100%"
-            style={{ maxWidth: svgWidth }}
-        >
-            {/* Upper jaw label */}
-            <text
-                x={centerX}
-                y={20}
-                textAnchor="middle"
-                fontSize={14}
-                fontWeight={600}
-                fill="#4A5568"
-            >
-                {t('dental.upperJaw')}
-            </text>
-
-            {/* Midline */}
-            <line
-                x1={centerX}
-                y1={35}
-                x2={centerX}
-                y2={155}
-                stroke="#CBD5E0"
-                strokeWidth={1}
-                strokeDasharray="4 4"
-            />
-
-            {/* Upper teeth */}
-            {upperPositions.map(renderTooth)}
-
-            {/* Separator line */}
-            <line
-                x1={40}
-                y1={svgHeight / 2}
-                x2={svgWidth - 40}
-                y2={svgHeight / 2}
-                stroke="#CBD5E0"
-                strokeWidth={1}
-            />
-
-            {/* Lower jaw label */}
-            <text
-                x={centerX}
-                y={svgHeight - 10}
-                textAnchor="middle"
-                fontSize={14}
-                fontWeight={600}
-                fill="#4A5568"
-            >
-                {t('dental.lowerJaw')}
-            </text>
-
-            {/* Midline lower */}
-            <line
-                x1={centerX}
-                y1={185}
-                x2={centerX}
-                y2={305}
-                stroke="#CBD5E0"
-                strokeWidth={1}
-                strokeDasharray="4 4"
-            />
-
-            {/* Lower teeth */}
-            {lowerPositions.map(renderTooth)}
-        </svg>
-    );
-};
-
-// ── Legend Component ─────────────────────────────────────────────────────────────
 
 const ChartLegend: React.FC = () => {
     const { t } = useTranslation();
-
-    const statusTranslationMap: Record<string, string> = {
-        healthy: 'dental.healthy',
-        filled: 'dental.filled',
-        crown: 'dental.crown',
-        missing: 'dental.missing',
-        implant: 'dental.implant',
-        needs_treatment: 'dental.needsTreatment',
-        root_canal: 'dental.rootCanal',
-        decayed: 'dental.decayed',
-        bridge: 'dental.bridge',
-        veneer: 'dental.veneer',
-    };
 
     return (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
@@ -282,12 +81,17 @@ const ChartLegend: React.FC = () => {
                         }}
                     />
                     <Typography variant="caption" color="text.secondary">
-                        {t(statusTranslationMap[status])}
+                        {t(statusTranslationKeys[status])}
                     </Typography>
                 </Box>
             ))}
         </Box>
     );
+};
+
+const entryDentistName = (dentist?: string | { firstName?: string; lastName?: string }): string => {
+    if (!dentist || typeof dentist === 'string') return '';
+    return getFullName(dentist.firstName || '', dentist.lastName || '');
 };
 
 // ── Main DentalChartPage ────────────────────────────────────────────────────────
@@ -541,6 +345,16 @@ const DentalChartPage: React.FC = () => {
                     {updateLoading ? t('common.loading') : t('common.save')}
                 </Button>
 
+                {/* Record a treatment for this tooth */}
+                <Divider sx={{ my: 3 }} />
+                {patientId && selectedTooth !== null && (
+                    <ToothTreatmentForm
+                        patientId={patientId}
+                        toothNumber={selectedTooth}
+                        defaultSurfaces={editSurfaces}
+                    />
+                )}
+
                 {/* Status History */}
                 <Divider sx={{ my: 3 }} />
                 <Typography variant="subtitle2" fontWeight={600} gutterBottom>
@@ -619,7 +433,7 @@ const DentalChartPage: React.FC = () => {
 
                 {toothHistory.length === 0 ? (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        {t('common.noData')}
+                        {t('dental.noTreatmentsYet')}
                     </Typography>
                 ) : (
                     <List dense disablePadding>
@@ -646,6 +460,27 @@ const DentalChartPage: React.FC = () => {
                                     }
                                     secondary={
                                         <Box>
+                                            <Box
+                                                sx={{
+                                                    display: 'flex',
+                                                    justifyContent: 'space-between',
+                                                    gap: 1,
+                                                    mt: 0.25,
+                                                }}
+                                            >
+                                                <Typography variant="caption" color="text.secondary">
+                                                    {entryDentistName(entry.dentistId) || '—'}
+                                                </Typography>
+                                                {entry.cost !== undefined && entry.cost !== null && (
+                                                    <Typography
+                                                        variant="caption"
+                                                        fontWeight={600}
+                                                        color="text.primary"
+                                                    >
+                                                        {formatCurrency(entry.cost, entry.currency)}
+                                                    </Typography>
+                                                )}
+                                            </Box>
                                             {!!entry.surfaces?.length && (
                                                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                                     {entry.surfaces.map((surface) => (

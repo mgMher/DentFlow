@@ -1,5 +1,16 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsArray, IsEnum, IsInt, IsMongoId, IsNotEmpty, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+    IsArray,
+    IsDateString,
+    IsEnum,
+    IsInt,
+    IsMongoId,
+    IsNotEmpty,
+    IsNumber,
+    IsOptional,
+    IsString,
+    Min,
+} from 'class-validator';
 import { Currency } from '../treatment-entry.schema';
 import { ToothSurface } from '../dental-record.schema';
 
@@ -28,6 +39,22 @@ export class CreateTreatmentEntryDto {
     appointmentId?: string;
 
     @ApiPropertyOptional({
+        example: '507f1f77bcf86cd799439013',
+        description: 'Dentist who performed the treatment. Defaults to the current user.',
+    })
+    @IsOptional()
+    @IsMongoId()
+    dentistId?: string;
+
+    @ApiPropertyOptional({
+        example: '2026-09-09',
+        description: 'When the treatment was performed. Defaults to now.',
+    })
+    @IsOptional()
+    @IsDateString()
+    date?: string;
+
+    @ApiPropertyOptional({
         enum: ToothSurface,
         isArray: true,
         example: [ToothSurface.MESIAL, ToothSurface.OCCLUSAL],
@@ -45,6 +72,7 @@ export class CreateTreatmentEntryDto {
     @ApiPropertyOptional({ example: 25000, description: 'Treatment cost' })
     @IsOptional()
     @IsNumber()
+    @Min(0)
     cost?: number;
 
     @ApiPropertyOptional({ enum: Currency, example: Currency.AMD })

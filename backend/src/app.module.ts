@@ -1,5 +1,6 @@
 import {Module} from '@nestjs/common';
 import {ConfigModule} from '@nestjs/config';
+import {getDatabaseConfig} from './config';
 import {MongooseModule} from '@nestjs/mongoose';
 import {APP_GUARD} from '@nestjs/core';
 import {AuthGuard, ClinicGuard, RolesGuard} from 'src/common';
@@ -19,7 +20,8 @@ import {SettingsModule} from './modules/settings/settings.module';
 @Module({
     imports: [
         ConfigModule.forRoot({isGlobal: true}),
-        MongooseModule.forRoot('mongodb+srv://eachbase:oh9nDM0ButKeSZ8n@dev.wrsq2ox.mongodb.net/TL_D?retryWrites=true&w=majority'),
+        // forRootAsync so ConfigModule has loaded .env before the URI is read.
+        MongooseModule.forRootAsync({useFactory: getDatabaseConfig}),
         AuthModule,
         ClinicsModule,
         UsersModule,

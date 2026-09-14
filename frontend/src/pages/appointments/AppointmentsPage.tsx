@@ -47,22 +47,12 @@ import { scheduleActions } from '../../store/schedule';
 import { httpActions } from '../../store/http';
 import { PageHeader, StatusChip, EmptyState, LoadingSpinner } from '../../components/ui';
 import { formatDate, formatTime } from '../../utils/formatters';
+import { staffRefId } from '../../utils/staff';
+import { patientName, staffName } from '../../utils/references';
 import { APPOINTMENT_STATUS_COLORS } from '../../utils/constants';
-import { Appointment, Patient, UserProfile } from '../../types';
+import { Appointment, Patient } from '../../types';
 
 // ── Helper: extract name from populated or raw field ────────────────────────
-
-const getPatientName = (patient: string | Patient | null): string => {
-    if (!patient) return '-';
-    if (typeof patient === 'string') return patient;
-    return `${patient.lastName} ${patient.firstName}`;
-};
-
-const getDentistName = (dentist: string | UserProfile | null): string => {
-    if (!dentist) return '-';
-    if (typeof dentist === 'string') return dentist;
-    return `${dentist.lastName} ${dentist.firstName}`;
-};
 
 // ── Form types ──────────────────────────────────────────────────────────────
 
@@ -372,7 +362,7 @@ const AppointmentsPage: React.FC = () => {
                                         whiteSpace: 'nowrap',
                                     }}
                                 >
-                                    {formatTime(appt.startTime)} {getPatientName(appt.patientId)}
+                                    {formatTime(appt.startTime)} {patientName(appt.patientId)}
                                 </Box>
                             ))}
                             {dayAppointments.length > 3 && (
@@ -474,10 +464,10 @@ const AppointmentsPage: React.FC = () => {
                                                 </Typography>
                                             </Box>
                                             <Typography variant="body2">
-                                                {getPatientName(appt.patientId)}
+                                                {patientName(appt.patientId)}
                                             </Typography>
                                             <Typography variant="body2" color="text.secondary">
-                                                {getDentistName(appt.dentistId)}
+                                                {staffName(appt.dentistId)}
                                             </Typography>
                                         </Box>
                                         <StatusChip status={appt.status} />
@@ -560,7 +550,7 @@ const AppointmentsPage: React.FC = () => {
                     >
                         <MenuItem value="all">{t('common.all')}</MenuItem>
                         {dentists.map((d: any) => (
-                            <MenuItem key={d._id} value={d._id}>
+                            <MenuItem key={d._id} value={staffRefId(d)}>
                                 {d.lastName} {d.firstName}
                             </MenuItem>
                         ))}
@@ -613,8 +603,8 @@ const AppointmentsPage: React.FC = () => {
                                             {formatTime(appt.startTime)} - {formatTime(appt.endTime)}
                                         </Typography>
                                     </TableCell>
-                                    <TableCell>{getPatientName(appt.patientId)}</TableCell>
-                                    <TableCell>{getDentistName(appt.dentistId)}</TableCell>
+                                    <TableCell>{patientName(appt.patientId)}</TableCell>
+                                    <TableCell>{staffName(appt.dentistId)}</TableCell>
                                     <TableCell>{appt.treatmentType || '-'}</TableCell>
                                     <TableCell>
                                         {appt.duration} {t('common.minutes').toLowerCase()}
@@ -691,7 +681,7 @@ const AppointmentsPage: React.FC = () => {
                                             helperText={errors.dentistId?.message}
                                         >
                                             {dentists.map((d: any) => (
-                                                <MenuItem key={d._id} value={d._id}>
+                                                <MenuItem key={d._id} value={staffRefId(d)}>
                                                     {d.lastName} {d.firstName}
                                                 </MenuItem>
                                             ))}

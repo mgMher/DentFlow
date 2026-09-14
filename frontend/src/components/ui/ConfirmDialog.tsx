@@ -9,6 +9,8 @@ interface ConfirmDialogProps {
     open: boolean;
     title: string;
     message: string;
+    /** Extra fields rendered under the message, e.g. a reason input. */
+    children?: React.ReactNode;
     confirmLabel?: string;
     cancelLabel?: string;
     onConfirm: () => void;
@@ -17,7 +19,8 @@ interface ConfirmDialogProps {
 }
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
-    open, title, message, confirmLabel, cancelLabel, onConfirm, onCancel, variant = 'default',
+    open, title, message, children, confirmLabel, cancelLabel,
+    onConfirm, onCancel, variant = 'default',
 }) => {
     const { t } = useTranslation();
 
@@ -26,6 +29,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             <DialogTitle>{title}</DialogTitle>
             <DialogContent>
                 <DialogContentText>{message}</DialogContentText>
+                {children}
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2 }}>
                 <Button onClick={onCancel} color="inherit">

@@ -32,6 +32,10 @@ import {
     ListItem,
     ListItemText,
     Stack,
+    Alert,
+    AlertTitle,
+    ToggleButton,
+    ToggleButtonGroup,
 } from '@mui/material';
 import {
     ArrowBack as BackIcon,
@@ -42,6 +46,7 @@ import {
     Close as CloseIcon,
     Save as SaveIcon,
     History as HistoryIcon,
+    WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -57,6 +62,8 @@ import {
     EmptyState,
     LoadingSpinner,
     ConfirmDialog,
+    ToothTreatmentForm,
+    Odontogram,
 } from '../../components/ui';
 import {
     formatDate,
@@ -71,7 +78,6 @@ import {
     PATIENT_STATUSES,
     PatientStatus,
     ToothStatus,
-    ToothRecord,
     ToothSurface,
 } from '../../types';
 
@@ -86,12 +92,7 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
     return <Box sx={{ py: 3 }}>{children}</Box>;
 };
 
-// ── Odontogram constants & components ──────────────────────────────────────
-
-const TOOTH_WIDTH = 34;
-const TOOTH_HEIGHT = 44;
-const TOOTH_GAP = 4;
-const TOOTH_RX = 6;
+// ── Odontogram constants ───────────────────────────────────────────────────
 
 const ALL_TOOTH_STATUSES: ToothStatus[] = [
     'healthy', 'filled', 'crown', 'missing', 'implant',
@@ -100,86 +101,20 @@ const ALL_TOOTH_STATUSES: ToothStatus[] = [
 
 const SURFACE_OPTIONS: ToothSurface[] = [...TOOTH_SURFACES];
 
-const UPPER_TEETH = Array.from({ length: 16 }, (_, i) => i + 1);
-const LOWER_TEETH = Array.from({ length: 16 }, (_, i) => i + 17);
-
-interface ToothPosition { x: number; y: number; toothNumber: number; }
-
-const buildArchPositions = (
-    teeth: number[], centerX: number, baseY: number, isUpper: boolean,
-): ToothPosition[] => {
-    const totalWidth = teeth.length * (TOOTH_WIDTH + TOOTH_GAP) - TOOTH_GAP;
-    const startX = centerX - totalWidth / 2;
-    return teeth.map((toothNumber, idx) => {
-        const x = startX + idx * (TOOTH_WIDTH + TOOTH_GAP);
-        const normalized = (idx - (teeth.length - 1) / 2) / ((teeth.length - 1) / 2);
-        const archOffset = normalized * normalized * 30;
-        const y = isUpper ? baseY + archOffset : baseY - archOffset;
-        return { x, y, toothNumber };
-    });
+const ageFromDateOfBirth = (dateOfBirth: string): number => {
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+    }
+    return age;
 };
 
-interface InlineOdontogramProps {
-    teeth: ToothRecord[];
-    selectedTooth: number | null;
-    onToothClick: (toothNumber: number) => void;
-    t: (key: string) => string;
-}
-
-const InlineOdontogram: React.FC<InlineOdontogramProps> = ({ teeth, selectedTooth, onToothClick, t }) => {
-    const svgWidth = 700;
-    const svgHeight = 340;
-    const centerX = svgWidth / 2;
-    const upperPositions = buildArchPositions(UPPER_TEETH, centerX, 50, true);
-    const lowerPositions = buildArchPositions(LOWER_TEETH, centerX, 220, false);
-
-    const toothStatusMap = useMemo(() => {
-        const map: Record<number, ToothStatus> = {};
-        teeth.forEach((tooth) => { map[tooth.toothNumber] = tooth.status; });
-        return map;
-    }, [teeth]);
-
-    const renderTooth = (pos: ToothPosition) => {
-        const status = toothStatusMap[pos.toothNumber] || 'healthy';
-        const fillColor = TOOTH_STATUS_COLORS[status] || TOOTH_STATUS_COLORS.healthy;
-        const isSelected = selectedTooth === pos.toothNumber;
-        return (
-            <g key={pos.toothNumber} onClick={() => onToothClick(pos.toothNumber)} style={{ cursor: 'pointer' }}>
-                <rect x={pos.x} y={pos.y} width={TOOTH_WIDTH} height={TOOTH_HEIGHT}
-                    rx={TOOTH_RX} ry={TOOTH_RX} fill={fillColor}
-                    stroke={isSelected ? '#1A202C' : '#E2E8F0'}
-                    strokeWidth={isSelected ? 2.5 : 1.5}
-                    opacity={status === 'missing' ? 0.4 : 1}
-                />
-                <rect x={pos.x} y={pos.y} width={TOOTH_WIDTH} height={TOOTH_HEIGHT}
-                    rx={TOOTH_RX} ry={TOOTH_RX} fill="transparent" stroke="transparent" strokeWidth={0}>
-                    <animate attributeName="fill" from="transparent" to="rgba(0,0,0,0.08)" dur="0.15s" begin="mouseover" fill="freeze" />
-                    <animate attributeName="fill" from="rgba(0,0,0,0.08)" to="transparent" dur="0.15s" begin="mouseout" fill="freeze" />
-                </rect>
-                <text x={pos.x + TOOTH_WIDTH / 2} y={pos.y + TOOTH_HEIGHT / 2 + 1}
-                    textAnchor="middle" dominantBaseline="central" fontSize={12} fontWeight={600}
-                    fill="#fff" style={{ pointerEvents: 'none', userSelect: 'none' }}>
-                    {pos.toothNumber}
-                </text>
-            </g>
-        );
-    };
-
-    return (
-        <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} width="100%" style={{ maxWidth: svgWidth }}>
-            <text x={centerX} y={20} textAnchor="middle" fontSize={14} fontWeight={600} fill="#4A5568">
-                {t('dental.upperJaw')}
-            </text>
-            <line x1={centerX} y1={35} x2={centerX} y2={155} stroke="#CBD5E0" strokeWidth={1} strokeDasharray="4 4" />
-            {upperPositions.map(renderTooth)}
-            <line x1={40} y1={svgHeight / 2} x2={svgWidth - 40} y2={svgHeight / 2} stroke="#CBD5E0" strokeWidth={1} />
-            <text x={centerX} y={svgHeight - 10} textAnchor="middle" fontSize={14} fontWeight={600} fill="#4A5568">
-                {t('dental.lowerJaw')}
-            </text>
-            <line x1={centerX} y1={185} x2={centerX} y2={305} stroke="#CBD5E0" strokeWidth={1} strokeDasharray="4 4" />
-            {lowerPositions.map(renderTooth)}
-        </svg>
-    );
+const entryDentistName = (dentist?: string | { firstName?: string; lastName?: string }): string => {
+    if (!dentist || typeof dentist === 'string') return '';
+    return getFullName(dentist.firstName || '', dentist.lastName || '');
 };
 
 const statusTranslationMap: Record<string, string> = {
@@ -202,8 +137,16 @@ const PatientDetailPage: React.FC = () => {
     const dispatch = useDispatch();
     const { id } = useParams<{ id: string }>();
 
-    const patient = useSelector((state: RootState) => state.patients.current);
+    const storedPatient = useSelector((state: RootState) => state.patients.current);
     const loading = useSelector((state: RootState) => state.http.loading.includes('GET_PATIENT'));
+    const loadError = useSelector(
+        (state: RootState) => state.http.errors.find((e) => e.type === 'GET_PATIENT')?.error,
+    );
+
+    // Never render the previously-viewed patient under this URL: switching
+    // patients would otherwise flash the wrong person's data (allergies
+    // included) for a frame before the fetch starts.
+    const patient = storedPatient && storedPatient._id === id ? storedPatient : null;
     const appointments = useSelector((state: RootState) => state.appointments.list);
     const invoices = useSelector((state: RootState) => state.billing.invoices);
     const chart = useSelector((state: RootState) => state.dentalRecords.chart);
@@ -221,6 +164,15 @@ const PatientDetailPage: React.FC = () => {
 
     const [tabValue, setTabValue] = useState(0);
     const [pendingStatus, setPendingStatus] = useState<PatientStatus | null>(null);
+    const [statusReason, setStatusReason] = useState('');
+    const [pendingChartType, setPendingChartType] = useState<'adult' | 'pediatric' | null>(null);
+
+    // Primary teeth are normally gone by ~13, so that is the default for a new
+    // chart. It is only a starting point — the type can be switched by hand.
+    const suggestedChartType: 'adult' | 'pediatric' = useMemo(() => {
+        if (!storedPatient?.dateOfBirth) return 'adult';
+        return ageFromDateOfBirth(storedPatient.dateOfBirth) < 13 ? 'pediatric' : 'adult';
+    }, [storedPatient?.dateOfBirth]);
 
     // Dental chart state
     const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
@@ -240,7 +192,14 @@ const PatientDetailPage: React.FC = () => {
         if (!id) return;
 
         if (tabValue === 1) {
-            dispatch(dentalRecordsActions.getChart(id));
+            // The chartType hint only applies when the chart is first created;
+            // an existing chart keeps whatever type it already has.
+            dispatch(
+                dentalRecordsActions.getChart({
+                    patientId: id,
+                    chartType: suggestedChartType,
+                }),
+            );
         }
         if (tabValue === 2) {
             dispatch(appointmentsActions.getAppointments({ patientId: id, limit: 100 }));
@@ -248,9 +207,10 @@ const PatientDetailPage: React.FC = () => {
         if (tabValue === 3) {
             dispatch(billingActions.getInvoices({ patientId: id, limit: 100 }));
         }
-    }, [tabValue, id, dispatch]);
+    }, [tabValue, id, suggestedChartType, dispatch]);
 
     const teeth = chart?.teeth || [];
+    const chartType = (chart?.chartType as 'adult' | 'pediatric') || 'adult';
 
     const handleToothClick = (toothNumber: number) => {
         setSelectedTooth(toothNumber);
@@ -289,28 +249,54 @@ const PatientDetailPage: React.FC = () => {
     const activeToothHistory =
         toothHistory && toothHistory.toothNumber === selectedTooth ? toothHistory : null;
 
+    const confirmChartTypeChange = () => {
+        if (!id || !pendingChartType) return;
+        dispatch(dentalRecordsActions.setChartType({ patientId: id, chartType: pendingChartType }));
+        setPendingChartType(null);
+        setSelectedTooth(null);
+        setDrawerOpen(false);
+    };
+
     const confirmStatusChange = () => {
         if (!id || !pendingStatus) return;
-        dispatch(patientsActions.updatePatientStatus({ id, status: pendingStatus }));
+        dispatch(
+            patientsActions.updatePatientStatus({
+                id,
+                status: pendingStatus,
+                reason: statusReason.trim() || undefined,
+            }),
+        );
         setPendingStatus(null);
+        setStatusReason('');
+    };
+
+    const cancelStatusChange = () => {
+        setPendingStatus(null);
+        setStatusReason('');
     };
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
     };
 
-    const calculateAge = (dateOfBirth: string): number => {
-        const today = new Date();
-        const birthDate = new Date(dateOfBirth);
-        let age = today.getFullYear() - birthDate.getFullYear();
-        const monthDiff = today.getMonth() - birthDate.getMonth();
-        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-            age--;
-        }
-        return age;
-    };
 
-    if (loading || !patient) {
+    if (!patient) {
+        if (loadError && !loading) {
+            return (
+                <Box>
+                    <PageHeader title={t('patients.patientProfile')}>
+                        <Button
+                            variant="outlined"
+                            startIcon={<BackIcon />}
+                            onClick={() => navigate('/patients')}
+                        >
+                            {t('common.back')}
+                        </Button>
+                    </PageHeader>
+                    <EmptyState title={t('patients.notFound')} description={loadError} />
+                </Box>
+            );
+        }
         return <LoadingSpinner fullPage />;
     }
 
@@ -386,7 +372,7 @@ const PatientDetailPage: React.FC = () => {
                                         <CalendarIcon fontSize="small" />
                                         <Typography variant="body2">
                                             {formatDate(patient.dateOfBirth)} · {t('patients.age')}{' '}
-                                            {calculateAge(patient.dateOfBirth)}
+                                            {ageFromDateOfBirth(patient.dateOfBirth)}
                                         </Typography>
                                     </Box>
                                 )}
@@ -437,6 +423,37 @@ const PatientDetailPage: React.FC = () => {
                     </Box>
                 </CardContent>
             </Card>
+
+            {/* Allergies must be impossible to miss before any treatment. */}
+            {!!patient.medicalHistory?.allergies?.length && (
+                <Alert
+                    severity="error"
+                    icon={<WarningIcon />}
+                    sx={{ mb: 3, alignItems: 'center' }}
+                >
+                    <AlertTitle sx={{ mb: 0.5 }}>{t('patients.allergies')}</AlertTitle>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                        {patient.medicalHistory.allergies.map((allergy) => (
+                            <Chip
+                                key={allergy}
+                                label={allergy}
+                                size="small"
+                                color="error"
+                                sx={{
+                                    fontWeight: 600,
+                                    maxWidth: '100%',
+                                    height: 'auto',
+                                    py: 0.25,
+                                    '& .MuiChip-label': {
+                                        whiteSpace: 'normal',
+                                        overflowWrap: 'anywhere',
+                                    },
+                                }}
+                            />
+                        ))}
+                    </Box>
+                </Alert>
+            )}
 
             {/* Tabs */}
             <Paper sx={{ mb: 2 }}>
@@ -813,6 +830,133 @@ const PatientDetailPage: React.FC = () => {
                             </CardContent>
                         </Card>
                     </Grid>
+
+                    {/* Status audit trail */}
+                    {!!patient.statusHistory?.length && (
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardContent>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <HistoryIcon fontSize="small" color="action" />
+                                        <Typography variant="h6" fontWeight={600}>
+                                            {t('patients.statusHistory')}
+                                        </Typography>
+                                    </Box>
+                                    <Divider sx={{ my: 2 }} />
+                                    <List dense disablePadding>
+                                        {[...patient.statusHistory]
+                                            .sort(
+                                                (a, b) =>
+                                                    new Date(b.changedAt).getTime() -
+                                                    new Date(a.changedAt).getTime(),
+                                            )
+                                            .map((change, index) => (
+                                                <ListItem
+                                                    key={change._id || `${change.changedAt}-${index}`}
+                                                    sx={{
+                                                        px: 0,
+                                                        borderBottom: '1px solid',
+                                                        borderColor: 'divider',
+                                                    }}
+                                                >
+                                                    <ListItemText
+                                                        disableTypography
+                                                        primary={
+                                                            <Box
+                                                                sx={{
+                                                                    display: 'flex',
+                                                                    flexWrap: 'wrap',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                    gap: 1,
+                                                                }}
+                                                            >
+                                                                <Box
+                                                                    sx={{
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        gap: 0.75,
+                                                                    }}
+                                                                >
+                                                                    {change.from ? (
+                                                                        <>
+                                                                            <StatusChip
+                                                                                status={change.from}
+                                                                                translationPrefix="patients"
+                                                                            />
+                                                                            <Typography
+                                                                                variant="caption"
+                                                                                color="text.secondary"
+                                                                            >
+                                                                                →
+                                                                            </Typography>
+                                                                        </>
+                                                                    ) : (
+                                                                        <Typography
+                                                                            variant="caption"
+                                                                            color="text.secondary"
+                                                                        >
+                                                                            {t('patients.registered')}
+                                                                        </Typography>
+                                                                    )}
+                                                                    <StatusChip
+                                                                        status={change.to}
+                                                                        translationPrefix="patients"
+                                                                    />
+                                                                </Box>
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    color="text.secondary"
+                                                                >
+                                                                    {formatDateTime(change.changedAt)}
+                                                                    {entryDentistName(change.changedBy) &&
+                                                                        ` · ${entryDentistName(change.changedBy)}`}
+                                                                </Typography>
+                                                            </Box>
+                                                        }
+                                                        secondary={
+                                                            change.reason ? (
+                                                                <Typography
+                                                                    variant="caption"
+                                                                    color="text.secondary"
+                                                                    sx={{
+                                                                        mt: 0.5,
+                                                                        display: 'block',
+                                                                        overflowWrap: 'anywhere',
+                                                                    }}
+                                                                >
+                                                                    {change.reason}
+                                                                </Typography>
+                                                            ) : null
+                                                        }
+                                                    />
+                                                </ListItem>
+                                            ))}
+                                    </List>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    )}
+
+                    {/* Internal notes */}
+                    {patient.notes && (
+                        <Grid item xs={12}>
+                            <Card>
+                                <CardContent>
+                                    <Typography variant="h6" fontWeight={600} gutterBottom>
+                                        {t('patients.internalNotes')}
+                                    </Typography>
+                                    <Divider sx={{ mb: 2 }} />
+                                    <Typography
+                                        variant="body2"
+                                        sx={{ overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}
+                                    >
+                                        {patient.notes}
+                                    </Typography>
+                                </CardContent>
+                            </Card>
+                        </Grid>
+                    )}
                 </Grid>
             </TabPanel>
 
@@ -823,15 +967,29 @@ const PatientDetailPage: React.FC = () => {
                         <Typography variant="h6" fontWeight={600} gutterBottom>
                             {t('dental.odontogram')}
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                             {t('dental.selectTooth')}
                         </Typography>
 
-                        <InlineOdontogram
+                        <ToggleButtonGroup
+                            size="small"
+                            exclusive
+                            value={chartType}
+                            onChange={(_e, value) => {
+                                if (value && value !== chartType) setPendingChartType(value);
+                            }}
+                            sx={{ mb: 3 }}
+                        >
+                            <ToggleButton value="adult">{t('dental.adultChart')}</ToggleButton>
+                            <ToggleButton value="pediatric">
+                                {t('dental.pediatricChart')}
+                            </ToggleButton>
+                        </ToggleButtonGroup>
+
+                        <Odontogram
                             teeth={teeth}
                             selectedTooth={selectedTooth}
                             onToothClick={handleToothClick}
-                            t={t}
                         />
 
                         {/* Legend */}
@@ -917,6 +1075,15 @@ const PatientDetailPage: React.FC = () => {
                         onClick={handleSaveTooth} disabled={updateToothLoading}>
                         {updateToothLoading ? t('common.loading') : t('common.save')}
                     </Button>
+
+                    <Divider sx={{ my: 3 }} />
+                    {id && selectedTooth !== null && (
+                        <ToothTreatmentForm
+                            patientId={id}
+                            toothNumber={selectedTooth}
+                            defaultSurfaces={editSurfaces}
+                        />
+                    )}
 
                     <Divider sx={{ my: 3 }} />
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
@@ -1013,7 +1180,7 @@ const PatientDetailPage: React.FC = () => {
                     </Typography>
                     {!activeToothHistory?.treatments?.length ? (
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {t('common.noData')}
+                            {t('dental.noTreatmentsYet')}
                         </Typography>
                     ) : (
                         <List dense disablePadding>
@@ -1031,6 +1198,27 @@ const PatientDetailPage: React.FC = () => {
                                         }
                                         secondary={
                                             <Box>
+                                                <Box
+                                                    sx={{
+                                                        display: 'flex',
+                                                        justifyContent: 'space-between',
+                                                        gap: 1,
+                                                        mt: 0.25,
+                                                    }}
+                                                >
+                                                    <Typography variant="caption" color="text.secondary">
+                                                        {entryDentistName(entry.dentistId) || '—'}
+                                                    </Typography>
+                                                    {entry.cost !== undefined && entry.cost !== null && (
+                                                        <Typography
+                                                            variant="caption"
+                                                            fontWeight={600}
+                                                            color="text.primary"
+                                                        >
+                                                            {formatCurrency(entry.cost, entry.currency)}
+                                                        </Typography>
+                                                    )}
+                                                </Box>
                                                 {!!entry.surfaces?.length && (
                                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
                                                         {entry.surfaces.map((surface) => (
@@ -1163,6 +1351,25 @@ const PatientDetailPage: React.FC = () => {
             </TabPanel>
 
             <ConfirmDialog
+                open={!!pendingChartType}
+                title={t('dental.changeChartType')}
+                message={
+                    pendingChartType
+                        ? t('dental.confirmChartTypeChange', {
+                              type: t(
+                                  pendingChartType === 'pediatric'
+                                      ? 'dental.pediatricChart'
+                                      : 'dental.adultChart',
+                              ),
+                          })
+                        : ''
+                }
+                variant="danger"
+                onConfirm={confirmChartTypeChange}
+                onCancel={() => setPendingChartType(null)}
+            />
+
+            <ConfirmDialog
                 open={!!pendingStatus}
                 title={t('patients.changeStatus')}
                 message={
@@ -1174,8 +1381,20 @@ const PatientDetailPage: React.FC = () => {
                 }
                 variant={pendingStatus === 'active' ? 'default' : 'danger'}
                 onConfirm={confirmStatusChange}
-                onCancel={() => setPendingStatus(null)}
-            />
+                onCancel={cancelStatusChange}
+            >
+                <TextField
+                    fullWidth
+                    size="small"
+                    label={t('patients.statusReason')}
+                    placeholder={t('patients.statusReasonHint')}
+                    value={statusReason}
+                    onChange={(e) => setStatusReason(e.target.value)}
+                    multiline
+                    rows={2}
+                    sx={{ mt: 2 }}
+                />
+            </ConfirmDialog>
         </Box>
     );
 };

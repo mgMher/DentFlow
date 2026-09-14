@@ -35,32 +35,19 @@ import { RootState } from '../../store';
 import { appointmentsActions } from '../../store/appointments';
 import { PageHeader, StatusChip, LoadingSpinner, ConfirmDialog } from '../../components/ui';
 import { formatDate, formatTime } from '../../utils/formatters';
-import { Patient, UserProfile } from '../../types';
+import { formatArmenianPhone } from '../../utils/validators';
+import {
+    patientEmail,
+    patientName,
+    patientPhone,
+    referenceKey,
+    roomName,
+    staffName,
+    treatmentName,
+} from '../../utils/references';
 import { APPOINTMENT_STATUS_COLORS } from '../../utils/constants';
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-const getPatientName = (patient: string | Patient | null): string => {
-    if (!patient) return '-';
-    if (typeof patient === 'string') return patient;
-    return `${patient.lastName} ${patient.firstName}`;
-};
-
-const getPatientPhone = (patient: string | Patient | null): string => {
-    if (!patient || typeof patient === 'string') return '-';
-    return patient.phone || '-';
-};
-
-const getPatientEmail = (patient: string | Patient | null): string => {
-    if (!patient || typeof patient === 'string') return '-';
-    return patient.email || '-';
-};
-
-const getDentistName = (dentist: string | UserProfile | null): string => {
-    if (!dentist) return '-';
-    if (typeof dentist === 'string') return dentist;
-    return `${dentist.lastName} ${dentist.firstName}`;
-};
 
 // ── Status flow: which transitions are allowed ──────────────────────────────
 
@@ -190,7 +177,7 @@ const AppointmentDetailPage: React.FC = () => {
             </Box>
 
             <PageHeader
-                title={appointment.title || getPatientName(appointment.patientId)}
+                title={appointment.title || patientName(appointment.patientId)}
                 subtitle={`${formatDate(appointment.startTime)} ${formatTime(appointment.startTime)} - ${formatTime(appointment.endTime)}`}
             >
                 <StatusChip status={appointment.status} />
@@ -211,13 +198,13 @@ const AppointmentDetailPage: React.FC = () => {
                             value={
                                 <Box>
                                     <Typography variant="body1" fontWeight={600}>
-                                        {getPatientName(appointment.patientId)}
+                                        {patientName(appointment.patientId)}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        {getPatientPhone(appointment.patientId)}
+                                        {formatArmenianPhone(patientPhone(appointment.patientId))}
                                     </Typography>
                                     <Typography variant="body2" color="text.secondary">
-                                        {getPatientEmail(appointment.patientId)}
+                                        {patientEmail(appointment.patientId)}
                                     </Typography>
                                 </Box>
                             }
@@ -228,7 +215,7 @@ const AppointmentDetailPage: React.FC = () => {
                         <InfoRow
                             icon={<PersonIcon />}
                             label={t('appointments.dentist')}
-                            value={getDentistName(appointment.dentistId)}
+                            value={staffName(appointment.dentistId)}
                         />
 
                         <Divider />
@@ -264,7 +251,7 @@ const AppointmentDetailPage: React.FC = () => {
                                 <InfoRow
                                     icon={<RoomIcon />}
                                     label={t('appointments.room')}
-                                    value={appointment.treatmentRoomId}
+                                    value={roomName(appointment.treatmentRoomId)}
                                 />
                             </>
                         )}
@@ -340,10 +327,10 @@ const AppointmentDetailPage: React.FC = () => {
                             <Divider sx={{ mb: 2 }} />
 
                             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-                                {appointment.treatmentIds.map((tid, idx) => (
+                                {appointment.treatmentIds.map((treatment, idx) => (
                                     <Chip
-                                        key={idx}
-                                        label={tid}
+                                        key={referenceKey(treatment, idx)}
+                                        label={treatmentName(treatment)}
                                         variant="outlined"
                                         size="small"
                                     />

@@ -47,10 +47,10 @@ const PatientEditPage: React.FC = () => {
     const dispatch = useDispatch();
     const { id } = useParams<{ id: string }>();
 
-    const patient = useSelector((state: RootState) => state.patients.current);
-    const patientLoading = useSelector((state: RootState) =>
-        state.http.loading.includes('GET_PATIENT'),
-    );
+    const storedPatient = useSelector((state: RootState) => state.patients.current);
+
+    // Only ever edit the patient named in the URL — not whoever was loaded last.
+    const patient = storedPatient && storedPatient._id === id ? storedPatient : null;
     const { loading, success, clearSuccess } = useHttpState('UPDATE_PATIENT');
 
     const {
@@ -73,10 +73,10 @@ const PatientEditPage: React.FC = () => {
     }, [id, dispatch]);
 
     useEffect(() => {
-        if (patient?._id === id) {
+        if (patient) {
             reset({ ...patientToForm(patient), status: patient.status || 'active' });
         }
-    }, [patient, id, reset]);
+    }, [patient, reset]);
 
     useEffect(() => {
         if (success) {
@@ -97,7 +97,9 @@ const PatientEditPage: React.FC = () => {
 
     const today = new Date().toISOString().slice(0, 10);
 
-    if (patientLoading && !patient) {
+    // Wait for the right patient before showing the form, so the fields are
+    // never briefly empty (or worse, another patient's values).
+    if (!patient) {
         return <LoadingSpinner fullPage />;
     }
 
@@ -611,6 +613,34 @@ const PatientEditPage: React.FC = () => {
                                 />
                             </Grid>
                         </Grid>
+                    </CardContent>
+                </Card>
+
+                {/* Internal notes */}
+                <Card sx={{ mb: 3 }}>
+                    <CardHeader
+                        title={
+                            <Typography variant="h6" fontWeight={600}>
+                                {t('patients.internalNotes')}
+                            </Typography>
+                        }
+                        subheader={t('patients.internalNotesHint')}
+                    />
+                    <CardContent>
+                        <Controller
+                            name="notes"
+                            control={control}
+                            render={({ field }) => (
+                                <TextField
+                                    {...field}
+                                    fullWidth
+                                    size="small"
+                                    label={t('patients.notes')}
+                                    multiline
+                                    rows={3}
+                                />
+                            )}
+                        />
                     </CardContent>
                 </Card>
 
