@@ -32,6 +32,88 @@ export interface UserProfile {
 
 export type UserRole = 'super_admin' | 'clinic_admin' | 'dentist' | 'receptionist' | 'assistant';
 
+// Staff types
+
+/** Roles a clinic can staff. `super_admin` is platform-level, never assignable here. */
+export type StaffRole = Exclude<UserRole, 'super_admin'>;
+
+export const STAFF_ROLES: StaffRole[] = [
+    'clinic_admin',
+    'dentist',
+    'receptionist',
+    'assistant',
+];
+
+export const DENTIST_SPECIALIZATIONS = [
+    'general_dentistry',
+    'orthodontics',
+    'periodontics',
+    'endodontics',
+    'prosthodontics',
+    'pediatric_dentistry',
+    'oral_surgery',
+    'cosmetic_dentistry',
+] as const;
+
+export type DentistSpecialization = (typeof DENTIST_SPECIALIZATIONS)[number];
+
+/**
+ * One working window in a member's week. A day the member does not work is
+ * absent from the array rather than present with a flag — that is what the
+ * scheduler reads when it offers bookable slots.
+ */
+export interface DayAvailability {
+    dayOfWeek: number;
+    startTime: string;
+    endTime: string;
+}
+
+/**
+ * The clinic-facing staff record (`user_profiles`). Its `_id` is *not* the id
+ * appointments and invoices reference — that is `authId`. See `utils/staff.ts`.
+ */
+export interface StaffMember {
+    _id: string;
+    authId?: string;
+    clinicId: string;
+    firstName: string;
+    lastName: string;
+    patronymic?: string;
+    email: string;
+    phone?: string;
+    role: UserRole;
+    specialization?: string;
+    licenseNumber?: string;
+    avatar?: string;
+    isActive: boolean;
+    schedule?: { defaultAvailability?: DayAvailability[] };
+    createdAt?: string;
+    updatedAt?: string;
+}
+
+/** One row of `/reports/dentist-performance`, keyed by the dentist's auth id. */
+export interface DentistAppointmentStats {
+    _id: string;
+    dentistProfileId?: string;
+    dentistName?: string;
+    totalAppointments: number;
+    completed: number;
+    cancelled: number;
+}
+
+export interface DentistRevenueStats {
+    _id: string;
+    dentistProfileId?: string;
+    dentistName?: string;
+    totalRevenue: number;
+    invoiceCount: number;
+}
+
+export interface DentistPerformance {
+    appointmentsPerDentist: DentistAppointmentStats[];
+    revenuePerDentist: DentistRevenueStats[];
+}
+
 // Clinic types
 export interface Clinic {
     _id: string;

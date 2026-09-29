@@ -264,10 +264,12 @@ export class ReportsService {
                         },
                     },
                     {
+                        // `dentistId` points at the auth `User`; the profile that
+                        // carries the name links back through `authId`.
                         $lookup: {
                             from: 'user_profiles',
                             localField: '_id',
-                            foreignField: '_id',
+                            foreignField: 'authId',
                             as: 'dentist',
                         },
                     },
@@ -275,6 +277,8 @@ export class ReportsService {
                     {
                         $project: {
                             _id: 1,
+                            // The profile id, which is what the staff pages address.
+                            dentistProfileId: '$dentist._id',
                             dentistName: {
                                 $concat: [
                                     { $ifNull: ['$dentist.firstName', ''] },
@@ -318,10 +322,12 @@ export class ReportsService {
                         },
                     },
                     {
+                        // `dentistId` points at the auth `User`; the profile that
+                        // carries the name links back through `authId`.
                         $lookup: {
                             from: 'user_profiles',
                             localField: '_id',
-                            foreignField: '_id',
+                            foreignField: 'authId',
                             as: 'dentist',
                         },
                     },
@@ -329,6 +335,8 @@ export class ReportsService {
                     {
                         $project: {
                             _id: 1,
+                            // The profile id, which is what the staff pages address.
+                            dentistProfileId: '$dentist._id',
                             dentistName: {
                                 $concat: [
                                     { $ifNull: ['$dentist.firstName', ''] },

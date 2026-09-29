@@ -1,81 +1,76 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+    Avatar,
     Box,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Grid,
+    IconButton,
+    InputAdornment,
+    ListItemIcon,
+    ListItemText,
+    Menu,
+    MenuItem,
     Paper,
+    Tab,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
-    TableRow,
     TablePagination,
+    TableRow,
     Tabs,
-    Tab,
     TextField,
-    InputAdornment,
-    IconButton,
     Tooltip,
-    Avatar,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    Grid,
-    MenuItem,
+    Typography,
 } from '@mui/material';
 import {
+    Edit as EditIcon,
+    MoreVert as MoreIcon,
     Search as SearchIcon,
-    Visibility as ViewIcon,
+    ToggleOff as DeactivateIcon,
+    ToggleOn as ActivateIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
+import { Controller, useForm } from 'react-hook-form';
 import { RootState } from '../../store';
 import { staffActions } from '../../store/staff';
-import { PageHeader, StatusChip, EmptyState, LoadingSpinner } from '../../components/ui';
+import {
+    ConfirmDialog,
+    EmptyState,
+    LoadingSpinner,
+    PageHeader,
+    StatusChip,
+} from '../../components/ui';
+import { useHttpState } from '../../hooks';
 import { getFullName, getInitials } from '../../utils/formatters';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
-import { UserRole } from '../../types';
+import { EMAIL_PATTERN, formatArmenianPhone, isArmenianPhone } from '../../utils/validators';
+import {
+    DENTIST_SPECIALIZATIONS,
+    STAFF_ROLES,
+    StaffMember,
+    StaffRole,
+} from '../../types';
+import {
+    MIN_PASSWORD_LENGTH,
+    StaffCreateFormData,
+    emptyStaffCreateForm,
+    roleTranslationKey,
+    toStaffCreatePayload,
+} from './staffForm';
 
-const ROLE_TABS: Array<UserRole | 'all'> = ['all', 'dentist', 'clinic_admin', 'receptionist', 'assistant'];
+type RoleFilter = StaffRole | 'all';
+type StatusFilter = 'active' | 'inactive' | 'all';
 
-const ROLE_OPTIONS: UserRole[] = ['clinic_admin', 'dentist', 'receptionist', 'assistant'];
-
-const SPECIALIZATIONS = [
-    'general_dentistry',
-    'orthodontics',
-    'periodontics',
-    'endodontics',
-    'prosthodontics',
-    'pediatric_dentistry',
-    'oral_surgery',
-    'cosmetic_dentistry',
-];
-
-interface StaffFormData {
-    firstName: string;
-    lastName: string;
-    patronymic: string;
-    email: string;
-    password: string;
-    phone: string;
-    role: UserRole;
-    specialization: string;
-    licenseNumber: string;
-}
-
-const EMPTY_FORM: StaffFormData = {
-    firstName: '',
-    lastName: '',
-    patronymic: '',
-    email: '',
-    password: '',
-    phone: '',
-    role: 'dentist',
-    specialization: '',
-    licenseNumber: '',
-};
+const ROLE_TABS: RoleFilter[] = ['all', ...STAFF_ROLES];
+const STATUS_FILTERS: StatusFilter[] = ['active', 'inactive', 'all'];
 
 const StaffListPage: React.FC = () => {
     const { t } = useTranslation();
@@ -84,24 +79,64 @@ const StaffListPage: React.FC = () => {
 
     const { list: staffList, total } = useSelector((state: RootState) => state.staff);
     const loading = useSelector((state: RootState) => state.http.loading.includes('GET_STAFF'));
-    const createSuccess = useSelector((state: RootState) => state.http.successes.includes('CREATE_STAFF'));
+    const listError = useSelector(
+        (state: RootState) => state.http.errors.find((e) => e.type === 'GET_STAFF')?.error,
+    );
+    const {
+        loading: creating,
+        error: createError,
+        success: createSuccess,
+        clearError: clearCreateError,
+        clearSuccess: clearCreateSuccess,
+    } = useHttpState('CREATE_STAFF');
+    const {
+        error: statusError,
+        success: statusSuccess,
+        clearError: clearStatusError,
+        clearSuccess: clearStatusSuccess,
+    } = useHttpState('UPDATE_STAFF_STATUS');
 
-    const [roleFilter, setRoleFilter] = useState<UserRole | 'all'>('all');
+    const [roleFilter, setRoleFilter] = useState<RoleFilter>('all');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('active');
     const [search, setSearch] = useState('');
     const [page, setPage] = useState(0);
     const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
-    const [debounceTimer, setDebounceTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [form, setForm] = useState<StaffFormData>({ ...EMPTY_FORM });
+    const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
+    const [menuMember, setMenuMember] = useState<StaffMember | null>(null);
+    const [pendingStatus, setPendingStatus] = useState<{
+        member: StaffMember;
+        isActive: boolean;
+    } | null>(null);
+
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const {
+        control,
+        handleSubmit,
+        watch,
+        reset,
+        formState: { errors },
+    } = useForm<StaffCreateFormData>({ defaultValues: emptyStaffCreateForm, mode: 'onBlur' });
+
+    const selectedRole = watch('role');
+    const password = watch('password');
 
     const fetchStaff = useCallback(
-        (searchValue: string, pageNum: number, limit: number, role: UserRole | 'all') => {
+        (
+            searchValue: string,
+            pageNum: number,
+            limit: number,
+            role: RoleFilter,
+            status: StatusFilter,
+        ) => {
             dispatch(
                 staffActions.getStaff({
-                    search: searchValue || undefined,
+                    search: searchValue.trim() || undefined,
+                    role: role === 'all' ? undefined : role,
+                    status,
                     page: pageNum + 1,
                     limit,
-                    role: role === 'all' ? undefined : role,
                 }),
             );
         },
@@ -109,91 +144,109 @@ const StaffListPage: React.FC = () => {
     );
 
     useEffect(() => {
-        fetchStaff(search, page, rowsPerPage, roleFilter);
-    }, [page, rowsPerPage, roleFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+        fetchStaff(search, page, rowsPerPage, roleFilter, statusFilter);
+    }, [page, rowsPerPage, roleFilter, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Clear the pending debounce when leaving the page.
+    useEffect(() => () => {
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+    }, []);
+
+    // The refreshed list is the visible feedback; drop the flag so it does not
+    // pile up across changes.
+    useEffect(() => {
+        if (statusSuccess) clearStatusSuccess();
+    }, [statusSuccess, clearStatusSuccess]);
 
     useEffect(() => {
         if (createSuccess) {
+            clearCreateSuccess();
             setDialogOpen(false);
-            setForm({ ...EMPTY_FORM });
+            reset(emptyStaffCreateForm);
         }
-    }, [createSuccess]);
+    }, [createSuccess, clearCreateSuccess, reset]);
 
     const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
         setSearch(value);
 
-        if (debounceTimer) {
-            clearTimeout(debounceTimer);
+        if (debounceTimer.current) {
+            clearTimeout(debounceTimer.current);
         }
 
-        const timer = setTimeout(() => {
+        debounceTimer.current = setTimeout(() => {
             setPage(0);
-            fetchStaff(value, 0, rowsPerPage, roleFilter);
+            fetchStaff(value, 0, rowsPerPage, roleFilter, statusFilter);
         }, 400);
-
-        setDebounceTimer(timer);
     };
-
-    useEffect(() => {
-        return () => {
-            if (debounceTimer) {
-                clearTimeout(debounceTimer);
-            }
-        };
-    }, [debounceTimer]);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setRoleFilter(ROLE_TABS[newValue]);
         setPage(0);
     };
 
-    const handleChangePage = (_event: unknown, newPage: number) => {
-        setPage(newPage);
+    const openDialog = () => {
+        clearCreateError();
+        reset(emptyStaffCreateForm);
+        setDialogOpen(true);
     };
 
-    const handleChangeRowsPerPage = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const newLimit = parseInt(event.target.value, 10);
-        setRowsPerPage(newLimit);
+    const closeDialog = () => {
+        clearCreateError();
+        setDialogOpen(false);
+    };
+
+    const onCreate = (data: StaffCreateFormData) => {
+        dispatch(staffActions.createStaff(toStaffCreatePayload(data)));
+    };
+
+    const openMenu = (event: React.MouseEvent<HTMLElement>, member: StaffMember) => {
+        event.stopPropagation();
+        setMenuAnchor(event.currentTarget);
+        setMenuMember(member);
+    };
+
+    const closeMenu = () => {
+        setMenuAnchor(null);
+        setMenuMember(null);
+    };
+
+    const requestStatusChange = (member: StaffMember, isActive: boolean) => {
+        closeMenu();
+        clearStatusError();
+        setPendingStatus({ member, isActive });
+    };
+
+    const confirmStatusChange = () => {
+        if (!pendingStatus) return;
+        dispatch(
+            staffActions.updateStaffStatus({
+                id: pendingStatus.member._id,
+                isActive: pendingStatus.isActive,
+            }),
+        );
+        setPendingStatus(null);
+    };
+
+    const isFiltered = search.trim() !== '' || roleFilter !== 'all' || statusFilter !== 'active';
+
+    const clearFilters = () => {
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        setSearch('');
+        setRoleFilter('all');
+        setStatusFilter('active');
         setPage(0);
+        fetchStaff('', 0, rowsPerPage, 'all', 'active');
     };
 
-    const handleRowClick = (staffId: string) => {
-        navigate(`/staff/${staffId}`);
-    };
-
-    const handleFormChange = (field: keyof StaffFormData, value: string) => {
-        setForm({ ...form, [field]: value });
-    };
-
-    const handleCreateStaff = () => {
-        const payload: any = {
-            firstName: form.firstName,
-            lastName: form.lastName,
-            email: form.email,
-            password: form.password,
-            phone: form.phone || undefined,
-            role: form.role,
-        };
-        if (form.patronymic) payload.patronymic = form.patronymic;
-        if (form.role === 'dentist' && form.specialization) payload.specialization = form.specialization;
-        if (form.licenseNumber) payload.licenseNumber = form.licenseNumber;
-
-        dispatch(staffActions.createStaff(payload));
-    };
-
-    const getRoleTranslationKey = (role: string): string => {
-        const roleMap: Record<string, string> = {
-            clinic_admin: 'clinicAdmin',
-            dentist: 'dentist',
-            receptionist: 'receptionist',
-            assistant: 'assistant',
-            super_admin: 'clinicAdmin',
-        };
-        return roleMap[role] || role;
-    };
-
-    const isFormValid = form.firstName.trim() && form.lastName.trim() && form.email.trim() && form.password.length >= 6 && form.role;
+    const statusOptions = useMemo(
+        () =>
+            STATUS_FILTERS.map((value) => ({
+                value,
+                label: value === 'all' ? t('common.all') : t(`common.${value}`),
+            })),
+        [t],
+    );
 
     if (loading && staffList.length === 0) {
         return <LoadingSpinner fullPage />;
@@ -203,54 +256,101 @@ const StaffListPage: React.FC = () => {
         <Box>
             <PageHeader
                 title={t('staff.title')}
+                subtitle={`${t('staff.totalStaff')}: ${total}`}
                 actionLabel={t('staff.addStaff')}
-                onAction={() => setDialogOpen(true)}
+                onAction={openDialog}
             />
 
             <Paper sx={{ mb: 2 }}>
                 <Tabs
                     value={ROLE_TABS.indexOf(roleFilter)}
                     onChange={handleTabChange}
+                    variant="scrollable"
+                    scrollButtons="auto"
                     sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
                 >
-                    <Tab label={t('common.all')} />
-                    <Tab label={t('staff.dentist')} />
-                    <Tab label={t('staff.clinicAdmin')} />
-                    <Tab label={t('staff.receptionist')} />
-                    <Tab label={t('staff.assistant')} />
+                    {ROLE_TABS.map((role) => (
+                        <Tab
+                            key={role}
+                            label={
+                                role === 'all'
+                                    ? t('common.all')
+                                    : t(`staff.${roleTranslationKey(role)}`)
+                            }
+                        />
+                    ))}
                 </Tabs>
             </Paper>
 
             <Paper sx={{ mb: 2, p: 2 }}>
-                <TextField
-                    fullWidth
-                    size="small"
-                    placeholder={`${t('common.search')}...`}
-                    value={search}
-                    onChange={handleSearchChange}
-                    InputProps={{
-                        startAdornment: (
-                            <InputAdornment position="start">
-                                <SearchIcon color="action" />
-                            </InputAdornment>
-                        ),
-                    }}
-                />
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                    <TextField
+                        sx={{ flex: '1 1 260px' }}
+                        size="small"
+                        placeholder={`${t('common.search')}...`}
+                        value={search}
+                        onChange={handleSearchChange}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon color="action" />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
+                    <TextField
+                        select
+                        size="small"
+                        label={t('common.status')}
+                        value={statusFilter}
+                        onChange={(e) => {
+                            setStatusFilter(e.target.value as StatusFilter);
+                            setPage(0);
+                        }}
+                        sx={{ minWidth: 180 }}
+                    >
+                        {statusOptions.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                                {option.label}
+                            </MenuItem>
+                        ))}
+                    </TextField>
+                </Box>
             </Paper>
 
+            {listError && (
+                <Typography color="error" sx={{ mb: 2 }}>
+                    {listError}
+                </Typography>
+            )}
+            {statusError && (
+                <Typography color="error" sx={{ mb: 2 }}>
+                    {statusError}
+                </Typography>
+            )}
+
             {staffList.length === 0 && !loading ? (
-                <EmptyState
-                    title={t('staff.noStaff')}
-                    actionLabel={t('staff.addStaff')}
-                    onAction={() => setDialogOpen(true)}
-                />
+                isFiltered ? (
+                    <EmptyState
+                        title={t('staff.noMatches')}
+                        description={t('staff.tryDifferentFilters')}
+                        actionLabel={t('common.reset')}
+                        onAction={clearFilters}
+                    />
+                ) : (
+                    <EmptyState
+                        title={t('staff.noStaff')}
+                        actionLabel={t('staff.addStaff')}
+                        onAction={openDialog}
+                    />
+                )
             ) : (
                 <Paper>
-                    <TableContainer>
+                    <TableContainer sx={{ overflowX: 'auto' }}>
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell>{t('patients.firstName')}</TableCell>
+                                    <TableCell>{t('patients.fullName')}</TableCell>
                                     <TableCell>{t('staff.role')}</TableCell>
                                     <TableCell>{t('patients.email')}</TableCell>
                                     <TableCell>{t('patients.phone')}</TableCell>
@@ -260,17 +360,17 @@ const StaffListPage: React.FC = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {staffList.map((member: any) => (
+                                {staffList.map((member) => (
                                     <TableRow
                                         key={member._id}
                                         hover
                                         sx={{ cursor: 'pointer' }}
-                                        onClick={() => handleRowClick(member._id)}
+                                        onClick={() => navigate(`/staff/${member._id}`)}
                                     >
                                         <TableCell>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                                                 <Avatar
-                                                    src={member.avatar}
+                                                    src={member.avatar || undefined}
                                                     sx={{
                                                         width: 36,
                                                         height: 36,
@@ -280,22 +380,37 @@ const StaffListPage: React.FC = () => {
                                                 >
                                                     {getInitials(member.firstName, member.lastName)}
                                                 </Avatar>
-                                                {getFullName(member.firstName, member.lastName, member.patronymic)}
+                                                <Typography variant="body2">
+                                                    {getFullName(
+                                                        member.firstName,
+                                                        member.lastName,
+                                                        member.patronymic,
+                                                    )}
+                                                </Typography>
                                             </Box>
                                         </TableCell>
                                         <TableCell>
                                             <StatusChip
                                                 status={member.role === 'dentist' ? 'confirmed' : 'scheduled'}
-                                                translationPrefix="appointments"
-                                                label={t(`staff.${getRoleTranslationKey(member.role)}`)}
+                                                translationPrefix="staff"
+                                                label={t(`staff.${roleTranslationKey(member.role)}`)}
                                             />
                                         </TableCell>
                                         <TableCell>{member.email || '-'}</TableCell>
-                                        <TableCell>{member.phone || '-'}</TableCell>
-                                        <TableCell>{member.specialization || '-'}</TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            {member.phone ? formatArmenianPhone(member.phone) : '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            {member.specialization
+                                                ? t(
+                                                      `staff.specializations.${member.specialization}`,
+                                                      member.specialization,
+                                                  )
+                                                : '-'}
+                                        </TableCell>
                                         <TableCell>
                                             <StatusChip
-                                                status={member.isActive !== false ? 'active' : 'inactive'}
+                                                status={member.isActive === false ? 'inactive' : 'active'}
                                                 translationPrefix="common"
                                             />
                                         </TableCell>
@@ -309,7 +424,15 @@ const StaffListPage: React.FC = () => {
                                                         size="small"
                                                         onClick={() => navigate(`/staff/${member._id}`)}
                                                     >
-                                                        <ViewIcon fontSize="small" />
+                                                        <EditIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                                <Tooltip title={t('staff.changeStatus')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={(e) => openMenu(e, member)}
+                                                    >
+                                                        <MoreIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
                                             </Box>
@@ -323,136 +446,310 @@ const StaffListPage: React.FC = () => {
                         component="div"
                         count={total}
                         page={page}
-                        onPageChange={handleChangePage}
+                        onPageChange={(_e, newPage) => setPage(newPage)}
                         rowsPerPage={rowsPerPage}
-                        onRowsPerPageChange={handleChangeRowsPerPage}
-                        rowsPerPageOptions={[10, 20, 50]}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(parseInt(e.target.value, 10));
+                            setPage(0);
+                        }}
+                        rowsPerPageOptions={[10, 20, 50, 100]}
+                        labelRowsPerPage={t('common.rowsPerPage')}
+                        labelDisplayedRows={({ from, to, count }) =>
+                            t('common.displayedRows', { from, to, total: count })
+                        }
                     />
                 </Paper>
             )}
 
+            <Menu anchorEl={menuAnchor} open={!!menuAnchor} onClose={closeMenu}>
+                <MenuItem
+                    disabled={menuMember?.isActive !== false}
+                    onClick={() => menuMember && requestStatusChange(menuMember, true)}
+                >
+                    <ListItemIcon>
+                        <ActivateIcon fontSize="small" color="success" />
+                    </ListItemIcon>
+                    <ListItemText>{t('common.activate')}</ListItemText>
+                </MenuItem>
+                <MenuItem
+                    disabled={menuMember?.isActive === false}
+                    onClick={() => menuMember && requestStatusChange(menuMember, false)}
+                >
+                    <ListItemIcon>
+                        <DeactivateIcon fontSize="small" color="action" />
+                    </ListItemIcon>
+                    <ListItemText>{t('common.deactivate')}</ListItemText>
+                </MenuItem>
+            </Menu>
+
+            <ConfirmDialog
+                open={!!pendingStatus}
+                title={t('staff.changeStatus')}
+                message={
+                    pendingStatus
+                        ? t('staff.confirmStatusChange', {
+                              name: getFullName(
+                                  pendingStatus.member.firstName,
+                                  pendingStatus.member.lastName,
+                              ),
+                              status: pendingStatus.isActive
+                                  ? t('common.active')
+                                  : t('common.inactive'),
+                          })
+                        : ''
+                }
+                variant={pendingStatus?.isActive ? 'default' : 'danger'}
+                onConfirm={confirmStatusChange}
+                onCancel={() => setPendingStatus(null)}
+            />
+
             {/* Add Staff Dialog */}
-            <Dialog
-                open={dialogOpen}
-                onClose={() => setDialogOpen(false)}
-                maxWidth="sm"
-                fullWidth
-            >
-                <DialogTitle>{t('staff.addStaff')}</DialogTitle>
-                <DialogContent>
-                    <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                label={t('patients.firstName')}
-                                fullWidth
-                                required
-                                value={form.firstName}
-                                onChange={(e) => handleFormChange('firstName', e.target.value)}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                label={t('patients.lastName')}
-                                fullWidth
-                                required
-                                value={form.lastName}
-                                onChange={(e) => handleFormChange('lastName', e.target.value)}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={4}>
-                            <TextField
-                                label={t('patients.patronymic')}
-                                fullWidth
-                                value={form.patronymic}
-                                onChange={(e) => handleFormChange('patronymic', e.target.value)}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                label={t('patients.email')}
-                                fullWidth
-                                required
-                                type="email"
-                                value={form.email}
-                                onChange={(e) => handleFormChange('email', e.target.value)}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                label={t('auth.password')}
-                                fullWidth
-                                required
-                                type="password"
-                                value={form.password}
-                                onChange={(e) => handleFormChange('password', e.target.value)}
-                                inputProps={{ minLength: 6 }}
-                                helperText={form.password && form.password.length < 6 ? t('validation.required') : ''}
-                                error={!!form.password && form.password.length < 6}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                label={t('patients.phone')}
-                                fullWidth
-                                value={form.phone}
-                                onChange={(e) => handleFormChange('phone', e.target.value)}
-                            />
-                        </Grid>
-                        <Grid item xs={12} md={6}>
-                            <TextField
-                                label={t('staff.role')}
-                                select
-                                fullWidth
-                                required
-                                value={form.role}
-                                onChange={(e) => handleFormChange('role', e.target.value)}
-                            >
-                                {ROLE_OPTIONS.map((role) => (
-                                    <MenuItem key={role} value={role}>
-                                        {t(`staff.${getRoleTranslationKey(role)}`)}
-                                    </MenuItem>
-                                ))}
-                            </TextField>
-                        </Grid>
-                        {form.role === 'dentist' && (
-                            <Grid item xs={12} md={6}>
-                                <TextField
-                                    label={t('staff.specialization')}
-                                    select
-                                    fullWidth
-                                    value={form.specialization}
-                                    onChange={(e) => handleFormChange('specialization', e.target.value)}
-                                >
-                                    {SPECIALIZATIONS.map((spec) => (
-                                        <MenuItem key={spec} value={spec}>
-                                            {spec.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-                            </Grid>
+            <Dialog open={dialogOpen} onClose={closeDialog} maxWidth="sm" fullWidth>
+                <Box component="form" onSubmit={handleSubmit(onCreate)} noValidate>
+                    <DialogTitle>{t('staff.addStaff')}</DialogTitle>
+                    <DialogContent>
+                        {createError && (
+                            <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                                {createError}
+                            </Typography>
                         )}
-                        <Grid item xs={12} md={form.role === 'dentist' ? 12 : 6}>
-                            <TextField
-                                label={t('staff.licenseNumber')}
-                                fullWidth
-                                value={form.licenseNumber}
-                                onChange={(e) => handleFormChange('licenseNumber', e.target.value)}
-                            />
+                        <Typography variant="caption" color="text.secondary">
+                            {t('common.requiredFieldsHint')}
+                        </Typography>
+                        <Grid container spacing={2} sx={{ mt: 0.5 }}>
+                            <Grid item xs={12} md={4}>
+                                <Controller
+                                    name="firstName"
+                                    control={control}
+                                    rules={{ required: t('validation.required') }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            required
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.firstName')}
+                                            error={!!errors.firstName}
+                                            helperText={errors.firstName?.message}
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <Controller
+                                    name="lastName"
+                                    control={control}
+                                    rules={{ required: t('validation.required') }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            required
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.lastName')}
+                                            error={!!errors.lastName}
+                                            helperText={errors.lastName?.message}
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={4}>
+                                <Controller
+                                    name="patronymic"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.patronymic')}
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Controller
+                                    name="email"
+                                    control={control}
+                                    rules={{
+                                        required: t('validation.required'),
+                                        pattern: {
+                                            value: EMAIL_PATTERN,
+                                            message: t('validation.invalidEmail'),
+                                        },
+                                    }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            required
+                                            fullWidth
+                                            size="small"
+                                            type="email"
+                                            label={t('patients.email')}
+                                            error={!!errors.email}
+                                            helperText={
+                                                errors.email?.message || t('staff.emailIsLogin')
+                                            }
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Controller
+                                    name="phone"
+                                    control={control}
+                                    rules={{
+                                        validate: (value) =>
+                                            !value.trim() ||
+                                            isArmenianPhone(value) ||
+                                            t('validation.invalidArmenianPhone'),
+                                    }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('patients.phone')}
+                                            placeholder="+374 93 123456"
+                                            error={!!errors.phone}
+                                            helperText={
+                                                errors.phone?.message ||
+                                                t('validation.invalidArmenianPhone')
+                                            }
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Controller
+                                    name="password"
+                                    control={control}
+                                    rules={{
+                                        required: t('validation.required'),
+                                        minLength: {
+                                            value: MIN_PASSWORD_LENGTH,
+                                            message: t('validation.passwordMin'),
+                                        },
+                                    }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            required
+                                            fullWidth
+                                            size="small"
+                                            type="password"
+                                            autoComplete="new-password"
+                                            label={t('auth.password')}
+                                            error={!!errors.password}
+                                            helperText={
+                                                errors.password?.message ||
+                                                t('validation.passwordMin')
+                                            }
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Controller
+                                    name="confirmPassword"
+                                    control={control}
+                                    rules={{
+                                        required: t('validation.required'),
+                                        validate: (value) =>
+                                            value === password || t('validation.passwordMatch'),
+                                    }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            required
+                                            fullWidth
+                                            size="small"
+                                            type="password"
+                                            autoComplete="new-password"
+                                            label={t('auth.confirmPassword')}
+                                            error={!!errors.confirmPassword}
+                                            helperText={errors.confirmPassword?.message}
+                                        />
+                                    )}
+                                />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                                <Controller
+                                    name="role"
+                                    control={control}
+                                    rules={{ required: t('validation.required') }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            required
+                                            fullWidth
+                                            size="small"
+                                            label={t('staff.role')}
+                                            error={!!errors.role}
+                                            helperText={errors.role?.message}
+                                        >
+                                            {STAFF_ROLES.map((role) => (
+                                                <MenuItem key={role} value={role}>
+                                                    {t(`staff.${roleTranslationKey(role)}`)}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                            </Grid>
+                            {selectedRole === 'dentist' && (
+                                <Grid item xs={12} md={6}>
+                                    <Controller
+                                        name="specialization"
+                                        control={control}
+                                        rules={{ required: t('validation.required') }}
+                                        render={({ field }) => (
+                                            <TextField
+                                                {...field}
+                                                select
+                                                required
+                                                fullWidth
+                                                size="small"
+                                                label={t('staff.specialization')}
+                                                error={!!errors.specialization}
+                                                helperText={errors.specialization?.message}
+                                            >
+                                                {DENTIST_SPECIALIZATIONS.map((spec) => (
+                                                    <MenuItem key={spec} value={spec}>
+                                                        {t(`staff.specializations.${spec}`)}
+                                                    </MenuItem>
+                                                ))}
+                                            </TextField>
+                                        )}
+                                    />
+                                </Grid>
+                            )}
+                            <Grid item xs={12} md={selectedRole === 'dentist' ? 12 : 6}>
+                                <Controller
+                                    name="licenseNumber"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            size="small"
+                                            label={t('staff.licenseNumber')}
+                                        />
+                                    )}
+                                />
+                            </Grid>
                         </Grid>
-                    </Grid>
-                </DialogContent>
-                <DialogActions sx={{ px: 3, pb: 2 }}>
-                    <Button onClick={() => setDialogOpen(false)} color="inherit">
-                        {t('common.cancel')}
-                    </Button>
-                    <Button
-                        variant="contained"
-                        onClick={handleCreateStaff}
-                        disabled={!isFormValid}
-                    >
-                        {t('common.save')}
-                    </Button>
-                </DialogActions>
+                    </DialogContent>
+                    <DialogActions sx={{ px: 3, pb: 2 }}>
+                        <Button onClick={closeDialog} color="inherit">
+                            {t('common.cancel')}
+                        </Button>
+                        <Button type="submit" variant="contained" disabled={creating}>
+                            {creating ? t('common.loading') : t('common.save')}
+                        </Button>
+                    </DialogActions>
+                </Box>
             </Dialog>
         </Box>
     );
