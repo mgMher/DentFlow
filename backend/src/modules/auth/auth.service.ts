@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 import * as jwt from 'jsonwebtoken';
 import { jwtConfig } from 'src/config';
 import { Role } from 'src/common/decorators';
+import { errorBody } from 'src/common/utils';
 import { User, UserDocument } from './auth.schema';
 import { Clinic, ClinicDocument } from '../clinics/clinic.schema';
 import { RegisterDto, LoginDto } from './dto';
@@ -29,7 +30,7 @@ export class AuthService {
         const existingUser = await this.userModel.findOne({ email: dto.email.toLowerCase() });
 
         if (existingUser) {
-            throw new ConflictException('A user with this email already exists');
+            throw new ConflictException(errorBody('accountEmailTaken', 'A user with this email already exists'));
         }
 
         const clinic = await this.clinicModel.create({
@@ -74,18 +75,17 @@ export class AuthService {
             email: dto.email.toLowerCase(),
         });
 
-        if (!user) {
-            throw new UnauthorizedException('Invalid email or password');
+        // Same answer for "no such user" and "wrong password", and the password
+        // is checked before the active flag, so the response never reveals
+        // whether an email has an account.
+        const isPasswordValid = !!user?.password && (await bcrypt.compare(dto.password, user.password));
+
+        if (!user || !isPasswordValid) {
+            throw new UnauthorizedException(errorBody('invalidCredentials', 'Invalid email or password'));
         }
 
         if (!user.isActive) {
-            throw new UnauthorizedException('Account is deactivated');
-        }
-
-        const isPasswordValid = await bcrypt.compare(dto.password, user.password);
-
-        if (!isPasswordValid) {
-            throw new UnauthorizedException('Invalid email or password');
+            throw new UnauthorizedException(errorBody('accountDeactivated', 'Account is deactivated'));
         }
 
         const tokens = this.generateTokens(

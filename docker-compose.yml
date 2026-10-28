@@ -15,7 +15,11 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      # The first stage keeps dev dependencies (Nest CLI) for watch mode.
+      target: build
     container_name: dentflow-api
+    # The image runs the compiled app in PROD mode; locally we want watch mode.
+    command: npm run start:dev
     ports:
       - '8000:8000'
     depends_on:
@@ -23,9 +27,10 @@ services:
     environment:
       - MONGO_URI=mongodb://mongodb:27017/dentflow
       - API_PORT=8000
-      - JWT_ACCESS_SECRET=change-me-in-production
-      - JWT_REFRESH_SECRET=change-me-in-production-refresh
-      - JWT_ACCESS_EXPIRATION=1d
+      # Local development only. Production secrets come from the deploy environment.
+      - JWT_ACCESS_SECRET=local-dev-access-secret
+      - JWT_REFRESH_SECRET=local-dev-refresh-secret
+      - JWT_ACCESS_EXPIRATION=15m
       - JWT_REFRESH_EXPIRATION=7d
       - MODE=DEV
     volumes:

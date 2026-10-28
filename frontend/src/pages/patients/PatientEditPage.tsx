@@ -36,6 +36,7 @@ import {
     patientToForm,
     toPatientPayload,
 } from './patientForm';
+import { toLocalDateString } from '../../utils/dates';
 
 interface PatientEditFormData extends PatientFormData {
     status: PatientStatus;
@@ -95,7 +96,7 @@ const PatientEditPage: React.FC = () => {
         );
     };
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalDateString();
 
     // Wait for the right patient before showing the form, so the fields are
     // never briefly empty (or worse, another patient's values).

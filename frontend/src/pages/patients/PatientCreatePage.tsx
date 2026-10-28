@@ -31,6 +31,7 @@ import { useHttpState } from '../../hooks';
 import { getInitials } from '../../utils/formatters';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
 import { PatientFormData, emptyPatientForm, toPatientPayload } from './patientForm';
+import { toLocalDateString } from '../../utils/dates';
 
 const PatientCreatePage: React.FC = () => {
     const { t } = useTranslation();
@@ -61,7 +62,7 @@ const PatientCreatePage: React.FC = () => {
         dispatch(patientsActions.createPatient(toPatientPayload(data) as any));
     };
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = toLocalDateString();
 
     return (
         <Box sx={{ maxWidth: '100%', overflowX: 'hidden' }}>

@@ -9,6 +9,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { Role } from 'src/common/decorators';
+import { errorBody, escapeRegex } from 'src/common/utils';
 import { User, UserDocument } from '../auth/auth.schema';
 import { UserProfile, UserProfileDocument } from './user.schema';
 import {
@@ -25,15 +26,6 @@ export interface PaginatedResult<T> {
     limit: number;
     totalPages: number;
 }
-
-/**
- * Errors carry a stable `code` next to the message so the UI can translate
- * them; the message stays as the developer-facing fallback.
- */
-const errorBody = (code: string, message: string) => ({ code, message });
-
-/** Escapes a user-supplied search term so it can be used inside a RegExp. */
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Availability is stored one entry per weekday, so a day the user switched off

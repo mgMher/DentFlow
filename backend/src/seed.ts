@@ -1,106 +1,62 @@
+/**
+ * Demo data: one clinic ("Ararat Dental") with staff, patients and a treatment
+ * catalogue.
+ *
+ * Safe to re-run: it replaces only the demo clinic's own data. It used to
+ * `deleteMany({})` every clinic, user and patient in the database, and wrote
+ * staff into the wrong collections (logins went to `auths`, which the app
+ * never reads), so seeded users could not sign in.
+ *
+ * Uses the app's real schemas so the seed cannot drift from them again.
+ */
 import * as mongoose from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import * as dotenv from 'dotenv';
+import { Clinic, ClinicSchema } from './modules/clinics/clinic.schema';
+import { User, UserSchema } from './modules/auth/auth.schema';
+import { UserProfile, UserProfileSchema } from './modules/users/user.schema';
+import { Patient, PatientSchema } from './modules/patients/patient.schema';
+import { Treatment, TreatmentSchema } from './modules/treatments/treatment.schema';
 
 dotenv.config();
 
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/dentflow';
+const DEMO_CLINIC_EMAIL = 'info@ararat-dental.am';
+const PASSWORD_COST = 12;
 
-// Schemas (inline for seed script)
-const ClinicSchema = new mongoose.Schema({
-    name: String,
-    address: { street: String, city: String, state: String, zipCode: String, country: String },
-    phone: String,
-    email: String,
-    workingHours: [{ dayOfWeek: Number, startTime: String, endTime: String, isOpen: Boolean }],
-    timezone: { type: String, default: 'Asia/Yerevan' },
-    language: { type: String, default: 'hy' },
-    currency: { type: String, default: 'AMD' },
-    subscription: { plan: String, status: String, expiresAt: Date },
-    isActive: { type: Boolean, default: true },
-}, { timestamps: true });
+/** Remove the previous demo clinic and everything that points at it, in every collection. */
+async function removeDemoClinic(ClinicModel: mongoose.Model<any>) {
+    const previous = await ClinicModel.findOne({ email: DEMO_CLINIC_EMAIL }).select('_id').lean<{ _id: mongoose.Types.ObjectId }>();
+    if (!previous) return;
 
-const AuthSchema = new mongoose.Schema({
-    email: { type: String, unique: true, lowercase: true, trim: true },
-    password: String,
-    clinicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Clinic' },
-    role: String,
-    firstName: String,
-    lastName: String,
-    patronymic: String,
-    isActive: { type: Boolean, default: true },
-    lastLogin: Date,
-    refreshToken: String,
-}, { timestamps: true });
-
-const UserSchema = new mongoose.Schema({
-    clinicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Clinic' },
-    authId: { type: mongoose.Schema.Types.ObjectId, ref: 'Auth' },
-    firstName: String,
-    lastName: String,
-    patronymic: String,
-    email: String,
-    phone: String,
-    role: String,
-    specialization: String,
-    licenseNumber: String,
-    isActive: { type: Boolean, default: true },
-    schedule: { defaultAvailability: [{ dayOfWeek: Number, startTime: String, endTime: String }] },
-}, { timestamps: true });
-
-const PatientSchema = new mongoose.Schema({
-    clinicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Clinic' },
-    firstName: String,
-    lastName: String,
-    patronymic: String,
-    dateOfBirth: Date,
-    gender: String,
-    phone: String,
-    email: String,
-    address: { street: String, city: String, state: String, zipCode: String, country: String },
-    medicalHistory: { conditions: [String], allergies: [String], medications: [String], notes: String },
-    status: { type: String, default: 'active' },
-    isActive: { type: Boolean, default: true },
-    lastVisit: Date,
-}, { timestamps: true });
-
-const TreatmentSchema = new mongoose.Schema({
-    clinicId: { type: mongoose.Schema.Types.ObjectId, ref: 'Clinic' },
-    name: String,
-    nameHy: String,
-    nameRu: String,
-    category: String,
-    description: String,
-    code: String,
-    duration: Number,
-    price: { amount: Number, currency: String },
-    isCustom: { type: Boolean, default: false },
-    isActive: { type: Boolean, default: true },
-}, { timestamps: true });
+    const collections = await mongoose.connection.db.listCollections({}, { nameOnly: true }).toArray();
+    for (const { name } of collections) {
+        if (name.startsWith('system.')) continue;
+        await mongoose.connection.db.collection(name).deleteMany({ clinicId: previous._id });
+    }
+    await ClinicModel.deleteOne({ _id: previous._id });
+    console.log('Removed the previous demo clinic and its data.');
+}
 
 async function seed() {
+    if (process.env.MODE === 'PROD') {
+        throw new Error('Refusing to seed demo data when MODE=PROD');
+    }
+
     console.log('Connecting to MongoDB...');
     await mongoose.connect(MONGO_URI);
-    console.log('Connected.');
+    console.log(`Connected to "${mongoose.connection.name}".`);
 
-    const Clinic = mongoose.model('Clinic', ClinicSchema);
-    const Auth = mongoose.model('Auth', AuthSchema);
-    const User = mongoose.model('User', UserSchema);
-    const Patient = mongoose.model('Patient', PatientSchema);
-    const Treatment = mongoose.model('Treatment', TreatmentSchema);
+    const Clinic_ = mongoose.model(Clinic.name, ClinicSchema);
+    const Auth = mongoose.model(User.name, UserSchema);
+    const User_ = mongoose.model(UserProfile.name, UserProfileSchema);
+    const Patient_ = mongoose.model(Patient.name, PatientSchema);
+    const Treatment_ = mongoose.model(Treatment.name, TreatmentSchema);
 
-    // Clear existing data
-    await Promise.all([
-        Clinic.deleteMany({}),
-        Auth.deleteMany({}),
-        User.deleteMany({}),
-        Patient.deleteMany({}),
-        Treatment.deleteMany({}),
-    ]);
-    console.log('Cleared existing data.');
+    await removeDemoClinic(Clinic_);
 
     // Create clinic
-    const clinic = await Clinic.create({
+    const clinic = await Clinic_.create({
         name: '\u0531\u0580\u0561\u0580\u0561\u057F \u0531\u057F\u0561\u0574\u0576\u0561\u0562\u0578\u0582\u056A\u0561\u0580\u0561\u0576',
         address: {
             street: '\u0544\u0561\u0577\u057F\u0578\u0581\u056B 42',
@@ -128,7 +84,7 @@ async function seed() {
     console.log('Created clinic:', clinic.name);
 
     // Create admin user
-    const adminPassword = await bcrypt.hash('admin123', 10);
+    const adminPassword = await bcrypt.hash('admin123', PASSWORD_COST);
     const adminAuth = await Auth.create({
         email: 'admin@ararat-dental.am',
         password: adminPassword,
@@ -138,7 +94,7 @@ async function seed() {
         lastName: '\u054A\u0565\u057F\u0580\u0578\u057D\u0575\u0561\u0576',
         isActive: true,
     });
-    const adminUser = await User.create({
+    await User_.create({
         clinicId: clinic._id,
         authId: adminAuth._id,
         firstName: '\u0531\u0580\u0574\u0561\u0576',
@@ -158,7 +114,7 @@ async function seed() {
             patronymic: '\u054D\u0565\u0580\u0563\u0565\u0575\u056B',
             email: 'ani.hayrapetyan@ararat-dental.am',
             phone: '+37493123456',
-            specialization: '\u0539\u0565\u0580\u0561\u057A\u0587\u057F',
+            specialization: 'general_dentistry',
             licenseNumber: 'DL-2024-001',
         },
         {
@@ -167,7 +123,7 @@ async function seed() {
             patronymic: '\u0540\u0561\u0575\u056F\u056B',
             email: 'artak.grigoryan@ararat-dental.am',
             phone: '+37494123456',
-            specialization: '\u0555\u0580\u0569\u0578\u0564\u0578\u0576\u057F',
+            specialization: 'orthodontics',
             licenseNumber: 'DL-2024-002',
         },
         {
@@ -176,13 +132,13 @@ async function seed() {
             patronymic: '\u0531\u0580\u0574\u0565\u0576\u056B',
             email: 'mariam.sargsyan@ararat-dental.am',
             phone: '+37495123456',
-            specialization: '\u0544\u0561\u0576\u056F\u0561\u0562\u0578\u0582\u056A\u0561\u0580\u0561\u0576',
+            specialization: 'pediatric_dentistry',
             licenseNumber: 'DL-2024-003',
         },
     ];
 
     for (const d of dentists) {
-        const pass = await bcrypt.hash('dentist123', 10);
+        const pass = await bcrypt.hash('dentist123', PASSWORD_COST);
         const auth = await Auth.create({
             email: d.email,
             password: pass,
@@ -193,7 +149,7 @@ async function seed() {
             patronymic: d.patronymic,
             isActive: true,
         });
-        await User.create({
+        await User_.create({
             clinicId: clinic._id,
             authId: auth._id,
             firstName: d.firstName,
@@ -219,7 +175,7 @@ async function seed() {
     }
 
     // Create receptionist
-    const recPass = await bcrypt.hash('reception123', 10);
+    const recPass = await bcrypt.hash('reception123', PASSWORD_COST);
     const recAuth = await Auth.create({
         email: 'reception@ararat-dental.am',
         password: recPass,
@@ -229,7 +185,7 @@ async function seed() {
         lastName: '\u0531\u057E\u0565\u057F\u056B\u057D\u0575\u0561\u0576',
         isActive: true,
     });
-    await User.create({
+    await User_.create({
         clinicId: clinic._id,
         authId: recAuth._id,
         firstName: '\u053C\u0578\u0582\u057D\u056B\u0576\u0565',
@@ -311,7 +267,7 @@ async function seed() {
     ];
 
     for (const p of patients) {
-        await Patient.create({
+        await Patient_.create({
             clinicId: clinic._id,
             ...p,
             address: { city: '\u0535\u0580\u0587\u0561\u0576', country: '\u0540\u0561\u0575\u0561\u057D\u057F\u0561\u0576' },
@@ -342,7 +298,7 @@ async function seed() {
     ];
 
     for (const t of treatments) {
-        await Treatment.create({
+        await Treatment_.create({
             clinicId: clinic._id,
             ...t,
             price: { amount: t.price, currency: 'AMD' },

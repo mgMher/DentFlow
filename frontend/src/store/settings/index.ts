@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
 
@@ -40,7 +41,7 @@ function* getTemplatesSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load templates'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadTemplates')));
     }
 }
 
@@ -54,7 +55,7 @@ function* createTemplateSaga(action: any) {
         yield put({ type: GET_TEMPLATES });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create template'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createTemplate')));
     }
 }
 
@@ -68,7 +69,7 @@ function* updateTemplateSaga(action: any) {
         yield put({ type: GET_TEMPLATES });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update template'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateTemplate')));
     }
 }
 
@@ -82,7 +83,7 @@ function* deleteTemplateSaga(action: any) {
         yield put({ type: GET_TEMPLATES });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to delete template'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.deleteTemplate')));
     }
 }
 

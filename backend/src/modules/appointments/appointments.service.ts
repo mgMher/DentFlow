@@ -16,6 +16,7 @@ import {
 import { CreateAppointmentDto, QueryAppointmentDto, UpdateAppointmentDto } from './dto';
 import { PatientsService } from '../patients/patients.service';
 import { UserProfile, UserProfileDocument } from '../users/user.schema';
+import { ClinicRefsService } from 'src/common/clinic-refs';
 
 @Injectable()
 export class AppointmentsService implements OnModuleInit {
@@ -27,6 +28,7 @@ export class AppointmentsService implements OnModuleInit {
         @InjectModel(UserProfile.name)
         private readonly userProfileModel: Model<UserProfileDocument>,
         private readonly patientsService: PatientsService,
+        private readonly clinicRefs: ClinicRefsService,
     ) {}
 
     /**
@@ -94,6 +96,8 @@ export class AppointmentsService implements OnModuleInit {
         if (endTime <= startTime) {
             throw new BadRequestException('endTime must be after startTime');
         }
+
+        await this.assertRefs(clinicId, dto);
 
         const conflict = await this.checkConflict(
             clinicId,
@@ -195,7 +199,7 @@ export class AppointmentsService implements OnModuleInit {
     /**
      * Find a single appointment by ID, scoped to a clinic.
      */
-    async findById(clinicId: string, appointmentId: string): Promise<AppointmentDocument> {
+    async findById(clinicId: string, appointmentId: string | Types.ObjectId): Promise<AppointmentDocument> {
         const appointment = await this.appointmentModel
             .findOne({
                 _id: new Types.ObjectId(appointmentId),
@@ -218,7 +222,7 @@ export class AppointmentsService implements OnModuleInit {
      */
     async update(
         clinicId: string,
-        appointmentId: string,
+        appointmentId: string | Types.ObjectId,
         dto: UpdateAppointmentDto,
     ): Promise<AppointmentDocument> {
         const existing = await this.findById(clinicId, appointmentId);
@@ -238,6 +242,8 @@ export class AppointmentsService implements OnModuleInit {
         if (endTime <= startTime) {
             throw new BadRequestException('endTime must be after startTime');
         }
+
+        await this.assertRefs(clinicId, dto);
 
         const dentistId = dto.dentistId || existing.dentistId.toString();
         const isRescheduled =
@@ -325,7 +331,7 @@ export class AppointmentsService implements OnModuleInit {
      */
     async cancel(
         clinicId: string,
-        appointmentId: string,
+        appointmentId: string | Types.ObjectId,
         reason?: string,
     ): Promise<AppointmentDocument> {
         const appointment = await this.findById(clinicId, appointmentId);
@@ -362,7 +368,7 @@ export class AppointmentsService implements OnModuleInit {
      */
     async updateStatus(
         clinicId: string,
-        appointmentId: string,
+        appointmentId: string | Types.ObjectId,
         status: AppointmentStatus,
     ): Promise<AppointmentDocument> {
         const appointment = await this.findById(clinicId, appointmentId);
@@ -488,16 +494,34 @@ export class AppointmentsService implements OnModuleInit {
     }
 
     /**
+     * Every id in the body must belong to this clinic — otherwise a caller
+     * could attach another clinic's patient or dentist and read their details
+     * back through populate. Only the fields present are checked, so this
+     * works for both create and partial update.
+     */
+    private async assertRefs(
+        clinicId: string,
+        dto: Pick<UpdateAppointmentDto, 'patientId' | 'dentistId' | 'treatmentRoomId' | 'treatmentIds'>,
+    ): Promise<void> {
+        await Promise.all([
+            dto.patientId && this.clinicRefs.assertPatient(clinicId, dto.patientId, { forBooking: true }),
+            dto.dentistId && this.clinicRefs.assertDentist(clinicId, dto.dentistId),
+            dto.treatmentRoomId && this.clinicRefs.assertRoom(clinicId, dto.treatmentRoomId),
+            dto.treatmentIds?.length && this.clinicRefs.assertTreatments(clinicId, dto.treatmentIds),
+        ]);
+    }
+
+    /**
      * Check whether a dentist has a conflicting appointment in the given time range.
      * Optionally exclude a specific appointment (for updates/reschedules).
      * Returns true if a conflict exists.
      */
     async checkConflict(
         clinicId: string,
-        dentistId: string,
+        dentistId: string | Types.ObjectId,
         startTime: Date,
         endTime: Date,
-        excludeId?: string,
+        excludeId?: string | Types.ObjectId,
     ): Promise<boolean> {
         const filter: FilterQuery<AppointmentDocument> = {
             clinicId: new Types.ObjectId(clinicId),
@@ -538,6 +562,8 @@ export class AppointmentsService implements OnModuleInit {
         if (durationMs <= 0) {
             throw new BadRequestException('endTime must be after startTime');
         }
+
+        await this.assertRefs(clinicId, dto);
 
         const dates: { start: Date; end: Date }[] = [];
         let currentDate = new Date(baseStartTime);

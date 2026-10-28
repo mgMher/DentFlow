@@ -27,10 +27,9 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { billingActions } from '../../store/billing';
-import { patientsActions } from '../../store/patients';
 import { appointmentsActions } from '../../store/appointments';
 import { httpActions } from '../../store/http';
-import { PageHeader } from '../../components/ui';
+import { PageHeader, PatientPicker } from '../../components/ui';
 import { formatCurrency, formatDate, formatTime } from '../../utils/formatters';
 import { CURRENCY_SYMBOLS } from '../../utils/constants';
 import { Currency, Patient } from '../../types';
@@ -56,7 +55,6 @@ const InvoiceCreatePage: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    const { list: patients } = useSelector((state: RootState) => state.patients);
     const { list: allAppointments } = useSelector((state: RootState) => state.appointments);
     const loading = useSelector((state: RootState) => state.http.loading.includes('CREATE_INVOICE'));
     const success = useSelector((state: RootState) => state.http.successes.includes('CREATE_INVOICE'));
@@ -69,7 +67,6 @@ const InvoiceCreatePage: React.FC = () => {
     const [lineItems, setLineItems] = useState<LineItem[]>([{ ...EMPTY_LINE_ITEM }]);
 
     useEffect(() => {
-        dispatch(patientsActions.getPatients({ limit: 1000 }));
         dispatch(appointmentsActions.getAppointments({ limit: 1000 }));
     }, [dispatch]);
 
@@ -153,10 +150,6 @@ const InvoiceCreatePage: React.FC = () => {
         lineItems.length > 0 &&
         lineItems.every((item) => item.description.trim() && item.quantity > 0 && item.unitPrice > 0);
 
-    const patientOptions = patients.map((p) => ({
-        label: `${p.lastName} ${p.firstName}${p.patronymic ? ' ' + p.patronymic : ''} - ${p.phone || ''}`,
-        value: p._id,
-    }));
 
     return (
         <Box>
@@ -170,21 +163,14 @@ const InvoiceCreatePage: React.FC = () => {
             <Paper sx={{ p: 3, mb: 3 }}>
                 <Grid container spacing={3}>
                     <Grid item xs={12} md={6}>
-                        <Autocomplete
-                            options={patientOptions}
-                            getOptionLabel={(option) => option.label}
-                            onChange={(_event, newValue) => {
-                                setSelectedPatient(newValue?.value || null);
+                        <PatientPicker
+                            value={selectedPatient}
+                            onChange={(id) => {
+                                setSelectedPatient(id);
                                 setSelectedAppointment(null);
                             }}
-                            renderInput={(params) => (
-                                <TextField
-                                    {...params}
-                                    label={t('billing.patient')}
-                                    required
-                                    fullWidth
-                                />
-                            )}
+                            label={t('billing.patient')}
+                            required
                         />
                     </Grid>
                     <Grid item xs={12} md={6}>

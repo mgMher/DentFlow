@@ -4,6 +4,7 @@ import {getDatabaseConfig} from './config';
 import {MongooseModule} from '@nestjs/mongoose';
 import {APP_GUARD} from '@nestjs/core';
 import {AuthGuard, ClinicGuard, RolesGuard} from 'src/common';
+import {ClinicRefsModule} from 'src/common/clinic-refs';
 import {AuthModule} from './modules/auth/auth.module';
 import {ClinicsModule} from './modules/clinics/clinics.module';
 import {UsersModule} from './modules/users/users.module';
@@ -22,6 +23,7 @@ import {SettingsModule} from './modules/settings/settings.module';
         ConfigModule.forRoot({isGlobal: true}),
         // forRootAsync so ConfigModule has loaded .env before the URI is read.
         MongooseModule.forRootAsync({useFactory: getDatabaseConfig}),
+        ClinicRefsModule,
         AuthModule,
         ClinicsModule,
         UsersModule,

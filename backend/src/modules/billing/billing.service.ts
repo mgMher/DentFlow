@@ -7,6 +7,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { Invoice, InvoiceDocument, InvoiceStatus } from './invoice.schema';
 import { Payment, PaymentDocument } from './payment.schema';
+import { ClinicRefsService } from 'src/common/clinic-refs';
 import {
     CreateInvoiceDto,
     UpdateInvoiceDto,
@@ -22,7 +23,13 @@ export class BillingService {
         private readonly invoiceModel: Model<InvoiceDocument>,
         @InjectModel(Payment.name)
         private readonly paymentModel: Model<PaymentDocument>,
+        private readonly clinicRefs: ClinicRefsService,
     ) {}
+
+    private assertItemTreatments(clinicId: Types.ObjectId, items: InvoiceItemDto[] = []): Promise<void> {
+        const ids = items.map((item) => item.treatmentId).filter(Boolean);
+        return this.clinicRefs.assertTreatments(clinicId, ids);
+    }
 
     /**
      * Generate a unique invoice number for the clinic.
@@ -101,6 +108,13 @@ export class BillingService {
         userId: Types.ObjectId,
         dto: CreateInvoiceDto,
     ): Promise<InvoiceDocument> {
+        // Body ids must belong to this clinic, or populate leaks another clinic's patient.
+        await Promise.all([
+            this.clinicRefs.assertPatient(clinicId, dto.patientId, { forBooking: true }),
+            dto.appointmentId && this.clinicRefs.assertAppointment(clinicId, dto.appointmentId, dto.patientId),
+            this.assertItemTreatments(clinicId, dto.items),
+        ]);
+
         const invoiceNumber = await this.generateInvoiceNumber(clinicId);
         const taxAmount = dto.taxAmount ?? 0;
         const { calculatedItems, subtotal, discountTotal, totalAmount } =
@@ -234,6 +248,7 @@ export class BillingService {
         const updateData: Record<string, any> = {};
 
         if (dto.items) {
+            await this.assertItemTreatments(clinicId, dto.items);
             const taxAmount = dto.taxAmount ?? invoice.taxAmount;
             const { calculatedItems, subtotal, discountTotal, totalAmount } =
                 this.calculateTotals(dto.items, taxAmount);

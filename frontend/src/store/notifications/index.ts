@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { Notification } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ function* getNotificationsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load notifications'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadNotifications')));
     }
 }
 
@@ -69,7 +70,7 @@ function* markReadSaga(action: any) {
         yield put({ type: GET_UNREAD_COUNT });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to mark notification'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.markNotification')));
     }
 }
 
@@ -83,7 +84,7 @@ function* markAllReadSaga(action: any) {
         yield put({ type: GET_NOTIFICATIONS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to mark all as read'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.markAllAsRead')));
     }
 }
 
@@ -97,7 +98,7 @@ function* getUnreadCountSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load unread count'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadUnreadCount')));
     }
 }
 
@@ -112,7 +113,7 @@ function* deleteNotificationSaga(action: any) {
         yield put({ type: GET_UNREAD_COUNT });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to delete notification'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.deleteNotification')));
     }
 }
 

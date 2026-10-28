@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { Clinic } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -41,7 +42,7 @@ function* getClinicSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load clinic'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadClinic')));
     }
 }
 
@@ -55,7 +56,7 @@ function* updateClinicSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update clinic'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateClinic')));
     }
 }
 
@@ -69,7 +70,7 @@ function* updateWorkingHoursSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update working hours'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateWorkingHours')));
     }
 }
 
@@ -83,7 +84,7 @@ function* updateSettingsSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update settings'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateSettings')));
     }
 }
 

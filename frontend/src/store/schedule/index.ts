@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { TreatmentRoom, BlockedTime } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -56,7 +57,7 @@ function* getRoomsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load rooms'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadRooms')));
     }
 }
 
@@ -70,7 +71,7 @@ function* createRoomSaga(action: any) {
         yield put({ type: GET_ROOMS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create room'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createRoom')));
     }
 }
 
@@ -83,7 +84,7 @@ function* getBlockedSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load blocked times'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadBlockedTimes')));
     }
 }
 
@@ -97,7 +98,7 @@ function* createBlockedSaga(action: any) {
         yield put({ type: GET_BLOCKED });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create blocked time'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createBlockedTime')));
     }
 }
 
@@ -111,7 +112,7 @@ function* deleteBlockedSaga(action: any) {
         yield put({ type: GET_BLOCKED });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to delete blocked time'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.deleteBlockedTime')));
     }
 }
 
@@ -128,7 +129,7 @@ function* getAvailabilitySaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load availability'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadAvailability')));
     }
 }
 

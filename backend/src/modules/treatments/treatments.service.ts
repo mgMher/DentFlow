@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
 import { Treatment, TreatmentDocument, TreatmentCategory, Currency } from './treatment.schema';
+import { escapeRegex } from 'src/common/utils';
 import { CreateTreatmentDto, UpdateTreatmentDto, QueryTreatmentDto } from './dto';
 
 interface DefaultTreatment {
@@ -232,7 +233,7 @@ export class TreatmentsService {
         }
 
         if (search) {
-            const regex = new RegExp(search, 'i');
+            const regex = new RegExp(escapeRegex(search.trim()), 'i');
             filter.$or = [
                 { name: regex },
                 { nameHy: regex },

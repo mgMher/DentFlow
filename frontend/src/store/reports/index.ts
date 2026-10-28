@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
 
@@ -56,7 +57,7 @@ function* getDashboardSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load dashboard'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadDashboard')));
     }
 }
 
@@ -69,7 +70,7 @@ function* getPatientStatsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load patient stats'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadPatientStats')));
     }
 }
 
@@ -82,7 +83,7 @@ function* getRevenueReportSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load revenue report'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadRevenueReport')));
     }
 }
 
@@ -95,7 +96,7 @@ function* getApptStatsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load appointment stats'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadAppointmentStats')));
     }
 }
 
@@ -108,7 +109,7 @@ function* getDentistPerfSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load dentist performance'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadDentistPerformance')));
     }
 }
 
@@ -121,7 +122,7 @@ function* getTreatmentStatsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load treatment stats'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadTreatmentStats')));
     }
 }
 

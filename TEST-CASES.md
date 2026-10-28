@@ -19,8 +19,8 @@ These preconditions are easy to miss and cause false failures.
 | S5 | At least one patient with a **completed** appointment | Needed for `lastVisit` and the billing/appointment tabs |
 | S6 | Test in all three languages (hy / ru / en) | Several bugs were untranslated hardcoded labels |
 
-> ⚠️ **Do not run the seed script** to create test data. `backend/src/seed.ts` starts with
-> `deleteMany({})` on clinics, users and patients — it will wipe the existing database.
+> The seed script (`npm run seed`) now only replaces its own demo clinic ("Ararat Dental") and
+> refuses to run with `MODE=PROD`. It still connects to whatever `MONGO_URI` points at — check it first.
 
 ### Already verified (no need to retest)
 
@@ -283,6 +283,38 @@ each module, not just patients.
 
 ---
 
+## 12. Phase 0 — foundation (branch `fix/phase-0-foundation`)
+
+**Before testing:** set `JWT_ACCESS_EXPIRATION=15m` in `backend/.env` (it still says `1d`).
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F0-01 | `.env` secrets used | Change `JWT_ACCESS_SECRET` in `backend/.env`, restart, log in | Works. A token signed with `dev-access-secret` (old default) is rejected | — |
+| F0-02 | PROD refuses weak secrets | Start with `MODE=PROD` and a 10-char secret | Backend exits at startup with a clear error | — |
+| F0-03 | Deactivation is immediate | Admin deactivates staff B while B is logged in; B clicks anything | B is sent to login on the next request (used to keep access up to 24h) | — |
+| F0-04 | Demotion is immediate | Change B from admin to receptionist while B is logged in | B's next action silently refreshes; admin-only pages disappear from B's sidebar after reload | — |
+| F0-05 | Wrong password message stays | Log in with a wrong password | "Invalid email or password" stays on screen, page does **not** reload | — |
+| F0-06 | Same message for unknown email | Log in with an email that has no account | Same message as F0-05 | — |
+| F0-07 | Parallel refresh | Wait 15+ min (token expired), open the Dashboard (several requests at once) | Page loads; you are **not** logged out | — |
+| F0-08 | Reload keeps the user | Log in as admin, press F5 on Staff detail | Avatar shows initials (not "?"), admin buttons still visible | — |
+| F0-09 | Logout revokes | Log out, then reuse the old refresh token (`POST /api/auth/refresh`) | 401 | — |
+| F0-10 | Bad id = 400 | Open `/appointments/abc`, `/billing/abc` | Translated error, not "Internal server error" | — |
+| F0-11 | Cross-clinic patient blocked | Clinic A: `POST /api/appointments` with a patientId from clinic B | 404 "Patient not found"; nothing created | — |
+| F0-12 | Cross-clinic dentist blocked | Same with clinic B's dentistId; also on invoices and treatment entries | 404 | — |
+| F0-13 | Deceased patient | Try to book or invoice a deceased/archived patient | Shown greyed out in the picker; API refuses with a translated message | — |
+| F0-14 | Patient picker search | Clinic with 25+ patients: book patient #25 by typing part of the name or phone | Found and bookable (used to show only the first 20) | — |
+| F0-15 | Invoice patient picker | Billing → New invoice | Patient search works (list used to be empty) | — |
+| F0-16 | Translated errors | In hy and ru, trigger a failed save on any page | Error in that language, not English | — |
+| F0-17 | No repeated toasts | Save a treatment, then save a patient | One toast each; the old toast does not reappear | — |
+| F0-18 | Second save toasts | Save the same treatment twice | Two toasts (the second used to be silent) | — |
+| F0-19 | Role gating | Log in as receptionist | No Reports / Settings in the sidebar; typing `/settings` lands on Dashboard | — |
+| F0-20 | Profile load failure | Stop the backend, reload the app | "Could not load your profile" + Try again button, not an endless spinner | — |
+| F0-21 | "Today" after midnight | Set the computer clock to 01:00, open Record treatment / new patient | Today's date is selectable and is the default | — |
+| F0-22 | Duplicate value | Create two treatment rooms or records that hit a unique index at the same time | 409 translated "already exists", not 500 | — |
+| F0-23 | Seed is scoped | Run `npm run seed` on a DB with another clinic | Other clinic untouched; seeded users can log in | — |
+
+---
+
 ## Known gaps (not bugs — not yet built)
 
 | Area | Note |
@@ -291,4 +323,4 @@ each module, not just patients.
 | Patient audit | Only **status** changes are audited. Edits to name, phone, medical history are not |
 | Photos | Stored as base64 on the patient document (192px, ~8KB). Fine at this scale; would need a file store if photos get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
-| JWT secrets | `backend/.env` has dev placeholders. Must be changed before production (`config/jwt.config.ts` already throws if they're missing when `NODE_ENV=production`) |
+| JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |

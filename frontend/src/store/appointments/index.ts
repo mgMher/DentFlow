@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { Appointment } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -72,7 +73,7 @@ function* getAppointmentsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load appointments'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadAppointments')));
     }
 }
 
@@ -85,7 +86,7 @@ function* getAppointmentSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load appointment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadAppointment')));
     }
 }
 
@@ -100,7 +101,7 @@ function* createAppointmentSaga(action: any) {
         yield put({ type: GET_TODAY });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create appointment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createAppointment')));
     }
 }
 
@@ -114,7 +115,7 @@ function* updateAppointmentSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update appointment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateAppointment')));
     }
 }
 
@@ -129,7 +130,7 @@ function* cancelAppointmentSaga(action: any) {
         yield put({ type: GET_TODAY });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to cancel appointment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.cancelAppointment')));
     }
 }
 
@@ -142,7 +143,7 @@ function* getTodaySaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load today appointments'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadTodayAppointments')));
     }
 }
 
@@ -155,7 +156,7 @@ function* getCalendarSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load calendar'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadCalendar')));
     }
 }
 
@@ -169,7 +170,7 @@ function* updateStatusSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update status'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateStatus')));
     }
 }
 

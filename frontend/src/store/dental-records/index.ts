@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { DentalChart, ToothHistory, TreatmentEntry } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -93,7 +94,7 @@ function* getChartSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load dental chart'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadDentalChart')));
     }
 }
 
@@ -116,7 +117,7 @@ function* updateToothSaga(action: any) {
         }
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update tooth'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateTooth')));
     }
 }
 
@@ -130,7 +131,7 @@ function* updateTeethSaga(action: any) {
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update teeth'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateTeeth')));
     }
 }
 
@@ -155,7 +156,7 @@ function* addEntrySaga(action: any) {
         }
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to add entry'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.addEntry')));
     }
 }
 
@@ -176,7 +177,7 @@ function* getHistorySaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load history'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadHistory')));
     }
 }
 
@@ -197,7 +198,7 @@ function* setChartTypeSaga(action: any) {
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(
-            httpActions.appendError(action.type, err?.data?.message || 'Failed to change chart type'),
+            httpActions.appendError(action.type, apiErrorMessage(err, 'errors.changeChartType')),
         );
     }
 }
@@ -216,7 +217,7 @@ function* getToothHistorySaga(action: any) {
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(
-            httpActions.appendError(action.type, err?.data?.message || 'Failed to load tooth history'),
+            httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadToothHistory')),
         );
     }
 }
@@ -230,7 +231,7 @@ function* getSummarySaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load summary'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadSummary')));
     }
 }
 

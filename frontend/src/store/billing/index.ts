@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { Invoice, Payment } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -71,7 +72,7 @@ function* getInvoicesSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load invoices'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadInvoices')));
     }
 }
 
@@ -84,7 +85,7 @@ function* getInvoiceSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load invoice'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadInvoice')));
     }
 }
 
@@ -98,7 +99,7 @@ function* createInvoiceSaga(action: any) {
         yield put({ type: GET_INVOICES });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create invoice'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createInvoice')));
     }
 }
 
@@ -112,7 +113,7 @@ function* cancelInvoiceSaga(action: any) {
         yield put({ type: GET_INVOICES });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to cancel invoice'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.cancelInvoice')));
     }
 }
 
@@ -127,7 +128,7 @@ function* addPaymentSaga(action: any) {
         yield put({ type: GET_PAYMENTS, payload: action.payload.invoiceId });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to add payment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.addPayment')));
     }
 }
 
@@ -140,7 +141,7 @@ function* getPaymentsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load payments'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadPayments')));
     }
 }
 
@@ -153,7 +154,7 @@ function* getRevenueSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load revenue'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadRevenue')));
     }
 }
 

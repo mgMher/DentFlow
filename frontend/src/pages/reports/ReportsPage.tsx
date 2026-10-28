@@ -26,6 +26,7 @@ import { reportsActions } from '../../store/reports';
 import { billingActions } from '../../store/billing';
 import { PageHeader, StatCard, LoadingSpinner } from '../../components/ui';
 import { formatCurrency } from '../../utils/formatters';
+import { toLocalDateString } from '../../utils/dates';
 
 type PeriodType = 'daily' | 'weekly' | 'monthly';
 
@@ -40,9 +41,9 @@ const ReportsPage: React.FC = () => {
     const [startDate, setStartDate] = useState(() => {
         const d = new Date();
         d.setMonth(d.getMonth() - 1);
-        return d.toISOString().split('T')[0];
+        return toLocalDateString(d);
     });
-    const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(() => toLocalDateString());
     const [period, setPeriod] = useState<PeriodType>('monthly');
 
     useEffect(() => {

@@ -10,6 +10,7 @@ import {
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
 import { CurrentUser } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
 import { BillingService } from './billing.service';
 import {
     CreateInvoiceDto,
@@ -68,7 +69,7 @@ export class BillingController {
     @ApiResponse({ status: 404, description: 'Invoice not found' })
     async findInvoiceById(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
     ) {
         return this.billingService.findInvoiceById(
             new Types.ObjectId(clinicId),
@@ -83,7 +84,7 @@ export class BillingController {
     @ApiResponse({ status: 404, description: 'Invoice not found' })
     async updateInvoice(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
         @Body() dto: UpdateInvoiceDto,
     ) {
         return this.billingService.updateInvoice(
@@ -100,7 +101,7 @@ export class BillingController {
     @ApiResponse({ status: 404, description: 'Invoice not found' })
     async cancelInvoice(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
     ) {
         return this.billingService.cancelInvoice(
             new Types.ObjectId(clinicId),
@@ -115,7 +116,7 @@ export class BillingController {
     @ApiResponse({ status: 404, description: 'Invoice not found' })
     async addPayment(
         @CurrentUser() user: { userId: string; clinicId: string },
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
         @Body() dto: CreatePaymentDto,
     ) {
         return this.billingService.addPayment(
@@ -132,7 +133,7 @@ export class BillingController {
     @ApiResponse({ status: 404, description: 'Invoice not found' })
     async getPaymentsByInvoice(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
     ) {
         return this.billingService.getPaymentsByInvoice(
             new Types.ObjectId(clinicId),
@@ -159,7 +160,7 @@ export class BillingController {
     @ApiResponse({ status: 200, description: 'Patient billing history' })
     async getPatientBillingHistory(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('patientId') patientId: string,
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
     ) {
         return this.billingService.getPatientBillingHistory(
             new Types.ObjectId(clinicId),

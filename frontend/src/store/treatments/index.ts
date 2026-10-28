@@ -1,6 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
 import { Treatment } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -55,7 +56,7 @@ function* getTreatmentsSaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load treatments'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadTreatments')));
     }
 }
 
@@ -69,7 +70,7 @@ function* createTreatmentSaga(action: any) {
         yield put({ type: GET_TREATMENTS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create treatment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createTreatment')));
     }
 }
 
@@ -83,7 +84,7 @@ function* updateTreatmentSaga(action: any) {
         yield put({ type: GET_TREATMENTS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to update treatment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateTreatment')));
     }
 }
 
@@ -97,7 +98,7 @@ function* deleteTreatmentSaga(action: any) {
         yield put({ type: GET_TREATMENTS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to delete treatment'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.deleteTreatment')));
     }
 }
 

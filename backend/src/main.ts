@@ -5,9 +5,13 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import helmet from 'helmet';
 import { GlobalExceptionFilter, TransformInterceptor } from './common';
+import { assertJwtConfig } from './config';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
+
+    // `.env` is loaded by now (ConfigModule ran while AppModule was created).
+    assertJwtConfig();
 
     app.use(helmet());
 

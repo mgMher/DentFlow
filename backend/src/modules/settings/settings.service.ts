@@ -40,7 +40,7 @@ export class SettingsService {
 
     async updateTemplate(
         clinicId: string,
-        templateId: string,
+        templateId: string | Types.ObjectId,
         dto: UpdateTemplateDto,
     ): Promise<NotificationTemplateDocument> {
         const template = await this.templateModel
@@ -61,7 +61,7 @@ export class SettingsService {
         return template;
     }
 
-    async deleteTemplate(clinicId: string, templateId: string): Promise<void> {
+    async deleteTemplate(clinicId: string, templateId: string | Types.ObjectId): Promise<void> {
         const result = await this.templateModel
             .findOneAndDelete({
                 _id: new Types.ObjectId(templateId),

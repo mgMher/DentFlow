@@ -50,7 +50,7 @@ export class ScheduleService {
 
     async updateRoom(
         clinicId: string,
-        roomId: string,
+        roomId: string | Types.ObjectId,
         dto: UpdateRoomDto,
     ): Promise<TreatmentRoomDocument> {
         const room = await this.roomModel
@@ -71,7 +71,7 @@ export class ScheduleService {
         return room;
     }
 
-    async deactivateRoom(clinicId: string, roomId: string): Promise<TreatmentRoomDocument> {
+    async deactivateRoom(clinicId: string, roomId: string | Types.ObjectId): Promise<TreatmentRoomDocument> {
         const room = await this.roomModel
             .findOneAndUpdate(
                 {
@@ -162,7 +162,7 @@ export class ScheduleService {
         return blockedTime.save();
     }
 
-    async deleteBlockedTime(clinicId: string, blockedTimeId: string): Promise<void> {
+    async deleteBlockedTime(clinicId: string, blockedTimeId: string | Types.ObjectId): Promise<void> {
         const result = await this.blockedTimeModel
             .findOneAndDelete({
                 _id: new Types.ObjectId(blockedTimeId),
@@ -179,7 +179,7 @@ export class ScheduleService {
 
     async getDentistAvailability(
         clinicId: string,
-        dentistId: string,
+        dentistId: string | Types.ObjectId,
         date: string,
     ): Promise<TimeSlot[]> {
         const targetDate = new Date(date);

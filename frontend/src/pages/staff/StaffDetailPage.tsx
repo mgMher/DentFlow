@@ -44,7 +44,7 @@ import {
     StatCard,
     StatusChip,
 } from '../../components/ui';
-import { useAuth, useHttpState } from '../../hooks';
+import { useAuth, useHttpState, usePermission } from '../../hooks';
 import { formatCurrency, getFullName, getInitials } from '../../utils/formatters';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
 import { staffRefId } from '../../utils/staff';
@@ -78,6 +78,7 @@ const StaffDetailPage: React.FC = () => {
     const dispatch = useDispatch();
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
+    const can = usePermission();
 
     const staff = useSelector((state: RootState) => state.staff.current);
     const performance = useSelector((state: RootState) => state.reports.dentistPerformance);
@@ -114,7 +115,7 @@ const StaffDetailPage: React.FC = () => {
     );
     const [pendingStatus, setPendingStatus] = useState<boolean | null>(null);
 
-    const canManageStaff = user?.role === 'clinic_admin' || user?.role === 'super_admin';
+    const canManageStaff = can('manageStaff');
     // Members maintain their own working hours even without staff-management rights.
     const isSelf = !!staff && !!user && staffRefId(staff) === user._id;
     const canEditAvailability = canManageStaff || isSelf;
@@ -148,7 +149,7 @@ const StaffDetailPage: React.FC = () => {
 
     // `/reports` is open to admins and dentists only, so anyone else would just
     // get a 403 behind the tab.
-    const canSeeReports = canManageStaff || user?.role === 'dentist';
+    const canSeeReports = can('viewReports');
     const showPerformance = staff?.role === 'dentist' && canSeeReports;
 
     useEffect(() => {

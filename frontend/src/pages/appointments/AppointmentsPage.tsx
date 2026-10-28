@@ -24,7 +24,6 @@ import {
     DialogContent,
     DialogActions,
     Button,
-    Autocomplete,
     Grid,
     Select,
     FormControl,
@@ -41,16 +40,16 @@ import {
 import { RootState } from '../../store';
 import { appointmentsActions } from '../../store/appointments';
 import { staffActions } from '../../store/staff';
-import { patientsActions } from '../../store/patients';
 import { treatmentsActions } from '../../store/treatments';
 import { scheduleActions } from '../../store/schedule';
 import { httpActions } from '../../store/http';
-import { PageHeader, StatusChip, EmptyState, LoadingSpinner } from '../../components/ui';
+import { PageHeader, StatusChip, EmptyState, LoadingSpinner, PatientPicker } from '../../components/ui';
 import { formatDate, formatTime } from '../../utils/formatters';
 import { staffRefId } from '../../utils/staff';
 import { patientName, staffName } from '../../utils/references';
 import { APPOINTMENT_STATUS_COLORS } from '../../utils/constants';
-import { Appointment, Patient } from '../../types';
+import { Appointment } from '../../types';
+import { toLocalDateString } from '../../utils/dates';
 
 // ── Helper: extract name from populated or raw field ────────────────────────
 
@@ -105,7 +104,6 @@ const AppointmentsPage: React.FC = () => {
         (state: RootState) => state.appointments,
     );
     const { dentists } = useSelector((state: RootState) => state.staff);
-    const { list: patients } = useSelector((state: RootState) => state.patients);
     const { list: treatments } = useSelector((state: RootState) => state.treatments);
     const { rooms } = useSelector((state: RootState) => state.schedule);
     const { loading, successes } = useSelector((state: RootState) => state.http);
@@ -136,7 +134,7 @@ const AppointmentsPage: React.FC = () => {
             patientId: '',
             dentistId: '',
             treatmentRoomId: '',
-            date: new Date().toISOString().slice(0, 10),
+            date: toLocalDateString(),
             startTime: '09:00',
             endTime: '10:00',
             treatmentType: '',
@@ -166,7 +164,6 @@ const AppointmentsPage: React.FC = () => {
             endDate: new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString(),
         }));
         dispatch(staffActions.getDentists());
-        dispatch(patientsActions.getPatients());
         dispatch(treatmentsActions.getTreatments());
         dispatch(scheduleActions.getRooms());
     }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -645,21 +642,11 @@ const AppointmentsPage: React.FC = () => {
                                     control={control}
                                     rules={{ required: t('validation.required') }}
                                     render={({ field }) => (
-                                        <Autocomplete
-                                            options={patients}
-                                            getOptionLabel={(opt: Patient) =>
-                                                `${opt.lastName} ${opt.firstName}${opt.patronymic ? ` ${opt.patronymic}` : ''}`
-                                            }
-                                            value={patients.find((p) => p._id === field.value) || null}
-                                            onChange={(_, val) => field.onChange(val?._id || '')}
-                                            renderInput={(params) => (
-                                                <TextField
-                                                    {...params}
-                                                    label={t('appointments.patient')}
-                                                    error={!!errors.patientId}
-                                                    helperText={errors.patientId?.message}
-                                                />
-                                            )}
+                                        <PatientPicker
+                                            value={field.value || null}
+                                            onChange={(id) => field.onChange(id || '')}
+                                            error={!!errors.patientId}
+                                            helperText={errors.patientId?.message}
                                         />
                                     )}
                                 />

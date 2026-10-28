@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout';
 import ProtectedRoute from './ProtectedRoute';
+import RequirePermission from './RequirePermission';
 
 // Auth pages
 import LoginPage from '../pages/auth/LoginPage';
@@ -62,10 +63,14 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     <Route path="/staff" element={<StaffListPage />} />
                     <Route path="/staff/:id" element={<StaffDetailPage />} />
 
-                    <Route path="/reports" element={<ReportsPage />} />
+                    <Route element={<RequirePermission permission="viewReports" />}>
+                        <Route path="/reports" element={<ReportsPage />} />
+                    </Route>
                     <Route path="/schedule" element={<SchedulePage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route element={<RequirePermission permission="manageClinic" />}>
+                        <Route path="/settings" element={<SettingsPage />} />
+                    </Route>
 
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

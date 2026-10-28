@@ -44,10 +44,8 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
 
     const handleLogout = () => {
         handleMenuClose();
+        // The saga revokes the session server-side, then clears storage and redirects.
         logout();
-        localStorage.removeItem('access-token');
-        localStorage.removeItem('refresh-token');
-        window.location.replace('/login');
     };
 
     return (

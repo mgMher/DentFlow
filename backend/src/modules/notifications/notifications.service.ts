@@ -72,7 +72,7 @@ export class NotificationsService {
 
     async markAsRead(
         clinicId: string,
-        notificationId: string,
+        notificationId: string | Types.ObjectId,
     ): Promise<NotificationDocument> {
         const notification = await this.notificationModel
             .findOneAndUpdate(
@@ -119,7 +119,7 @@ export class NotificationsService {
         return { count };
     }
 
-    async delete(clinicId: string, notificationId: string): Promise<void> {
+    async delete(clinicId: string, notificationId: string | Types.ObjectId): Promise<void> {
         const result = await this.notificationModel
             .findOneAndDelete({
                 _id: new Types.ObjectId(notificationId),

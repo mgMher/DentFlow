@@ -27,6 +27,7 @@ import { useHttpState } from '../../hooks';
 import { TOOTH_SURFACES } from '../../utils/constants';
 import { Currency, ToothSurface, Treatment } from '../../types';
 import { staffRefId } from '../../utils/staff';
+import { toLocalDateString } from '../../utils/dates';
 
 const CURRENCIES: Currency[] = ['AMD', 'USD', 'RUB'];
 
@@ -66,14 +67,14 @@ const ToothTreatmentForm: React.FC<ToothTreatmentFormProps> = ({
     const [treatmentId, setTreatmentId] = useState('');
     const [treatmentName, setTreatmentName] = useState('');
     const [dentistId, setDentistId] = useState('');
-    const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+    const [date, setDate] = useState(() => toLocalDateString());
     const [surfaces, setSurfaces] = useState<ToothSurface[]>(defaultSurfaces);
     const [cost, setCost] = useState('');
     const [currency, setCurrency] = useState<Currency>('AMD');
     const [notes, setNotes] = useState('');
     const [nameError, setNameError] = useState(false);
 
-    const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+    const today = useMemo(() => toLocalDateString(), []);
 
     // Only fetch the pickers' data once — the drawer remounts on every open.
     useEffect(() => {
@@ -105,7 +106,7 @@ const ToothTreatmentForm: React.FC<ToothTreatmentFormProps> = ({
         setCost('');
         setNotes('');
         setNameError(false);
-        setDate(new Date().toISOString().slice(0, 10));
+        setDate(toLocalDateString());
     };
 
     useEffect(() => {

@@ -20,11 +20,15 @@ import {
     ChevronRight as ExpandIcon,
 } from '@mui/icons-material';
 import { DRAWER_WIDTH, DRAWER_WIDTH_COLLAPSED } from '../../utils/constants';
+import { usePermission } from '../../hooks';
+import { Permission } from '../../utils/permissions';
 
 interface NavItem {
     path: string;
     labelKey: string;
     icon: React.ReactNode;
+    /** Hidden for roles that would only get a 403 there. Must match the route guard in AppRouter. */
+    permission?: Permission;
 }
 
 const navItems: NavItem[] = [
@@ -35,9 +39,9 @@ const navItems: NavItem[] = [
     { path: '/billing', labelKey: 'nav.billing', icon: <BillingIcon /> },
     { path: '/staff', labelKey: 'nav.staff', icon: <StaffIcon /> },
     { path: '/schedule', labelKey: 'nav.schedule', icon: <ScheduleIcon /> },
-    { path: '/reports', labelKey: 'nav.reports', icon: <ReportsIcon /> },
+    { path: '/reports', labelKey: 'nav.reports', icon: <ReportsIcon />, permission: 'viewReports' },
     { path: '/notifications', labelKey: 'nav.notifications', icon: <NotificationsIcon /> },
-    { path: '/settings', labelKey: 'nav.settings', icon: <SettingsIcon /> },
+    { path: '/settings', labelKey: 'nav.settings', icon: <SettingsIcon />, permission: 'manageClinic' },
 ];
 
 interface SidebarProps {
@@ -50,6 +54,8 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
+    const can = usePermission();
+    const visibleItems = navItems.filter((item) => !item.permission || can(item.permission));
     const width = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH;
 
     return (
@@ -92,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
             <Divider />
 
             <List sx={{ px: 1, py: 1 }}>
-                {navItems.map((item) => {
+                {visibleItems.map((item) => {
                     const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
 
                     const button = (

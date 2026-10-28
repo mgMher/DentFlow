@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Roles, Role } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
+import { Types } from 'mongoose';
 import { AppointmentStatus } from './appointment.schema';
 import { AppointmentsService } from './appointments.service';
 import { CreateAppointmentDto, QueryAppointmentDto, UpdateAppointmentDto } from './dto';
@@ -69,7 +71,7 @@ export class AppointmentsController {
     @ApiOperation({ summary: 'Get appointment by ID' })
     async findById(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
         return this.appointmentsService.findById(user.clinicId, id);
     }
@@ -79,7 +81,7 @@ export class AppointmentsController {
     @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
     async update(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateAppointmentDto,
     ) {
         return this.appointmentsService.update(user.clinicId, id, dto);
@@ -90,7 +92,7 @@ export class AppointmentsController {
     @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
     async updateStatus(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body('status') status: AppointmentStatus,
     ) {
         return this.appointmentsService.updateStatus(user.clinicId, id, status);
@@ -101,7 +103,7 @@ export class AppointmentsController {
     @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
     async cancel(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body('reason') reason?: string,
     ) {
         return this.appointmentsService.cancel(user.clinicId, id, reason);

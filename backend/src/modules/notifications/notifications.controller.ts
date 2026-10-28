@@ -8,6 +8,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
+import { Types } from 'mongoose';
 import { NotificationsService } from './notifications.service';
 import { QueryNotificationDto } from './dto';
 
@@ -38,7 +40,7 @@ export class NotificationsController {
     @ApiOperation({ summary: 'Mark a notification as read' })
     markAsRead(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
         return this.notificationsService.markAsRead(user.clinicId, id);
     }
@@ -55,7 +57,7 @@ export class NotificationsController {
     @ApiOperation({ summary: 'Delete a notification' })
     delete(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
         return this.notificationsService.delete(user.clinicId, id);
     }

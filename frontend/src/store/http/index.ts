@@ -35,15 +35,16 @@ const initialState: HttpState = {
 export const httpReducer = (state = initialState, action: any): HttpState => {
     switch (action.type) {
         case APPEND_LOADING:
-            return { ...state, loading: [...state.loading, action.payload] };
+            return { ...state, loading: [...state.loading.filter((t) => t !== action.payload), action.payload] };
         case REMOVE_LOADING:
             return { ...state, loading: state.loading.filter((t) => t !== action.payload) };
         case APPEND_ERROR:
-            return { ...state, errors: [...state.errors, action.payload] };
+            // One error per request type: the latest attempt replaces the previous one.
+            return { ...state, errors: [...state.errors.filter((e) => e.type !== action.payload.type), action.payload] };
         case REMOVE_ERROR:
             return { ...state, errors: state.errors.filter((e) => e.type !== action.payload) };
         case APPEND_SUCCESS:
-            return { ...state, successes: [...state.successes, action.payload] };
+            return { ...state, successes: [...state.successes.filter((s) => s !== action.payload), action.payload] };
         case REMOVE_SUCCESS:
             return { ...state, successes: state.successes.filter((s) => s !== action.payload) };
         default:

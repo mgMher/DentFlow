@@ -9,6 +9,7 @@ import {
 } from './dental-record.schema';
 import { TreatmentEntry, TreatmentEntryDocument } from './treatment-entry.schema';
 import { UpdateToothDto, CreateTreatmentEntryDto, QueryRecordsDto } from './dto';
+import { ClinicRefsService } from 'src/common/clinic-refs';
 
 @Injectable()
 export class DentalRecordsService {
@@ -17,6 +18,7 @@ export class DentalRecordsService {
         private readonly dentalRecordModel: Model<DentalRecordDocument>,
         @InjectModel(TreatmentEntry.name)
         private readonly treatmentEntryModel: Model<TreatmentEntryDocument>,
+        private readonly clinicRefs: ClinicRefsService,
     ) {}
 
     /**
@@ -37,6 +39,9 @@ export class DentalRecordsService {
         if (chart) {
             return chart;
         }
+
+        // Only on first creation: a GET for any random id used to create a chart.
+        await this.clinicRefs.assertPatient(clinicId, patientId);
 
         const teeth = this.generateDefaultTeeth(chartType);
 
@@ -250,6 +255,12 @@ export class DentalRecordsService {
                 `Tooth number ${dto.toothNumber} not found in chart`,
             );
         }
+
+        await Promise.all([
+            dto.dentistId && this.clinicRefs.assertDentist(clinicId, dto.dentistId),
+            dto.treatmentId && this.clinicRefs.assertTreatment(clinicId, dto.treatmentId),
+            dto.appointmentId && this.clinicRefs.assertAppointment(clinicId, dto.appointmentId, patientId),
+        ]);
 
         const entry = await this.treatmentEntryModel.create({
             clinicId,

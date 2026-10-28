@@ -14,17 +14,8 @@ import {
     PatientStatus,
     PatientStatusChange,
 } from './patient.schema';
-import { ARMENIAN_PHONE_E164, normalizeArmenianPhone } from 'src/common/utils';
+import { ARMENIAN_PHONE_E164, errorBody, escapeRegex, normalizeArmenianPhone } from 'src/common/utils';
 import { CreatePatientDto, QueryPatientDto, UpdatePatientDto } from './dto';
-
-/**
- * Errors carry a stable `code` next to the message so the UI can translate
- * them; the message stays as the developer-facing fallback.
- */
-const errorBody = (code: string, message: string) => ({ code, message });
-
-/** Escapes a user-supplied search term so it can be used inside a RegExp. */
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export interface PaginatedPatients {
     data: PatientDocument[];
