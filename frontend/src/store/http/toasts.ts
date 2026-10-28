@@ -3,8 +3,8 @@ import { toast } from 'react-toastify';
 import i18n from '../../locales/i18n';
 import { APPEND_ERROR, APPEND_SUCCESS } from './index';
 
-/** Auth screens show their own inline feedback. */
-const SILENT = new Set(['LOGIN', 'REGISTER', 'GET_PROFILE']);
+/** No error toast: these screens and dialogs show the error inline already. */
+const SILENT = new Set(['LOGIN', 'REGISTER', 'GET_PROFILE', 'CHANGE_PASSWORD', 'RESET_STAFF_PASSWORD']);
 
 /**
  * Actions that get a success toast, mapped to a translation key so the toast
@@ -24,6 +24,11 @@ const SUCCESS_TOAST_KEYS: Record<string, string> = {
     CANCEL_INVOICE: 'toast.updateSuccess',
     ADD_PAYMENT: 'toast.saveSuccess',
     CREATE_ROOM: 'toast.saveSuccess',
+    UPDATE_ROOM: 'toast.updateSuccess',
+    DEACTIVATE_ROOM: 'toast.updateSuccess',
+    CHANGE_PASSWORD: 'toast.passwordChanged',
+    RESET_STAFF_PASSWORD: 'toast.passwordReset',
+    LOGOUT_ALL: 'toast.loggedOutEverywhere',
     CREATE_BLOCKED: 'toast.saveSuccess',
     DELETE_BLOCKED: 'toast.deleteSuccess',
     UPDATE_TOOTH: 'toast.saveSuccess',

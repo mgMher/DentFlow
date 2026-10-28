@@ -9,6 +9,8 @@ import { TreatmentRoom, BlockedTime } from '../../types';
 const GET_ROOMS = 'GET_ROOMS';
 const GET_ROOMS_SUCCESS = 'GET_ROOMS_SUCCESS';
 const CREATE_ROOM = 'CREATE_ROOM';
+const UPDATE_ROOM = 'UPDATE_ROOM';
+const DEACTIVATE_ROOM = 'DEACTIVATE_ROOM';
 const GET_BLOCKED = 'GET_BLOCKED';
 const GET_BLOCKED_SUCCESS = 'GET_BLOCKED_SUCCESS';
 const CREATE_BLOCKED = 'CREATE_BLOCKED';
@@ -22,6 +24,10 @@ export const scheduleActions = {
     getRooms: () => ({ type: GET_ROOMS }),
     getRoomsSuccess: (payload: TreatmentRoom[]) => ({ type: GET_ROOMS_SUCCESS, payload }),
     createRoom: (payload: Partial<TreatmentRoom>) => ({ type: CREATE_ROOM, payload }),
+    /** Also reactivates a room: `{ id, data: { isActive: true } }`. */
+    updateRoom: (payload: { id: string; data: Partial<TreatmentRoom> }) => ({ type: UPDATE_ROOM, payload }),
+    /** Rooms are never hard-deleted: past appointments still point at them. */
+    deactivateRoom: (payload: string) => ({ type: DEACTIVATE_ROOM, payload }),
     getBlocked: (payload?: any) => ({ type: GET_BLOCKED, payload }),
     getBlockedSuccess: (payload: BlockedTime[]) => ({ type: GET_BLOCKED_SUCCESS, payload }),
     createBlocked: (payload: Partial<BlockedTime>) => ({ type: CREATE_BLOCKED, payload }),
@@ -39,6 +45,7 @@ const service = {
     getRooms: () => api.get('/schedule/rooms'),
     createRoom: (data: Partial<TreatmentRoom>) => api.post('/schedule/rooms', data),
     updateRoom: (id: string, data: Partial<TreatmentRoom>) => api.patch(`/schedule/rooms/${id}`, data),
+    deactivateRoom: (id: string) => api.delete(`/schedule/rooms/${id}`),
     getBlocked: (params?: any) => api.get('/schedule/blocked-times', { params }),
     createBlocked: (data: Partial<BlockedTime>) => api.post('/schedule/blocked-times', data),
     deleteBlocked: (id: string) => api.delete(`/schedule/blocked-times/${id}`),
@@ -72,6 +79,34 @@ function* createRoomSaga(action: any) {
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createRoom')));
+    }
+}
+
+function* updateRoomSaga(action: ReturnType<typeof scheduleActions.updateRoom>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        yield call(service.updateRoom, action.payload.id, action.payload.data);
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+        yield put({ type: GET_ROOMS });
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateRoom')));
+    }
+}
+
+function* deactivateRoomSaga(action: ReturnType<typeof scheduleActions.deactivateRoom>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        yield call(service.deactivateRoom, action.payload);
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+        yield put({ type: GET_ROOMS });
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateRoom')));
     }
 }
 
@@ -136,6 +171,8 @@ function* getAvailabilitySaga(action: any) {
 export function* watchSchedule() {
     yield takeLatest(GET_ROOMS, getRoomsSaga);
     yield takeLatest(CREATE_ROOM, createRoomSaga);
+    yield takeLatest(UPDATE_ROOM, updateRoomSaga);
+    yield takeLatest(DEACTIVATE_ROOM, deactivateRoomSaga);
     yield takeLatest(GET_BLOCKED, getBlockedSaga);
     yield takeLatest(CREATE_BLOCKED, createBlockedSaga);
     yield takeLatest(DELETE_BLOCKED, deleteBlockedSaga);

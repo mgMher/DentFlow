@@ -7,39 +7,55 @@ import {
     IsInt,
     IsOptional,
     IsString,
-    IsUrl,
+    Matches,
     Max,
+    MaxLength,
     Min,
+    ValidateIf,
     ValidateNested,
-    IsDateString,
 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { SupportedCurrency, SupportedLanguage, SubscriptionStatus } from '../clinic.schema';
+import { Transform, Type } from 'class-transformer';
+import { IsTimeZone, TIME_OF_DAY, Trim } from 'src/common/decorators';
+import { ARMENIAN_PHONE_E164, ARMENIAN_PHONE_MESSAGE, normalizeArmenianPhone } from 'src/common/utils';
+import { SupportedCurrency, SupportedLanguage } from '../clinic.schema';
+
+/** `''` means "clear this field", so it skips the format check. */
+const unlessEmpty = ValidateIf((_, value) => value !== '');
 
 export class UpdateAddressDto {
     @ApiPropertyOptional({ example: '15 Tumanyan St' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(200)
     street?: string;
 
     @ApiPropertyOptional({ example: 'Yerevan' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(100)
     city?: string;
 
     @ApiPropertyOptional({ example: 'Yerevan' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(100)
     state?: string;
 
     @ApiPropertyOptional({ example: '0001' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(100)
     zipCode?: string;
 
     @ApiPropertyOptional({ example: 'Armenia' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(100)
     country?: string;
 }
 
@@ -51,11 +67,11 @@ export class UpdateWorkingHourDto {
     dayOfWeek: number;
 
     @ApiPropertyOptional({ example: '09:00' })
-    @IsString()
+    @Matches(TIME_OF_DAY, { message: 'startTime must be in HH:MM format' })
     startTime: string;
 
     @ApiPropertyOptional({ example: '18:00' })
-    @IsString()
+    @Matches(TIME_OF_DAY, { message: 'endTime must be in HH:MM format' })
     endTime: string;
 
     @ApiPropertyOptional({ example: true })
@@ -64,27 +80,12 @@ export class UpdateWorkingHourDto {
     isOpen?: boolean;
 }
 
-export class UpdateSubscriptionDto {
-    @ApiPropertyOptional({ example: 'premium' })
-    @IsOptional()
-    @IsString()
-    plan?: string;
-
-    @ApiPropertyOptional({ enum: SubscriptionStatus, example: SubscriptionStatus.ACTIVE })
-    @IsOptional()
-    @IsEnum(SubscriptionStatus)
-    status?: SubscriptionStatus;
-
-    @ApiPropertyOptional({ example: '2027-01-01T00:00:00.000Z' })
-    @IsOptional()
-    @IsDateString()
-    expiresAt?: string;
-}
-
 export class UpdateClinicDto {
     @ApiPropertyOptional({ example: 'Bright Smile Dental' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(120)
     name?: string;
 
     @ApiPropertyOptional({ type: UpdateAddressDto })
@@ -95,17 +96,24 @@ export class UpdateClinicDto {
 
     @ApiPropertyOptional({ example: '+374 10 123456' })
     @IsOptional()
-    @IsString()
+    @Transform(({ value }) => normalizeArmenianPhone(value))
+    @unlessEmpty
+    @Matches(ARMENIAN_PHONE_E164, { message: `phone ${ARMENIAN_PHONE_MESSAGE}` })
     phone?: string;
 
     @ApiPropertyOptional({ example: 'info@brightsmile.am' })
     @IsOptional()
+    @Trim()
+    @unlessEmpty
     @IsEmail()
+    @MaxLength(254)
     email?: string;
 
     @ApiPropertyOptional({ example: 'https://cdn.example.com/logo.png' })
     @IsOptional()
+    @Trim()
     @IsString()
+    @MaxLength(500)
     logo?: string;
 
     @ApiPropertyOptional({ type: [UpdateWorkingHourDto] })
@@ -117,7 +125,7 @@ export class UpdateClinicDto {
 
     @ApiPropertyOptional({ example: 'Asia/Yerevan' })
     @IsOptional()
-    @IsString()
+    @IsTimeZone()
     timezone?: string;
 
     @ApiPropertyOptional({ enum: SupportedLanguage, example: SupportedLanguage.HY })
@@ -130,11 +138,8 @@ export class UpdateClinicDto {
     @IsEnum(SupportedCurrency)
     currency?: SupportedCurrency;
 
-    @ApiPropertyOptional({ type: UpdateSubscriptionDto })
-    @IsOptional()
-    @ValidateNested()
-    @Type(() => UpdateSubscriptionDto)
-    subscription?: UpdateSubscriptionDto;
+    // `subscription` is deliberately absent: a clinic must not be able to
+    // grant itself a plan. It belongs to a platform-admin path.
 }
 
 export class UpdateWorkingHoursDto {
@@ -158,6 +163,6 @@ export class UpdateSettingsDto {
 
     @ApiPropertyOptional({ example: 'Asia/Yerevan' })
     @IsOptional()
-    @IsString()
+    @IsTimeZone()
     timezone?: string;
 }

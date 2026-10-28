@@ -4,6 +4,8 @@ import {
     Delete,
     ForbiddenException,
     Get,
+    HttpCode,
+    HttpStatus,
     Param,
     Patch,
     Post,
@@ -14,6 +16,7 @@ import { CurrentUser, Roles, Role } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { Types } from 'mongoose';
 import { UsersService } from './users.service';
+import { ResetPasswordDto } from '../auth/dto';
 import {
     CreateUserDto,
     QueryUserDto,
@@ -125,6 +128,21 @@ export class UsersController {
         }
 
         return this.usersService.updateAvailability(clinicId, id.toString(), dto);
+    }
+
+    @Post(':id/reset-password')
+    @HttpCode(HttpStatus.OK)
+    @Roles(...STAFF_MANAGERS)
+    @ApiOperation({ summary: "Set a new password for a staff member (signs them out everywhere)" })
+    @ApiResponse({ status: 200, description: 'Password reset' })
+    @ApiResponse({ status: 404, description: 'User not found' })
+    async resetPassword(
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') actingAuthId: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+        @Body() dto: ResetPasswordDto,
+    ) {
+        return this.usersService.resetPassword(clinicId, id.toString(), actingAuthId, dto);
     }
 
     @Delete(':id')

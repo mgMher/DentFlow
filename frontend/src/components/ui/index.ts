@@ -10,3 +10,4 @@ export { default as ToothTreatmentForm } from './ToothTreatmentForm';
 export { default as DuplicatePatientWarning } from './DuplicatePatientWarning';
 export { default as Odontogram } from './Odontogram';
 export { default as PatientPicker } from './PatientPicker';
+export { default as PasswordDialog } from './PasswordDialog';

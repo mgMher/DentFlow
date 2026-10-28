@@ -69,23 +69,33 @@ built from treatment entries. Reports come after billing because they read billi
 - [ ] **Not verified at runtime yet** — needs a MongoDB to boot against (see TEST-CASES §12)
 - [ ] ~~One shared `Currency` enum~~ → moved to Phase 5 (billing owns it)
 
-### Phase 1 — Auth & Clinic settings
+### Phase 1 — Auth & Clinic settings — ✅ done 2026-10-28 (same branch, not committed yet)
 
-- [ ] **P1** Register: create the admin's `UserProfile` (founder missing from staff list) + backfill migration
-- [ ] **P1** Register: transaction / cleanup — failure leaves an orphan clinic; duplicate race → 409
-- [ ] **P1** Login rate limit + lockout (`@nestjs/throttler`); check password before "account deactivated"
-- [ ] **P1** Per-device refresh tokens (hashed) — today logging in on device B logs out device A
-- [ ] **P1** Logout: server call goes out without a token → refresh token stays valid 7 days
-- [ ] **P1** Remove `subscription` from the clinic update DTO
-- [ ] **P1** Settings: empty clinic email → 400; can't save a new clinic's profile
-- [ ] **P1** Settings: room edit calls *create* (400); room delete calls *delete template* (404)
-- [ ] **P2** Password policy: one constant (register 6 vs staff/login 8), max 72
-- [ ] **P2** Working hours DTO: HH:mm, start < end, no duplicate days, valid IANA timezone
-- [ ] **P2** Dark-mode switch in Settings does nothing; language choice lost on reload
-- [ ] **P2** Hardcoded English labels (address fields, equipment); template table shows raw enums
-- [ ] **P2** If loading clinic fails, Save overwrites real working hours with defaults
-- [ ] **P2** "Forgot password?" link has no handler → build reset flow (Phase 9) or hide
-- [ ] **NEW** Change password (self) + admin reset password for staff
+- [x] **P1** Register creates the founder's `UserProfile` + startup backfill for existing founders (`AuthService.onModuleInit`)
+- [x] **P1** Register cleans up clinic/user/profile on failure; duplicate race → 409 `accountEmailTaken`; seeds the default treatment catalogue
+- [x] **P1** Rate limits (`@nestjs/throttler` v4, per IP, auth routes only) + per-account lockout (5 wrong passwords → 15 min, `accountLocked`)
+- [x] **P1** Per-device sessions (`auth_sessions`, SHA-256 hashed refresh tokens, rotation with reuse detection + 30 s two-tab grace, max 10 per user). Guard rejects revoked sessions. Legacy plaintext `refreshToken` fields removed at startup
+- [x] **P1** Logout revokes only this device; new "Sign out of all devices"
+- [x] **P1** `subscription` removed from the clinic update DTO
+- [x] **P1** Settings: empty email/phone accepted (clears the field); phone validated + normalised
+- [x] **P1** Settings: room edit (PATCH) and deactivate/reactivate (were calling create / delete-template)
+- [x] **P2** One password policy (8–72) shared by register, staff create, change, reset; login form no longer blocks old short passwords
+- [x] **P2** Working hours: HH:mm, open days end after start, no duplicate days (server + inline in the form); IANA timezone validated; full timezone list
+- [x] **P2** Dark-mode switch removed from Settings (theme and UI language are per user, in the header); "Appearance" → "Language & currency" with clinic defaults only
+- [x] **P2** Hardcoded English labels replaced; template table shows translated type/channel
+- [x] **P2** Settings never renders forms without the real clinic (load error → retry), so Save can't overwrite real hours with defaults
+- [x] **P2** "Forgot password?" explains to ask the admin (self-service email reset = F9)
+- [x] **NEW** Change password (self, signs out other devices) and admin "Reset password" on the staff page (signs the member out everywhere, clears lockout)
+- [x] **P2** `ClinicGuard` enforces `Clinic.isActive` (60 s cache) → `clinicInactive`
+- [x] **P3** `useHttpState` callbacks stable (`useCallback`)
+- [x] **P0 (found while testing)** Every schema reference (`clinicId`, `patientId`, … 40 fields) was declared `type: Types.ObjectId`, which @nestjs/mongoose 9 + Mongoose 7 silently turn into `Mixed`: nothing was cast, API-written docs stored string ids, seeded/old docs ObjectIds, and each query only matched one kind. Schemas now use `Schema.Types.ObjectId`; one-off startup repair `common/migrations/objectid-repair.service.ts` converts stored strings (recorded in `migrations`)
+- [x] **P1** Patient stats aggregate cast fixed ("Active" was always 0)
+- [x] **P1** Refresh tokens get a `jti` — two issued in the same second were identical, defeating rotation
+- [x] **P2** Error filter passes message parameters (e.g. lockout `minutes`)
+- [x] **P2** Layout: `minWidth: 0` on `<main>` — every page scrolled sideways at ~1024 px
+- [x] Verified end-to-end on local MongoDB: 57 API checks (scratchpad `smoke.mjs`) + browser pass of login, settings, rooms, change password, patient picker
+- [ ] Deploy note: everyone signs in once after this ships (old tokens have no session id)
+- [ ] PROD: create the TTL index by hand — `db.auth_sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })` (autoIndex is off in PROD); set `TRUST_PROXY=1` behind the load balancer
 
 ### Phase 2 — Patients & Staff (finish)
 

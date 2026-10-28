@@ -11,20 +11,18 @@ import {
     Max,
     MaxLength,
     Min,
-    MinLength,
     ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { Role } from 'src/common/decorators';
+import { IsPassword, PASSWORD_MIN_LENGTH, Role, TIME_OF_DAY } from 'src/common/decorators';
 import { STAFF_ROLES } from './query-user.dto';
 
 /** `+374` followed by the 8-digit national significant number. */
 export const ARMENIAN_PHONE = /^\+374\d{8}$/;
 
-/** 24-hour `HH:MM`, which is what an `<input type="time">` submits. */
-export const TIME_OF_DAY = /^([01]\d|2[0-3]):[0-5]\d$/;
-
-export const MIN_PASSWORD_LENGTH = 8;
+export { TIME_OF_DAY };
+/** @deprecated use PASSWORD_MIN_LENGTH from src/common/decorators */
+export const MIN_PASSWORD_LENGTH = PASSWORD_MIN_LENGTH;
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value;
@@ -77,11 +75,9 @@ export class CreateUserDto {
     @MaxLength(254)
     email: string;
 
-    @ApiProperty({ example: 'StrongP@ss1', minLength: MIN_PASSWORD_LENGTH })
+    @ApiProperty({ example: 'StrongP@ss1', minLength: PASSWORD_MIN_LENGTH })
     @IsNotEmpty()
-    @IsString()
-    @MinLength(MIN_PASSWORD_LENGTH)
-    @MaxLength(128)
+    @IsPassword()
     password: string;
 
     @ApiPropertyOptional({ example: '+37493123456' })

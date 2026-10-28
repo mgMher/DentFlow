@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { Role } from 'src/common/decorators';
 
 export type UserDocument = User & Document;
@@ -18,7 +18,7 @@ export class User {
     password: string;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -47,8 +47,13 @@ export class User {
     @Prop()
     lastLogin: Date;
 
+    /** Consecutive wrong passwords; reset on success. */
+    @Prop({ default: 0 })
+    failedLoginAttempts: number;
+
+    /** Set after too many wrong passwords; login is refused until then. */
     @Prop()
-    refreshToken: string;
+    lockedUntil?: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

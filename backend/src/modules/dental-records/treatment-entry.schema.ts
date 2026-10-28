@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type TreatmentEntryDocument = TreatmentEntry & Document;
 
@@ -26,7 +26,7 @@ export const TreatmentImageSchema = SchemaFactory.createForClass(TreatmentImage)
 @Schema({ timestamps: true })
 export class TreatmentEntry {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -34,7 +34,7 @@ export class TreatmentEntry {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
         index: true,
@@ -44,20 +44,20 @@ export class TreatmentEntry {
     @Prop({ required: true })
     toothNumber: number;
 
-    @Prop({ type: Types.ObjectId, ref: 'Treatment' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Treatment' })
     treatmentId: Types.ObjectId;
 
     @Prop({ required: true, trim: true })
     treatmentName: string;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'User',
         required: true,
     })
     dentistId: Types.ObjectId;
 
-    @Prop({ type: Types.ObjectId, ref: 'Appointment' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Appointment' })
     appointmentId: Types.ObjectId;
 
     @Prop({ required: true, default: () => new Date() })

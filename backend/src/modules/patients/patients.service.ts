@@ -413,7 +413,8 @@ export class PatientsService implements OnModuleInit {
                 .exec(),
             this.patientModel
                 .aggregate<{ _id: string | null; count: number }>([
-                    { $match: { clinicId } },
+                    // Aggregations are not cast by the schema: the JWT gives a string.
+                    { $match: { clinicId: new Types.ObjectId(clinicId.toString()) } },
                     { $group: { _id: '$status', count: { $sum: 1 } } },
                 ])
                 .exec(),

@@ -14,7 +14,8 @@ export const apiErrorMessage = (err: any, fallbackKey = 'toast.saveError'): stri
 
     if (code) {
         const key = `errors.${code}`;
-        const translated = i18n.t(key);
+        // Extra fields in the body (e.g. `minutes` on accountLocked) fill {{placeholders}}.
+        const translated = String(i18n.t(key, { ...body, returnObjects: false }));
         if (translated !== key) {
             return translated;
         }

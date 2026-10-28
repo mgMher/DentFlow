@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type DentalRecordDocument = DentalRecord & Document;
 
@@ -56,7 +56,7 @@ export class ToothStatusChange {
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     changedBy: Types.ObjectId;
 
     @Prop({ required: true, default: () => new Date() })
@@ -95,7 +95,7 @@ export const ToothRecordSchema = SchemaFactory.createForClass(ToothRecord);
 @Schema({ timestamps: true })
 export class DentalRecord {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -103,7 +103,7 @@ export class DentalRecord {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
         index: true,
@@ -119,7 +119,7 @@ export class DentalRecord {
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     lastUpdatedBy: Types.ObjectId;
 }
 

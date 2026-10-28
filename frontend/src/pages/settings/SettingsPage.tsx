@@ -28,12 +28,15 @@ import {
     ListItemText,
     ListItemSecondaryAction,
     Divider,
+    Chip,
+    Alert,
 } from '@mui/material';
 import {
     Save as SaveIcon,
     Add as AddIcon,
     Edit as EditIcon,
-    Delete as DeleteIcon,
+    Block as DeactivateIcon,
+    Replay as ActivateIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
@@ -44,6 +47,8 @@ import { settingsActions } from '../../store/settings';
 import { PageHeader, LoadingSpinner, ConfirmDialog } from '../../components/ui';
 import { DAYS_OF_WEEK, LANGUAGES, CURRENCY_SYMBOLS } from '../../utils/constants';
 import { Currency, WorkingHour, TreatmentRoom } from '../../types';
+import { useHttpState } from '../../hooks';
+import { isArmenianPhone } from '../../utils/validators';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -58,30 +63,26 @@ const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
 
 const CURRENCIES: Currency[] = ['AMD', 'USD', 'RUB'];
 
-const TIMEZONES = [
-    'Asia/Yerevan',
-    'Europe/Moscow',
-    'America/New_York',
-    'America/Los_Angeles',
-    'Europe/London',
-    'Europe/Berlin',
-    'Asia/Dubai',
-];
+/** Every IANA zone the browser knows; the clinic's own zone is kept even if it is missing. */
+const ALL_TIMEZONES: string[] = (() => {
+    const supported = (Intl as unknown as { supportedValuesOf?: (key: string) => string[] }).supportedValuesOf;
+    return supported ? supported('timeZone') : ['Asia/Yerevan', 'Europe/Moscow', 'Europe/London', 'Europe/Berlin', 'Asia/Dubai'];
+})();
 
 const SettingsPage: React.FC = () => {
-    const { t, i18n } = useTranslation();
+    const { t } = useTranslation();
     const dispatch = useDispatch();
 
     const clinic = useSelector((state: RootState) => state.clinic.clinic);
     const rooms = useSelector((state: RootState) => state.schedule.rooms);
     const templates = useSelector((state: RootState) => state.settings.templates);
-    const loading = useSelector((state: RootState) => state.http.loading.includes('GET_CLINIC'));
-    const saving = useSelector(
-        (state: RootState) =>
-            state.http.loading.includes('UPDATE_CLINIC') ||
-            state.http.loading.includes('UPDATE_WORKING_HOURS') ||
-            state.http.loading.includes('UPDATE_SETTINGS'),
-    );
+    const { loading, error: clinicError } = useHttpState('GET_CLINIC');
+    const { loading: savingProfile } = useHttpState('UPDATE_CLINIC');
+    const { loading: savingHours } = useHttpState('UPDATE_WORKING_HOURS');
+    const { loading: savingRegional } = useHttpState('UPDATE_SETTINGS');
+    const createRoomState = useHttpState('CREATE_ROOM');
+    const updateRoomState = useHttpState('UPDATE_ROOM');
+    const savingRoom = createRoomState.loading || updateRoomState.loading;
 
     const [activeTab, setActiveTab] = useState(0);
 
@@ -113,9 +114,8 @@ const SettingsPage: React.FC = () => {
     const [roomForm, setRoomForm] = useState({ name: '', description: '', equipment: '' });
     const [deleteRoomId, setDeleteRoomId] = useState<string | null>(null);
 
-    // Appearance
+    // Regional defaults for the clinic (the UI language and theme are per user, in the header)
     const [appearance, setAppearance] = useState({
-        darkMode: false,
         language: 'hy',
         currency: 'AMD' as Currency,
         timezone: 'Asia/Yerevan',
@@ -153,7 +153,6 @@ const SettingsPage: React.FC = () => {
                 );
             }
             setAppearance({
-                darkMode: false,
                 language: clinic.language || 'hy',
                 currency: clinic.currency || 'AMD',
                 timezone: clinic.timezone || 'Asia/Yerevan',
@@ -161,14 +160,29 @@ const SettingsPage: React.FC = () => {
         }
     }, [clinic]);
 
+    // The room dialog closes only once the save succeeded, so a failed save keeps what was typed.
+    const roomSaved = createRoomState.success || updateRoomState.success;
+    useEffect(() => {
+        if (!roomSaved) return;
+        createRoomState.clearSuccess();
+        updateRoomState.clearSuccess();
+        setRoomDialogOpen(false);
+        setEditingRoom(null);
+        setRoomForm({ name: '', description: '', equipment: '' });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [roomSaved]);
+
+    const phoneInvalid = !!profileForm.phone.trim() && !isArmenianPhone(profileForm.phone);
+
     // ── Clinic Profile handlers ──
 
     const handleSaveProfile = () => {
         dispatch(
             clinicActions.updateClinic({
-                name: profileForm.name,
-                phone: profileForm.phone,
-                email: profileForm.email,
+                name: profileForm.name.trim(),
+                // '' clears the field; the API accepts it for both.
+                phone: profileForm.phone.trim(),
+                email: profileForm.email.trim(),
                 address: {
                     street: profileForm.street,
                     city: profileForm.city,
@@ -187,6 +201,8 @@ const SettingsPage: React.FC = () => {
         updated[index] = { ...updated[index], [field]: value };
         setWorkingHours(updated);
     };
+
+    const hoursInvalid = workingHours.some((wh) => wh.isOpen && wh.endTime <= wh.startTime);
 
     const handleSaveWorkingHours = () => {
         dispatch(clinicActions.updateWorkingHours({ workingHours }));
@@ -219,18 +235,15 @@ const SettingsPage: React.FC = () => {
         };
 
         if (editingRoom) {
-            dispatch(scheduleActions.createRoom({ ...data, _id: editingRoom._id } as any));
+            dispatch(scheduleActions.updateRoom({ id: editingRoom._id, data }));
         } else {
             dispatch(scheduleActions.createRoom(data));
         }
-        setRoomDialogOpen(false);
-        setEditingRoom(null);
-        setRoomForm({ name: '', description: '', equipment: '' });
     };
 
-    const handleDeleteRoom = () => {
+    const handleDeactivateRoom = () => {
         if (deleteRoomId) {
-            dispatch(settingsActions.deleteTemplate(deleteRoomId));
+            dispatch(scheduleActions.deactivateRoom(deleteRoomId));
             setDeleteRoomId(null);
         }
     };
@@ -249,9 +262,6 @@ const SettingsPage: React.FC = () => {
     // ── Appearance handlers ──
 
     const handleSaveAppearance = () => {
-        if (appearance.language !== i18n.language) {
-            i18n.changeLanguage(appearance.language);
-        }
         dispatch(
             clinicActions.updateSettings({
                 language: appearance.language,
@@ -261,7 +271,26 @@ const SettingsPage: React.FC = () => {
         );
     };
 
-    if (loading && !clinic) {
+    if (!clinic) {
+        // Never render the forms without the real data: saving defaults would
+        // overwrite the clinic's actual working hours.
+        if (clinicError && !loading) {
+            return (
+                <Box>
+                    <PageHeader title={t('settings.title')} />
+                    <Alert
+                        severity="error"
+                        action={
+                            <Button color="inherit" size="small" onClick={() => dispatch(clinicActions.getClinic())}>
+                                {t('common.retry')}
+                            </Button>
+                        }
+                    >
+                        {clinicError}
+                    </Alert>
+                </Box>
+            );
+        }
         return <LoadingSpinner fullPage />;
     }
 
@@ -281,7 +310,7 @@ const SettingsPage: React.FC = () => {
                     <Tab label={t('settings.workingHours')} />
                     <Tab label={t('settings.rooms')} />
                     <Tab label={t('settings.notifications')} />
-                    <Tab label={t('settings.appearance')} />
+                    <Tab label={t('settings.regional')} />
                 </Tabs>
             </Paper>
 
@@ -307,6 +336,8 @@ const SettingsPage: React.FC = () => {
                             <TextField
                                 label={t('patients.phone')}
                                 fullWidth
+                                error={phoneInvalid}
+                                helperText={phoneInvalid ? t('validation.invalidPhone') : undefined}
                                 value={profileForm.phone}
                                 onChange={(e) =>
                                     setProfileForm({ ...profileForm, phone: e.target.value })
@@ -332,18 +363,17 @@ const SettingsPage: React.FC = () => {
                         </Grid>
                         <Grid item xs={12} md={6}>
                             <TextField
-                                label={t('patients.address')}
+                                label={t('settings.street')}
                                 fullWidth
                                 value={profileForm.street}
                                 onChange={(e) =>
                                     setProfileForm({ ...profileForm, street: e.target.value })
                                 }
-                                placeholder="Street address"
                             />
                         </Grid>
                         <Grid item xs={12} md={3}>
                             <TextField
-                                label="City"
+                                label={t('settings.city')}
                                 fullWidth
                                 value={profileForm.city}
                                 onChange={(e) =>
@@ -353,7 +383,7 @@ const SettingsPage: React.FC = () => {
                         </Grid>
                         <Grid item xs={12} md={3}>
                             <TextField
-                                label="State / Region"
+                                label={t('settings.region')}
                                 fullWidth
                                 value={profileForm.state}
                                 onChange={(e) =>
@@ -363,7 +393,7 @@ const SettingsPage: React.FC = () => {
                         </Grid>
                         <Grid item xs={12} md={3}>
                             <TextField
-                                label="ZIP / Postal Code"
+                                label={t('settings.zipCode')}
                                 fullWidth
                                 value={profileForm.zipCode}
                                 onChange={(e) =>
@@ -373,7 +403,7 @@ const SettingsPage: React.FC = () => {
                         </Grid>
                         <Grid item xs={12} md={3}>
                             <TextField
-                                label="Country"
+                                label={t('settings.country')}
                                 fullWidth
                                 value={profileForm.country}
                                 onChange={(e) =>
@@ -387,9 +417,9 @@ const SettingsPage: React.FC = () => {
                             variant="contained"
                             startIcon={<SaveIcon />}
                             onClick={handleSaveProfile}
-                            disabled={saving || !profileForm.name.trim()}
+                            disabled={savingProfile || !profileForm.name.trim() || phoneInvalid}
                         >
-                            {saving ? t('common.loading') : t('common.save')}
+                            {savingProfile ? t('common.loading') : t('common.save')}
                         </Button>
                     </Box>
                 </Paper>
@@ -405,7 +435,7 @@ const SettingsPage: React.FC = () => {
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell sx={{ width: '25%' }}>{t('common.date')}</TableCell>
+                                    <TableCell sx={{ width: '25%' }}>{t('settings.day')}</TableCell>
                                     <TableCell sx={{ width: '25%' }}>{t('appointments.startTime')}</TableCell>
                                     <TableCell sx={{ width: '25%' }}>{t('appointments.endTime')}</TableCell>
                                     <TableCell sx={{ width: '25%' }}>{t('common.status')}</TableCell>
@@ -413,7 +443,7 @@ const SettingsPage: React.FC = () => {
                             </TableHead>
                             <TableBody>
                                 {workingHours.map((wh, index) => (
-                                    <TableRow key={DAYS_OF_WEEK[index]}>
+                                    <TableRow key={DAYS_OF_WEEK[index]} sx={{ opacity: wh.isOpen ? 1 : 0.6 }}>
                                         <TableCell>
                                             <Typography fontWeight={wh.isOpen ? 600 : 400}>
                                                 {t(`days.${DAYS_OF_WEEK[index]}`)}
@@ -440,6 +470,12 @@ const SettingsPage: React.FC = () => {
                                                     handleWorkingHoursChange(index, 'endTime', e.target.value)
                                                 }
                                                 disabled={!wh.isOpen}
+                                                error={wh.isOpen && wh.endTime <= wh.startTime}
+                                                helperText={
+                                                    wh.isOpen && wh.endTime <= wh.startTime
+                                                        ? t('errors.availabilityEndBeforeStart')
+                                                        : undefined
+                                                }
                                                 sx={{ width: 140 }}
                                             />
                                         </TableCell>
@@ -458,7 +494,7 @@ const SettingsPage: React.FC = () => {
                                                         color="primary"
                                                     />
                                                 }
-                                                label={wh.isOpen ? t('common.active') : t('common.inactive')}
+                                                label={wh.isOpen ? t('settings.open') : t('settings.closed')}
                                             />
                                         </TableCell>
                                     </TableRow>
@@ -471,9 +507,9 @@ const SettingsPage: React.FC = () => {
                             variant="contained"
                             startIcon={<SaveIcon />}
                             onClick={handleSaveWorkingHours}
-                            disabled={saving}
+                            disabled={savingHours || hoursInvalid}
                         >
-                            {saving ? t('common.loading') : t('common.save')}
+                            {savingHours ? t('common.loading') : t('common.save')}
                         </Button>
                     </Box>
                 </Paper>
@@ -503,7 +539,15 @@ const SettingsPage: React.FC = () => {
                                     {index > 0 && <Divider />}
                                     <ListItem>
                                         <ListItemText
-                                            primary={room.name}
+                                            sx={{ opacity: room.isActive === false ? 0.6 : 1 }}
+                                            primary={
+                                                <Box component="span" sx={{ display: 'inline-flex', alignItems: 'center', gap: 1 }}>
+                                                    {room.name}
+                                                    {room.isActive === false && (
+                                                        <Chip size="small" label={t('common.inactive')} />
+                                                    )}
+                                                </Box>
+                                            }
                                             secondary={
                                                 <>
                                                     {room.description && (
@@ -533,15 +577,28 @@ const SettingsPage: React.FC = () => {
                                                     <EditIcon fontSize="small" />
                                                 </IconButton>
                                             </Tooltip>
-                                            <Tooltip title={t('common.delete')}>
-                                                <IconButton
-                                                    size="small"
-                                                    color="error"
-                                                    onClick={() => setDeleteRoomId(room._id)}
-                                                >
-                                                    <DeleteIcon fontSize="small" />
-                                                </IconButton>
-                                            </Tooltip>
+                                            {room.isActive === false ? (
+                                                <Tooltip title={t('settings.activateRoom')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        onClick={() =>
+                                                            dispatch(scheduleActions.updateRoom({ id: room._id, data: { isActive: true } }))
+                                                        }
+                                                    >
+                                                        <ActivateIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            ) : (
+                                                <Tooltip title={t('settings.deactivateRoom')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => setDeleteRoomId(room._id)}
+                                                    >
+                                                        <DeactivateIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
                                         </ListItemSecondaryAction>
                                     </ListItem>
                                 </React.Fragment>
@@ -557,9 +614,7 @@ const SettingsPage: React.FC = () => {
                     maxWidth="sm"
                     fullWidth
                 >
-                    <DialogTitle>
-                        {editingRoom ? t('common.edit') : t('common.add')} - {t('settings.rooms')}
-                    </DialogTitle>
+                    <DialogTitle>{editingRoom ? t('settings.editRoom') : t('settings.addRoom')}</DialogTitle>
                     <DialogContent>
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
                             <TextField
@@ -580,13 +635,14 @@ const SettingsPage: React.FC = () => {
                                 }
                             />
                             <TextField
-                                label="Equipment (comma separated)"
+                                label={t('settings.equipment')}
                                 fullWidth
                                 value={roomForm.equipment}
                                 onChange={(e) =>
                                     setRoomForm({ ...roomForm, equipment: e.target.value })
                                 }
-                                placeholder="X-ray, Dental chair, Sterilizer"
+                                placeholder={t('settings.equipmentPlaceholder')}
+                                helperText={t('settings.equipmentHelp')}
                             />
                         </Box>
                     </DialogContent>
@@ -597,9 +653,9 @@ const SettingsPage: React.FC = () => {
                         <Button
                             variant="contained"
                             onClick={handleSaveRoom}
-                            disabled={!roomForm.name.trim()}
+                            disabled={!roomForm.name.trim() || savingRoom}
                         >
-                            {t('common.save')}
+                            {savingRoom ? t('common.loading') : t('common.save')}
                         </Button>
                     </DialogActions>
                 </Dialog>
@@ -607,9 +663,9 @@ const SettingsPage: React.FC = () => {
                 {/* Delete Room Confirm */}
                 <ConfirmDialog
                     open={!!deleteRoomId}
-                    title={t('common.confirm')}
-                    message={t('common.delete') + '?'}
-                    onConfirm={handleDeleteRoom}
+                    title={t('settings.deactivateRoom')}
+                    message={t('settings.deactivateRoomConfirm')}
+                    onConfirm={handleDeactivateRoom}
                     onCancel={() => setDeleteRoomId(null)}
                     variant="danger"
                 />
@@ -630,18 +686,20 @@ const SettingsPage: React.FC = () => {
                             <Table>
                                 <TableHead>
                                     <TableRow>
-                                        <TableCell>{t('treatments.name')}</TableCell>
-                                        <TableCell>{t('treatments.category')}</TableCell>
-                                        <TableCell>{t('treatments.description')}</TableCell>
+                                        <TableCell>{t('settings.templateType')}</TableCell>
+                                        <TableCell>{t('settings.channel')}</TableCell>
+                                        <TableCell>{t('settings.language')}</TableCell>
+                                        <TableCell>{t('settings.subject')}</TableCell>
                                         <TableCell align="center">{t('common.status')}</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
                                     {templates.map((template: any) => (
                                         <TableRow key={template._id}>
-                                            <TableCell>{template.type || template.name}</TableCell>
-                                            <TableCell>{template.channel || '-'}</TableCell>
-                                            <TableCell>{template.subject || template.description || '-'}</TableCell>
+                                            <TableCell>{t(`settings.templateTypes.${template.type}`, { defaultValue: template.type })}</TableCell>
+                                            <TableCell>{t(`settings.channels.${template.channel}`, { defaultValue: template.channel })}</TableCell>
+                                            <TableCell>{LANGUAGES.find((l) => l.code === template.language)?.label || template.language}</TableCell>
+                                            <TableCell>{template.subject || '-'}</TableCell>
                                             <TableCell align="center">
                                                 <Switch
                                                     checked={template.isActive !== false}
@@ -667,30 +725,17 @@ const SettingsPage: React.FC = () => {
             <TabPanel value={activeTab} index={4}>
                 <Paper sx={{ p: 3 }}>
                     <Typography variant="h6" gutterBottom>
-                        {t('settings.appearance')}
+                        {t('settings.regional')}
                     </Typography>
                     <Grid container spacing={3}>
                         <Grid item xs={12}>
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={appearance.darkMode}
-                                        onChange={(e) =>
-                                            setAppearance({ ...appearance, darkMode: e.target.checked })
-                                        }
-                                        color="primary"
-                                    />
-                                }
-                                label={
-                                    appearance.darkMode
-                                        ? t('settings.darkMode')
-                                        : t('settings.lightMode')
-                                }
-                            />
+                            <Typography variant="body2" color="text.secondary">
+                                {t('settings.regionalHelp')}
+                            </Typography>
                         </Grid>
                         <Grid item xs={12} md={4}>
                             <TextField
-                                label={t('settings.language')}
+                                label={t('settings.defaultLanguage')}
                                 select
                                 fullWidth
                                 value={appearance.language}
@@ -735,7 +780,10 @@ const SettingsPage: React.FC = () => {
                                     setAppearance({ ...appearance, timezone: e.target.value })
                                 }
                             >
-                                {TIMEZONES.map((tz) => (
+                                {(ALL_TIMEZONES.includes(appearance.timezone)
+                                    ? ALL_TIMEZONES
+                                    : [appearance.timezone, ...ALL_TIMEZONES]
+                                ).map((tz) => (
                                     <MenuItem key={tz} value={tz}>
                                         {tz}
                                     </MenuItem>
@@ -748,9 +796,9 @@ const SettingsPage: React.FC = () => {
                             variant="contained"
                             startIcon={<SaveIcon />}
                             onClick={handleSaveAppearance}
-                            disabled={saving}
+                            disabled={savingRegional}
                         >
-                            {saving ? t('common.loading') : t('common.save')}
+                            {savingRegional ? t('common.loading') : t('common.save')}
                         </Button>
                     </Box>
                 </Paper>

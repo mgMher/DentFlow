@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type PaymentDocument = Payment & Document;
 
@@ -18,7 +18,7 @@ export enum PaymentCurrency {
 @Schema({ timestamps: true })
 export class Payment {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -26,7 +26,7 @@ export class Payment {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Invoice',
         required: true,
         index: true,
@@ -34,7 +34,7 @@ export class Payment {
     invoiceId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
     })
@@ -65,7 +65,7 @@ export class Payment {
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     receivedBy: Types.ObjectId;
 }
 

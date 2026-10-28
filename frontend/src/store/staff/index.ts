@@ -14,6 +14,7 @@ const CLEAR_STAFF_MEMBER = 'CLEAR_STAFF_MEMBER';
 const CREATE_STAFF = 'CREATE_STAFF';
 const UPDATE_STAFF = 'UPDATE_STAFF';
 const UPDATE_STAFF_STATUS = 'UPDATE_STAFF_STATUS';
+const RESET_STAFF_PASSWORD = 'RESET_STAFF_PASSWORD';
 const UPDATE_STAFF_AVAILABILITY = 'UPDATE_STAFF_AVAILABILITY';
 const DELETE_STAFF = 'DELETE_STAFF';
 const GET_DENTISTS = 'GET_DENTISTS';
@@ -44,6 +45,8 @@ export const staffActions = {
         payload,
     }),
     deleteStaff: (payload: string) => ({ type: DELETE_STAFF, payload }),
+    /** Admin sets a new password; the member is signed out on every device. */
+    resetStaffPassword: (payload: { id: string; newPassword: string }) => ({ type: RESET_STAFF_PASSWORD, payload }),
     getDentists: () => ({ type: GET_DENTISTS }),
 };
 
@@ -137,6 +140,19 @@ function* updateStaffSaga(action: any) {
     }
 }
 
+function* resetStaffPasswordSaga(action: ReturnType<typeof staffActions.resetStaffPassword>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        yield call(() => api.post(`/users/${action.payload.id}/reset-password`, { newPassword: action.payload.newPassword }));
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, errorMessage(err, 'errors.resetPassword')));
+    }
+}
+
 function* updateStaffStatusSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
@@ -213,6 +229,7 @@ export function* watchStaff() {
     yield takeLatest(CREATE_STAFF, createStaffSaga);
     yield takeLatest(UPDATE_STAFF, updateStaffSaga);
     yield takeLatest(UPDATE_STAFF_STATUS, updateStaffStatusSaga);
+    yield takeLatest(RESET_STAFF_PASSWORD, resetStaffPasswordSaga);
     yield takeLatest(UPDATE_STAFF_AVAILABILITY, updateStaffAvailabilitySaga);
     yield takeLatest(DELETE_STAFF, deleteStaffSaga);
     yield takeLatest(GET_DENTISTS, getDentistsSaga);

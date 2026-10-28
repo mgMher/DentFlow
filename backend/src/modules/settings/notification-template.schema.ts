@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type NotificationTemplateDocument = NotificationTemplate & Document;
 
@@ -24,7 +24,7 @@ export enum TemplateLanguage {
 @Schema({ timestamps: true })
 export class NotificationTemplate {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,

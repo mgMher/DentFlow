@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export enum TreatmentCategory {
     GENERAL = 'general',
@@ -36,7 +36,7 @@ export type TreatmentDocument = Treatment & Document;
 @Schema({ timestamps: true })
 export class Treatment {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,

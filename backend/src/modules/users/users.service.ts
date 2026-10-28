@@ -11,6 +11,9 @@ import * as bcrypt from 'bcryptjs';
 import { Role } from 'src/common/decorators';
 import { errorBody, escapeRegex } from 'src/common/utils';
 import { User, UserDocument } from '../auth/auth.schema';
+import { SessionsService } from '../auth/sessions.service';
+import { PASSWORD_HASH_COST } from '../auth/auth.service';
+import { ResetPasswordDto } from '../auth/dto';
 import { UserProfile, UserProfileDocument } from './user.schema';
 import {
     CreateUserDto,
@@ -60,6 +63,7 @@ export class UsersService {
     constructor(
         @InjectModel(UserProfile.name) private readonly userProfileModel: Model<UserProfileDocument>,
         @InjectModel(User.name) private readonly authModel: Model<UserDocument>,
+        private readonly sessions: SessionsService,
     ) {}
 
     /**
@@ -90,7 +94,7 @@ export class UsersService {
         const availability = dto.defaultAvailability || [];
         assertValidAvailability(availability);
 
-        const hashedPassword = await bcrypt.hash(dto.password, 12);
+        const hashedPassword = await bcrypt.hash(dto.password, PASSWORD_HASH_COST);
 
         // Create the auth record
         const authRecord = await this.authModel.create({
@@ -346,9 +350,48 @@ export class UsersService {
                 .findByIdAndUpdate(profile._id, { $set: { isActive } }, { new: true })
                 .lean(),
             this.authModel.findByIdAndUpdate(profile.authId, { $set: { isActive } }),
+            // Signed-in devices go too, so reactivating later doesn't revive old sessions.
+            !isActive && profile.authId && this.sessions.revokeAllForUser(profile.authId),
         ]);
 
         return updated as UserProfileDocument;
+    }
+
+    /**
+     * An admin sets a new password for a staff member who forgot theirs. All
+     * of that member's devices are signed out. Your own password goes through
+     * change-password, which asks for the current one.
+     */
+    async resetPassword(
+        clinicId: string,
+        userId: string,
+        actingAuthId: string,
+        dto: ResetPasswordDto,
+    ): Promise<{ message: string }> {
+        const profile = await this.userProfileModel
+            .findOne({ _id: new Types.ObjectId(userId), clinicId: new Types.ObjectId(clinicId) })
+            .select('authId')
+            .lean();
+
+        if (!profile?.authId) {
+            throw new NotFoundException(errorBody('staffNotFound', 'User not found'));
+        }
+        if (profile.authId.toString() === actingAuthId) {
+            throw new BadRequestException(
+                errorBody('useChangePassword', 'Use "Change password" for your own account'),
+            );
+        }
+
+        await this.authModel.updateOne(
+            { _id: profile.authId, clinicId: new Types.ObjectId(clinicId) },
+            {
+                $set: { password: await bcrypt.hash(dto.newPassword, PASSWORD_HASH_COST), failedLoginAttempts: 0 },
+                $unset: { lockedUntil: 1 },
+            },
+        );
+        await this.sessions.revokeAllForUser(profile.authId);
+
+        return { message: 'Password reset' };
     }
 
     /**

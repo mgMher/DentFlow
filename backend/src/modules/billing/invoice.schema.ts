@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type InvoiceDocument = Invoice & Document;
 
@@ -20,7 +20,7 @@ export enum InvoiceCurrency {
 
 @Schema({ _id: false })
 export class InvoiceItem {
-    @Prop({ type: Types.ObjectId, ref: 'Treatment' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Treatment' })
     treatmentId: Types.ObjectId;
 
     @Prop({ required: true, trim: true })
@@ -44,7 +44,7 @@ export const InvoiceItemSchema = SchemaFactory.createForClass(InvoiceItem);
 @Schema({ timestamps: true })
 export class Invoice {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -52,7 +52,7 @@ export class Invoice {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
         index: true,
@@ -60,7 +60,7 @@ export class Invoice {
     patientId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Appointment',
     })
     appointmentId: Types.ObjectId;
@@ -106,7 +106,7 @@ export class Invoice {
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     createdBy: Types.ObjectId;
 }
 

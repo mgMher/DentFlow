@@ -29,6 +29,7 @@ import {
     Save as SaveIcon,
     ToggleOff as DeactivateIcon,
     ToggleOn as ActivateIcon,
+    Password as PasswordIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -40,6 +41,7 @@ import { reportsActions } from '../../store/reports';
 import {
     ConfirmDialog,
     LoadingSpinner,
+    PasswordDialog,
     PageHeader,
     StatCard,
     StatusChip,
@@ -114,6 +116,16 @@ const StaffDetailPage: React.FC = () => {
         availabilityToRows(undefined),
     );
     const [pendingStatus, setPendingStatus] = useState<boolean | null>(null);
+    const [resetOpen, setResetOpen] = useState(false);
+    const resetPassword = useHttpState('RESET_STAFF_PASSWORD');
+
+    useEffect(() => {
+        if (resetPassword.success) {
+            resetPassword.clearSuccess();
+            setResetOpen(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resetPassword.success]);
 
     const canManageStaff = can('manageStaff');
     // Members maintain their own working hours even without staff-management rights.
@@ -265,6 +277,18 @@ const StaffDetailPage: React.FC = () => {
                 <Button variant="text" startIcon={<BackIcon />} onClick={() => navigate('/staff')}>
                     {t('common.back')}
                 </Button>
+                {canManageStaff && !isSelf && (
+                    <Button
+                        variant="outlined"
+                        startIcon={<PasswordIcon />}
+                        onClick={() => {
+                            resetPassword.clearError();
+                            setResetOpen(true);
+                        }}
+                    >
+                        {t('staff.resetPassword')}
+                    </Button>
+                )}
                 {canManageStaff && (
                     <Button
                         variant="outlined"
@@ -782,6 +806,16 @@ const StaffDetailPage: React.FC = () => {
                 variant={pendingStatus ? 'default' : 'danger'}
                 onConfirm={confirmStatusChange}
                 onCancel={() => setPendingStatus(null)}
+            />
+
+            <PasswordDialog
+                open={resetOpen}
+                title={t('staff.resetPassword')}
+                description={t('staff.resetPasswordHint', { name: getFullName(staff.firstName, staff.lastName) })}
+                loading={resetPassword.loading}
+                error={resetPassword.error}
+                onSubmit={({ newPassword }) => dispatch(staffActions.resetStaffPassword({ id: staff._id, newPassword }))}
+                onClose={() => setResetOpen(false)}
             />
         </Box>
     );

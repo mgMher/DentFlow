@@ -313,6 +313,49 @@ each module, not just patients.
 | F0-22 | Duplicate value | Create two treatment rooms or records that hit a unique index at the same time | 409 translated "already exists", not 500 | — |
 | F0-23 | Seed is scoped | Run `npm run seed` on a DB with another clinic | Other clinic untouched; seeded users can log in | — |
 
+## 13. Phase 1 — auth & clinic settings
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F1-01 | Founder in staff list | Register a new clinic, open Staff | The founder is listed as admin | — |
+| F1-02 | Founder backfill | Restart backend on a DB with clinics registered before this change | Log: `Created staff profiles for N account(s)`; those founders appear in Staff | — |
+| F1-03 | New clinic has a catalogue | Register, open Treatments | Default treatments present | — |
+| F1-04 | Duplicate email on register | Register with an email that already has an account | Translated "account with this email already exists"; no orphan clinic in DB | — |
+| F1-05 | Register password rule | Password of 7 characters | Inline "min 8" error; API also refuses | — |
+| F1-06 | Lockout | 5 wrong passwords for one account | 6th attempt: "Too many failed attempts. Try again in 15 min…" even with the right password | — |
+| F1-07 | Lockout cleared by reset | Admin resets that member's password | Member can log in immediately with the new password | — |
+| F1-08 | Two devices | Log in on Chrome and Firefox with the same account; use both for 20+ min | Both stay signed in (used to kick each other out) | — |
+| F1-09 | Two tabs refresh | Two tabs open, wait 15+ min, click in both quickly | Neither is logged out | — |
+| F1-10 | Logout one device | Log out in Chrome | Firefox stays signed in | — |
+| F1-11 | Log out everywhere | Profile menu → Sign out of all devices | Every device is sent to login on its next action | — |
+| F1-12 | Change password | Profile menu → Change password; wrong current password | Inline translated error, dialog stays open | — |
+| F1-13 | Change password OK | Correct current + new | Toast; this device stays signed in; other devices are signed out | — |
+| F1-14 | Admin reset | Staff → member → Reset password | Toast; member signed out everywhere; old password no longer works | — |
+| F1-15 | No reset for self | Open your own staff page as admin | No "Reset password" button | — |
+| F1-16 | Forgot password | Login → "Forgot password?" | Hint to ask the administrator | — |
+| F1-17 | Empty clinic email | Freshly registered clinic → Settings → Save profile without email | Saves (used to fail "email must be an email") | — |
+| F1-18 | Clinic phone | Enter `123` | Inline error, Save disabled; `093123456` saves as `+37493123456` | — |
+| F1-19 | Working hours | Set Monday 18:00–09:00 | Inline error, Save disabled; API also refuses | — |
+| F1-20 | Edit room | Settings → Rooms → edit name | Saved (used to fail with 400) | — |
+| F1-21 | Deactivate / activate room | Deactivate a room, then activate it | Confirm text explains effect; room greyed with "Inactive" chip; activate restores it | — |
+| F1-22 | Dialog keeps input on error | Make a room save fail (e.g. stop backend) | Dialog stays open with your text | — |
+| F1-23 | Settings load failure | Stop backend, open Settings | Error + Retry, no forms with default hours | — |
+| F1-24 | Regional tab | Settings → Language & currency | No dark-mode switch; changing the default language does **not** change your UI language | — |
+| F1-25 | Timezone list | Open the timezone select | Full IANA list; current value selected | — |
+| F1-26 | Subscription not editable | `PATCH /api/clinics/current` with `{"subscription":{"status":"active"}}` | 400 (property should not exist) | — |
+| F1-27 | Suspended clinic | Set `isActive:false` on a clinic in DB | Within a minute its users get "clinic's account is suspended" | — |
+| F1-28 | Rate limit | 31 logins from one IP within a minute | 31st: "Too many attempts" (429) | — |
+| F1-29 | Sign in once after deploy | Existing logged-in user after upgrading | Sent to login once, then normal | — |
+
+## 14. Data repair (check the backend log once, on each existing database)
+
+| ID | What to test | Expected | Status |
+|---|---|---|---|
+| MIG-07 | ObjectId repair | First start logs `Converted string ids to ObjectIds in N <collection> document(s)` (or nothing); a `migrations` document `2026-10-28-objectid-repair` exists | — |
+| MIG-08 | Runs once | Restart again | No repair log line | — |
+| MIG-09 | Old data visible | Patients/appointments/invoices created through the app **before** this change | Listed, searchable, bookable and billable | — |
+| MIG-10 | No string ids left | `mongosh`: count `{clinicId: {$type: "string"}}` in every collection | 0 | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

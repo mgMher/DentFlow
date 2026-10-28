@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export enum AppointmentStatus {
     SCHEDULED = 'scheduled',
@@ -38,7 +38,7 @@ export type AppointmentDocument = Appointment & Document;
 @Schema({ timestamps: true })
 export class Appointment {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -46,7 +46,7 @@ export class Appointment {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
         index: true,
@@ -54,7 +54,7 @@ export class Appointment {
     patientId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true,
@@ -62,7 +62,7 @@ export class Appointment {
     dentistId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'TreatmentRoom',
     })
     treatmentRoomId: Types.ObjectId;
@@ -89,7 +89,7 @@ export class Appointment {
     @Prop({ trim: true })
     treatmentType: string;
 
-    @Prop({ type: [{ type: Types.ObjectId, ref: 'Treatment' }] })
+    @Prop({ type: [{ type: MongooseSchema.Types.ObjectId, ref: 'Treatment' }] })
     treatmentIds: Types.ObjectId[];
 
     @Prop({ trim: true })

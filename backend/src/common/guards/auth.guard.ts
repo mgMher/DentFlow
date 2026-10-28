@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import * as jwt from 'jsonwebtoken';
 import { jwtConfig } from 'src/config';
 import { User, UserDocument } from 'src/modules/auth/auth.schema';
+import { SessionsService } from 'src/modules/auth/sessions.service';
 import { IS_PUBLIC_KEY } from '../decorators';
 
 @Injectable()
@@ -12,6 +13,7 @@ export class AuthGuard implements CanActivate {
     constructor(
         private reflector: Reflector,
         @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
+        private readonly sessions: SessionsService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -40,12 +42,15 @@ export class AuthGuard implements CanActivate {
         // deactivated, demoted or moved user loses access on their next request
         // instead of when the token expires. A role mismatch returns 401, which
         // makes the client refresh and receive a token with the current role.
-        const user = await this.userModel
-            .findById(payload.userId)
-            .select('isActive role clinicId')
-            .lean();
+        // A token from before per-device sessions has no `sid`; it fails here
+        // and the client signs in again once.
+        const [user, sessionLive] = await Promise.all([
+            this.userModel.findById(payload.userId).select('isActive role clinicId').lean(),
+            payload.sid ? this.sessions.isActive(payload.sid) : Promise.resolve(false),
+        ]);
 
         if (
+            !sessionLive ||
             !user ||
             !user.isActive ||
             user.role !== payload.role ||
@@ -59,6 +64,7 @@ export class AuthGuard implements CanActivate {
             clinicId: payload.clinicId,
             email: payload.email,
             role: payload.role,
+            sessionId: payload.sid,
         };
 
         return true;

@@ -15,6 +15,13 @@ async function bootstrap() {
 
     app.use(helmet());
 
+    // Behind a load balancer every request comes from the balancer's IP, which
+    // would put all clinics in one rate-limit bucket. Set TRUST_PROXY to the
+    // number of proxy hops (usually 1) so `req.ip` is the real client.
+    if (process.env.TRUST_PROXY) {
+        app.set('trust proxy', Number(process.env.TRUST_PROXY) || process.env.TRUST_PROXY);
+    }
+
     app.enableCors({
         origin: process.env.CLIENT_URL || 'http://localhost:3000',
         credentials: true,

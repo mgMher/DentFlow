@@ -13,6 +13,8 @@ const LOGOUT = 'LOGOUT';
 const GET_PROFILE = 'GET_PROFILE';
 const GET_PROFILE_SUCCESS = 'GET_PROFILE_SUCCESS';
 const REGISTER = 'REGISTER';
+const CHANGE_PASSWORD = 'CHANGE_PASSWORD';
+const LOGOUT_ALL = 'LOGOUT_ALL';
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
@@ -23,6 +25,9 @@ export const authActions = {
     getProfile: () => ({ type: GET_PROFILE }),
     getProfileSuccess: (payload: UserProfile) => ({ type: GET_PROFILE_SUCCESS, payload }),
     register: (payload: RegisterRequest) => ({ type: REGISTER, payload }),
+    changePassword: (payload: { currentPassword: string; newPassword: string }) => ({ type: CHANGE_PASSWORD, payload }),
+    /** Sign out every device, this one included. */
+    logoutAll: () => ({ type: LOGOUT_ALL }),
 };
 
 // ── Service ───────────────────────────────────────────────────────────────────
@@ -31,6 +36,8 @@ const service = {
     login: (data: LoginRequest) => api.post<AuthResponse>('/auth/login', data),
     register: (data: RegisterRequest) => api.post<AuthResponse>('/auth/register', data),
     logout: () => api.post('/auth/logout'),
+    logoutAll: () => api.post('/auth/logout-all'),
+    changePassword: (data: { currentPassword: string; newPassword: string }) => api.post('/auth/change-password', data),
     getProfile: () => api.get<{ data: UserProfile }>('/auth/me'),
 };
 
@@ -91,6 +98,29 @@ function* logoutSaga() {
     window.location.replace('/login');
 }
 
+function* changePasswordSaga(action: ReturnType<typeof authActions.changePassword>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        yield call(service.changePassword, action.payload);
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.changePassword')));
+    }
+}
+
+function* logoutAllSaga() {
+    try {
+        yield call(service.logoutAll);
+    } catch {
+        // Fall through: this device is signed out regardless.
+    }
+    clearSession();
+    window.location.replace('/login');
+}
+
 function* getProfileSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
@@ -109,6 +139,8 @@ export function* watchAuth() {
     yield takeLatest(REGISTER, registerSaga);
     yield takeLatest(LOGOUT, logoutSaga);
     yield takeLatest(GET_PROFILE, getProfileSaga);
+    yield takeLatest(CHANGE_PASSWORD, changePasswordSaga);
+    yield takeLatest(LOGOUT_ALL, logoutAllSaga);
 }
 
 // ── Reducer ───────────────────────────────────────────────────────────────────

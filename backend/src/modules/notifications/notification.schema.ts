@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type NotificationDocument = Notification & Document;
 
@@ -16,7 +16,7 @@ export enum NotificationType {
 @Schema({ timestamps: true })
 export class Notification {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -24,7 +24,7 @@ export class Notification {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true,
@@ -46,7 +46,7 @@ export class Notification {
     @Prop({ default: false })
     isRead: boolean;
 
-    @Prop({ type: Types.ObjectId })
+    @Prop({ type: MongooseSchema.Types.ObjectId })
     relatedId: Types.ObjectId;
 
     @Prop({ trim: true })

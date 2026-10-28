@@ -11,9 +11,15 @@ import {
     LightMode as LightModeIcon,
     Logout as LogoutIcon,
     Settings as SettingsIcon,
+    Password as PasswordIcon,
+    PhonelinkErase as LogoutAllIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useHttpState, usePermission } from '../../hooks';
+import { PasswordDialog } from '../ui';
+import { useDispatch } from 'react-redux';
+import { authActions } from '../../store/auth';
 import { getInitials } from '../../utils/formatters';
 import { HEADER_HEIGHT, LANGUAGES } from '../../utils/constants';
 
@@ -29,6 +35,19 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [passwordOpen, setPasswordOpen] = useState(false);
+    const dispatch = useDispatch();
+    const can = usePermission();
+    const changePassword = useHttpState('CHANGE_PASSWORD');
+
+    // Close only after the server accepted it, so a wrong current password keeps the form.
+    React.useEffect(() => {
+        if (changePassword.success) {
+            changePassword.clearSuccess();
+            setPasswordOpen(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [changePassword.success]);
 
     const handleLanguageChange = (e: SelectChangeEvent) => {
         const lang = e.target.value;
@@ -108,15 +127,44 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
                         <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
                     </Box>
                     <Divider />
-                    <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
-                        <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
-                        {t('nav.settings')}
+                    {can('manageClinic') && (
+                        <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
+                            <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                            {t('nav.settings')}
+                        </MenuItem>
+                    )}
+                    <MenuItem onClick={() => { handleMenuClose(); changePassword.clearError(); setPasswordOpen(true); }}>
+                        <ListItemIcon><PasswordIcon fontSize="small" /></ListItemIcon>
+                        {t('auth.changePassword')}
                     </MenuItem>
+                    <Divider />
                     <MenuItem onClick={handleLogout}>
                         <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
                         {t('auth.logout')}
                     </MenuItem>
+                    <MenuItem onClick={() => { handleMenuClose(); dispatch(authActions.logoutAll()); }}>
+                        <ListItemIcon><LogoutAllIcon fontSize="small" /></ListItemIcon>
+                        {t('auth.logoutAll')}
+                    </MenuItem>
                 </Menu>
+
+                <PasswordDialog
+                    open={passwordOpen}
+                    title={t('auth.changePassword')}
+                    description={t('auth.changePasswordHint')}
+                    requireCurrent
+                    loading={changePassword.loading}
+                    error={changePassword.error}
+                    onSubmit={(values) =>
+                        dispatch(
+                            authActions.changePassword({
+                                currentPassword: values.currentPassword || '',
+                                newPassword: values.newPassword,
+                            }),
+                        )
+                    }
+                    onClose={() => setPasswordOpen(false)}
+                />
             </Toolbar>
         </AppBar>
     );

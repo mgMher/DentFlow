@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { Role } from 'src/common/decorators';
 
 export type UserProfileDocument = UserProfile & Document;
@@ -29,7 +29,7 @@ export const UserScheduleSchema = SchemaFactory.createForClass(UserSchedule);
 @Schema({ timestamps: true, collection: 'user_profiles' })
 export class UserProfile {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -37,7 +37,7 @@ export class UserProfile {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'User',
         required: true,
     })

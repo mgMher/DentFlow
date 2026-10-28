@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type PatientDocument = Patient & Document;
 
@@ -106,7 +106,7 @@ export class PatientStatusChange {
     @Prop({ trim: true })
     reason: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     changedBy: Types.ObjectId;
 
     @Prop({ required: true, default: () => new Date() })
@@ -118,7 +118,7 @@ export const PatientStatusChangeSchema = SchemaFactory.createForClass(PatientSta
 @Schema({ timestamps: true })
 export class Patient {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,

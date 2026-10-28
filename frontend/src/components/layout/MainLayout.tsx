@@ -29,6 +29,9 @@ const MainLayout: React.FC<MainLayoutProps> = ({ themeMode, onToggleTheme }) => 
                 component="main"
                 sx={{
                     flexGrow: 1,
+                    // Without this a flex child is at least as wide as its content, so a
+                    // wide table or tab bar pushed the whole page into sideways scrolling.
+                    minWidth: 0,
                     p: 3,
                     mt: `${HEADER_HEIGHT}px`,
                     ml: 0,

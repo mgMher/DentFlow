@@ -13,7 +13,12 @@ interface ErrorResult {
     status: number;
     message: string | string[];
     code?: string;
+    /** Extra values the client needs to build the message, e.g. `{ minutes: 12 }`. */
+    params?: Record<string, string | number | boolean>;
 }
+
+/** Keys of an exception body that are not message parameters. */
+const RESERVED_KEYS = new Set(['statusCode', 'message', 'code', 'error', 'path', 'timestamp']);
 
 /** Fallback codes so even a bare `throw new ForbiddenException()` can be translated. */
 const CODE_BY_STATUS: Partial<Record<number, string>> = {
@@ -39,9 +44,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         let status = HttpStatus.INTERNAL_SERVER_ERROR;
         let message: string | string[] = 'Internal server error';
         let code: string | undefined;
+        let params: ErrorResult['params'];
 
         if (result) {
-            ({ status, message, code } = result);
+            ({ status, message, code, params } = result);
         } else {
             // Unexpected failure: log it in full, never leak internals to the client.
             const err = exception instanceof Error ? exception : new Error(String(exception));
@@ -59,6 +65,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             statusCode: status,
             message,
             ...(code ? { code } : {}),
+            ...params,
             path: request.url,
             timestamp: new Date().toISOString(),
         });
@@ -75,12 +82,19 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         }
 
         const payload = body as Record<string, unknown>;
+        const params: ErrorResult['params'] = {};
+        for (const [key, value] of Object.entries(payload)) {
+            if (!RESERVED_KEYS.has(key) && ['string', 'number', 'boolean'].includes(typeof value)) {
+                params[key] = value as string | number | boolean;
+            }
+        }
         return {
             status,
             message: (payload.message as string | string[]) ?? exception.message,
             // Services attach a stable `code` next to the message so the
             // client can translate it. It must survive this filter.
             code: typeof payload.code === 'string' ? payload.code : undefined,
+            params,
         };
     }
 

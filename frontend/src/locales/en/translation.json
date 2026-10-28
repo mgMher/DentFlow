@@ -78,7 +78,14 @@
     "hasAccount": "Already have an account?",
     "loginError": "Could not sign in",
     "registerError": "Could not register the clinic",
-    "profileError": "Could not load your profile"
+    "profileError": "Could not load your profile",
+    "forgotPasswordHint": "Ask your clinic administrator to reset your password from the Staff page.",
+    "changePassword": "Change password",
+    "changePasswordHint": "You will stay signed in here. Your other devices will be signed out.",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "logoutAll": "Sign out of all devices",
+    "showPassword": "Show password"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -345,7 +352,9 @@
       "pediatric_dentistry": "Pediatric Dentistry",
       "oral_surgery": "Oral Surgery",
       "cosmetic_dentistry": "Cosmetic Dentistry"
-    }
+    },
+    "resetPassword": "Reset password",
+    "resetPasswordHint": "{{name}} will be signed out on every device and must sign in with the new password."
   },
   "reports": {
     "title": "Reports",
@@ -376,7 +385,39 @@
     "general": "General",
     "appearance": "Appearance",
     "darkMode": "Dark Mode",
-    "lightMode": "Light Mode"
+    "lightMode": "Light Mode",
+    "street": "Street and building",
+    "city": "City",
+    "region": "Region",
+    "zipCode": "Postal code",
+    "country": "Country",
+    "equipment": "Equipment",
+    "equipmentPlaceholder": "X-ray, dental chair, sterilizer",
+    "equipmentHelp": "Separate items with commas",
+    "day": "Day",
+    "open": "Open",
+    "closed": "Closed",
+    "addRoom": "Add room",
+    "editRoom": "Edit room",
+    "activateRoom": "Activate room",
+    "deactivateRoom": "Deactivate room",
+    "deactivateRoomConfirm": "New appointments can no longer be booked in this room. Past appointments keep it. You can activate it again later.",
+    "templateType": "Message",
+    "channel": "Channel",
+    "subject": "Subject",
+    "templateTypes": {
+      "appointment_reminder": "Appointment reminder",
+      "appointment_confirmation": "Appointment confirmation",
+      "appointment_cancellation": "Appointment cancellation",
+      "payment_receipt": "Payment receipt"
+    },
+    "channels": {
+      "email": "Email",
+      "sms": "SMS"
+    },
+    "regional": "Language & currency",
+    "regionalHelp": "Clinic-wide defaults. Each user picks their own interface language and theme in the top bar.",
+    "defaultLanguage": "Default language for patients"
   },
   "days": {
     "monday": "Monday",
@@ -395,7 +436,8 @@
     "invalidPhone": "Invalid phone number",
     "invalidArmenianPhone": "Enter an Armenian number, e.g. +374 93 123456",
     "futureDate": "Date cannot be in the future",
-    "invalidDate": "Invalid date"
+    "invalidDate": "Invalid date",
+    "passwordMax": "At most {{max}} characters"
   },
   "toast": {
     "saveSuccess": "Saved successfully",
@@ -404,7 +446,10 @@
     "deleteError": "Error deleting",
     "loginSuccess": "Logged in successfully",
     "logoutSuccess": "Logged out successfully",
-    "updateSuccess": "Updated successfully"
+    "updateSuccess": "Updated successfully",
+    "passwordChanged": "Password changed",
+    "passwordReset": "Password reset. Share it with the staff member securely.",
+    "loggedOutEverywhere": "Signed out of all devices"
   },
   "schedule": {
     "blockedTimes": "Blocked Times",
@@ -533,6 +578,17 @@
     "appointmentNotFound": "Appointment not found",
     "invalidCredentials": "Invalid email or password",
     "accountEmailTaken": "An account with this email already exists",
-    "accountDeactivated": "This account is deactivated. Contact your clinic administrator."
+    "accountDeactivated": "This account is deactivated. Contact your clinic administrator.",
+    "updateRoom": "Could not save the room",
+    "changePassword": "Could not change the password",
+    "resetPassword": "Could not reset the password",
+    "wrongCurrentPassword": "Current password is incorrect",
+    "samePassword": "The new password must be different from the current one",
+    "useChangePassword": "To change your own password, use “Change password” in your profile menu",
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "sessionRevoked": "You were signed out. Please sign in again.",
+    "accountLocked": "Too many failed attempts. Try again in {{minutes}} min, or ask your administrator to reset your password.",
+    "clinicInactive": "This clinic's account is suspended. Contact DentFlow support.",
+    "clinicNotFound": "Clinic not found"
   }
 }
