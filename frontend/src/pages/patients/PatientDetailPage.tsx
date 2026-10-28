@@ -7,7 +7,6 @@ import {
     Avatar,
     Tabs,
     Tab,
-    Divider,
     Button,
     Chip,
     Table,
@@ -17,24 +16,13 @@ import {
     TableHead,
     TableRow,
     Paper,
-    Drawer,
-    TextField,
     FormControl,
     InputLabel,
     Select,
     MenuItem,
-    FormGroup,
-    FormControlLabel,
-    Checkbox,
-    IconButton,
-    List,
-    ListItem,
-    ListItemText,
     Stack,
     Alert,
     AlertTitle,
-    ToggleButton,
-    ToggleButtonGroup,
 } from '@mui/material';
 import {
     ArrowBack as BackIcon,
@@ -42,9 +30,6 @@ import {
     Phone as PhoneIcon,
     Email as EmailIcon,
     CalendarMonth as CalendarIcon,
-    Close as CloseIcon,
-    Save as SaveIcon,
-    History as HistoryIcon,
     WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
@@ -52,36 +37,27 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
-import { dentalRecordsActions } from '../../store/dental-records';
 import { billingActions } from '../../store/billing';
 import {
     PageHeader,
     StatusChip,
     EmptyState,
     LoadingSpinner,
-    ConfirmDialog,
-    ToothTreatmentForm,
-    Odontogram,
 } from '../../components/ui';
 import {
     formatDate,
-    formatDateTime,
     formatCurrency,
     getFullName,
     getInitials,
 } from '../../utils/formatters';
 import { formatArmenianPhone } from '../../utils/validators';
-import { TOOTH_STATUS_COLORS, TOOTH_SURFACES } from '../../utils/constants';
 import { usePermission } from '../../hooks';
 import PatientProfileTab from './PatientProfileTab';
 import PatientAppointmentsTab from './PatientAppointmentsTab';
+import PatientChartTab from './PatientChartTab';
+import PatientTreatmentsTab from './PatientTreatmentsTab';
 import PatientStatusDialog from './PatientStatusDialog';
-import {
-    PATIENT_STATUSES,
-    PatientStatus,
-    ToothStatus,
-    ToothSurface,
-} from '../../types';
+import { ChartType, PATIENT_STATUSES, PatientStatus } from '../../types';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -89,19 +65,12 @@ interface TabPanelProps {
     value: number;
 }
 
+const TABS = { profile: 0, chart: 1, treatments: 2, appointments: 3, billing: 4 } as const;
+
 const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
     if (value !== index) return null;
     return <Box sx={{ py: 3 }}>{children}</Box>;
 };
-
-// ── Odontogram constants ───────────────────────────────────────────────────
-
-const ALL_TOOTH_STATUSES: ToothStatus[] = [
-    'healthy', 'filled', 'crown', 'missing', 'implant',
-    'needs_treatment', 'root_canal', 'decayed', 'bridge', 'veneer',
-];
-
-const SURFACE_OPTIONS: ToothSurface[] = [...TOOTH_SURFACES];
 
 const ageFromDateOfBirth = (dateOfBirth: string): number => {
     const today = new Date();
@@ -112,23 +81,6 @@ const ageFromDateOfBirth = (dateOfBirth: string): number => {
         age--;
     }
     return age;
-};
-
-const entryDentistName = (dentist?: string | { firstName?: string; lastName?: string }): string => {
-    if (!dentist || typeof dentist === 'string') return '';
-    return getFullName(dentist.firstName || '', dentist.lastName || '');
-};
-
-const statusTranslationMap: Record<string, string> = {
-    healthy: 'dental.healthy', filled: 'dental.filled', crown: 'dental.crown',
-    missing: 'dental.missing', implant: 'dental.implant', needs_treatment: 'dental.needsTreatment',
-    root_canal: 'dental.rootCanal', decayed: 'dental.decayed', bridge: 'dental.bridge', veneer: 'dental.veneer',
-};
-
-const surfaceTranslationMap: Record<string, string> = {
-    mesial: 'dental.mesial', distal: 'dental.distal', occlusal: 'dental.occlusal',
-    incisal: 'dental.incisal', buccal: 'dental.buccal', lingual: 'dental.lingual',
-    palatal: 'dental.palatal', cervical: 'dental.cervical',
 };
 
 // ── Main Component ──────────────────────────────────────────────────────────
@@ -150,12 +102,9 @@ const PatientDetailPage: React.FC = () => {
     // included) for a frame before the fetch starts.
     const patient = storedPatient && storedPatient._id === id ? storedPatient : null;
     const invoices = useSelector((state: RootState) => state.billing.invoices);
-    const chart = useSelector((state: RootState) => state.dentalRecords.chart);
-    const toothHistory = useSelector((state: RootState) => state.dentalRecords.toothHistory);
     const invoicesLoading = useSelector((state: RootState) =>
         state.http.loading.includes('GET_INVOICES'),
     );
-    const updateToothLoading = useSelector((state: RootState) => state.http.loading.includes('UPDATE_TOOTH'));
     const statusLoading = useSelector((state: RootState) =>
         state.http.loading.includes('UPDATE_PATIENT_STATUS'),
     );
@@ -163,21 +112,13 @@ const PatientDetailPage: React.FC = () => {
     const [tabValue, setTabValue] = useState(0);
     const [pendingStatus, setPendingStatus] = useState<PatientStatus | null>(null);
     const can = usePermission();
-    const [pendingChartType, setPendingChartType] = useState<'adult' | 'pediatric' | null>(null);
 
     // Primary teeth are normally gone by ~13, so that is the default for a new
     // chart. It is only a starting point — the type can be switched by hand.
-    const suggestedChartType: 'adult' | 'pediatric' = useMemo(() => {
+    const suggestedChartType: ChartType = useMemo(() => {
         if (!storedPatient?.dateOfBirth) return 'adult';
         return ageFromDateOfBirth(storedPatient.dateOfBirth) < 13 ? 'pediatric' : 'adult';
     }, [storedPatient?.dateOfBirth]);
-
-    // Dental chart state
-    const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
-    const [drawerOpen, setDrawerOpen] = useState(false);
-    const [editStatus, setEditStatus] = useState<ToothStatus>('healthy');
-    const [editSurfaces, setEditSurfaces] = useState<ToothSurface[]>([]);
-    const [editNotes, setEditNotes] = useState('');
 
     useEffect(() => {
         if (id) {
@@ -189,71 +130,10 @@ const PatientDetailPage: React.FC = () => {
     useEffect(() => {
         if (!id) return;
 
-        if (tabValue === 1) {
-            // The chartType hint only applies when the chart is first created;
-            // an existing chart keeps whatever type it already has.
-            dispatch(
-                dentalRecordsActions.getChart({
-                    patientId: id,
-                    chartType: suggestedChartType,
-                }),
-            );
-        }
-        if (tabValue === 2) {
-        }
-        if (tabValue === 3) {
+        if (tabValue === TABS.billing) {
             dispatch(billingActions.getInvoices({ patientId: id, limit: 100 }));
         }
-    }, [tabValue, id, suggestedChartType, dispatch]);
-
-    const teeth = chart?.teeth || [];
-    const chartType = (chart?.chartType as 'adult' | 'pediatric') || 'adult';
-
-    const handleToothClick = (toothNumber: number) => {
-        setSelectedTooth(toothNumber);
-        const toothRecord = teeth.find((tooth) => tooth.toothNumber === toothNumber);
-        setEditStatus(toothRecord?.status || 'healthy');
-        setEditSurfaces(toothRecord?.surfaces || []);
-        setEditNotes(toothRecord?.notes || '');
-        if (id) {
-            dispatch(dentalRecordsActions.getToothHistory({ patientId: id, toothNumber }));
-        }
-        setDrawerOpen(true);
-    };
-
-    const handleSurfaceToggle = (surface: ToothSurface) => {
-        setEditSurfaces((prev) =>
-            prev.includes(surface) ? prev.filter((s) => s !== surface) : [...prev, surface],
-        );
-    };
-
-    const handleSaveTooth = () => {
-        if (!id || selectedTooth === null) return;
-        dispatch(dentalRecordsActions.updateTooth({
-            patientId: id,
-            data: { toothNumber: selectedTooth, status: editStatus, surfaces: editSurfaces, notes: editNotes },
-        }));
-    };
-
-    const handleCloseDrawer = () => {
-        setDrawerOpen(false);
-        setSelectedTooth(null);
-        dispatch(dentalRecordsActions.clearToothHistory());
-    };
-
-    // The store only ever holds the selected tooth's timeline, but guard anyway
-    // so a stale response can never be shown under the wrong tooth.
-    const activeToothHistory =
-        toothHistory && toothHistory.toothNumber === selectedTooth ? toothHistory : null;
-
-    const confirmChartTypeChange = () => {
-        if (!id || !pendingChartType) return;
-        dispatch(dentalRecordsActions.setChartType({ patientId: id, chartType: pendingChartType }));
-        setPendingChartType(null);
-        setSelectedTooth(null);
-        setDrawerOpen(false);
-    };
-
+    }, [tabValue, id, dispatch]);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -443,308 +323,27 @@ const PatientDetailPage: React.FC = () => {
                 >
                     <Tab label={t('patients.patientProfile')} />
                     <Tab label={t('dental.odontogram')} />
+                    <Tab label={t('dental.treatmentsTab')} />
                     <Tab label={t('patients.appointmentHistory')} />
                     <Tab label={t('patients.billingHistory')} />
                 </Tabs>
             </Paper>
 
             {/* Profile Tab */}
-            <TabPanel value={tabValue} index={0}>
+            <TabPanel value={tabValue} index={TABS.profile}>
                 <PatientProfileTab patient={patient} />
             </TabPanel>
 
-            {/* Dental Chart Tab */}
-            <TabPanel value={tabValue} index={1}>
-                <Card sx={{ mb: 3 }}>
-                    <CardContent sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-                        <Typography variant="h6" fontWeight={600} gutterBottom>
-                            {t('dental.odontogram')}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                            {t('dental.selectTooth')}
-                        </Typography>
+            <TabPanel value={tabValue} index={TABS.chart}>
+                <PatientChartTab patientId={patient._id} suggestedChartType={suggestedChartType} />
+            </TabPanel>
 
-                        <ToggleButtonGroup
-                            size="small"
-                            exclusive
-                            value={chartType}
-                            onChange={(_e, value) => {
-                                if (value && value !== chartType) setPendingChartType(value);
-                            }}
-                            sx={{ mb: 3 }}
-                        >
-                            <ToggleButton value="adult">{t('dental.adultChart')}</ToggleButton>
-                            <ToggleButton value="pediatric">
-                                {t('dental.pediatricChart')}
-                            </ToggleButton>
-                        </ToggleButtonGroup>
-
-                        <Odontogram
-                            teeth={teeth}
-                            selectedTooth={selectedTooth}
-                            onToothClick={handleToothClick}
-                        />
-
-                        {/* Legend */}
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, justifyContent: 'center', mt: 2 }}>
-                            {ALL_TOOTH_STATUSES.map((status) => (
-                                <Box key={status} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    <Box sx={{
-                                        width: 14, height: 14, borderRadius: '3px',
-                                        bgcolor: TOOTH_STATUS_COLORS[status],
-                                        opacity: status === 'missing' ? 0.4 : 1,
-                                    }} />
-                                    <Typography variant="caption" color="text.secondary">
-                                        {t(statusTranslationMap[status])}
-                                    </Typography>
-                                </Box>
-                            ))}
-                        </Box>
-                    </CardContent>
-                </Card>
-
-                {/* Tooth Detail Drawer */}
-                <Drawer
-                    anchor="right"
-                    open={drawerOpen}
-                    onClose={handleCloseDrawer}
-                    PaperProps={{ sx: { width: { xs: '100%', sm: 400 }, maxWidth: '100%', p: 3 } }}
-                >
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="h6" fontWeight={600}>
-                            {t('dental.toothNumber')} {selectedTooth}
-                        </Typography>
-                        <IconButton onClick={handleCloseDrawer} size="small">
-                            <CloseIcon />
-                        </IconButton>
-                    </Box>
-                    <Divider sx={{ mb: 3 }} />
-
-                    {selectedTooth && (
-                        <Box sx={{ mb: 2 }}>
-                            <Chip
-                                label={t(statusTranslationMap[editStatus])}
-                                sx={{ bgcolor: TOOTH_STATUS_COLORS[editStatus], color: '#fff', fontWeight: 600 }}
-                            />
-                        </Box>
-                    )}
-
-                    <FormControl fullWidth size="small" sx={{ mb: 3 }}>
-                        <InputLabel>{t('common.status')}</InputLabel>
-                        <Select value={editStatus} label={t('common.status')}
-                            onChange={(e) => setEditStatus(e.target.value as ToothStatus)}>
-                            {ALL_TOOTH_STATUSES.map((status) => (
-                                <MenuItem key={status} value={status}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Box sx={{
-                                            width: 12, height: 12, borderRadius: '2px',
-                                            bgcolor: TOOTH_STATUS_COLORS[status],
-                                            opacity: status === 'missing' ? 0.4 : 1,
-                                        }} />
-                                        {t(statusTranslationMap[status])}
-                                    </Box>
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
-
-                    <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                        {t('dental.surfaces')}
-                    </Typography>
-                    <FormGroup sx={{ mb: 3 }}>
-                        {SURFACE_OPTIONS.map((surface) => (
-                            <FormControlLabel key={surface}
-                                control={<Checkbox size="small" checked={editSurfaces.includes(surface)}
-                                    onChange={() => handleSurfaceToggle(surface)} />}
-                                label={t(surfaceTranslationMap[surface])}
-                            />
-                        ))}
-                    </FormGroup>
-
-                    <TextField fullWidth size="small" label={t('patients.notes')} multiline rows={3}
-                        value={editNotes} onChange={(e) => setEditNotes(e.target.value)} sx={{ mb: 3 }} />
-
-                    <Button fullWidth variant="contained" startIcon={<SaveIcon />}
-                        onClick={handleSaveTooth} disabled={updateToothLoading}>
-                        {updateToothLoading ? t('common.loading') : t('common.save')}
-                    </Button>
-
-                    <Divider sx={{ my: 3 }} />
-                    {id && selectedTooth !== null && (
-                        <ToothTreatmentForm
-                            patientId={id}
-                            toothNumber={selectedTooth}
-                            defaultSurfaces={editSurfaces}
-                        />
-                    )}
-
-                    <Divider sx={{ my: 3 }} />
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                        <HistoryIcon fontSize="small" color="action" />
-                        <Typography variant="subtitle2" fontWeight={600}>
-                            {t('dental.statusHistory')}
-                        </Typography>
-                    </Box>
-                    {!activeToothHistory?.statusHistory?.length ? (
-                        <Typography variant="body2" color="text.secondary">
-                            {t('dental.noHistory')}
-                        </Typography>
-                    ) : (
-                        <List dense disablePadding>
-                            {activeToothHistory.statusHistory.map((change, index) => (
-                                <ListItem
-                                    key={change._id || `${change.changedAt}-${index}`}
-                                    sx={{ px: 0, borderBottom: '1px solid', borderColor: 'divider' }}
-                                >
-                                    <ListItemText
-                                        disableTypography
-                                        primary={
-                                            <Box
-                                                sx={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    justifyContent: 'space-between',
-                                                    gap: 1,
-                                                }}
-                                            >
-                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    {change.previousStatus &&
-                                                        change.previousStatus !== change.status && (
-                                                            <>
-                                                                <Typography
-                                                                    variant="caption"
-                                                                    color="text.secondary"
-                                                                    sx={{ textDecoration: 'line-through' }}
-                                                                >
-                                                                    {t(statusTranslationMap[change.previousStatus])}
-                                                                </Typography>
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    →
-                                                                </Typography>
-                                                            </>
-                                                        )}
-                                                    <Typography variant="body2" fontWeight={600}>
-                                                        {t(statusTranslationMap[change.status])}
-                                                    </Typography>
-                                                </Box>
-                                                <Typography variant="caption" color="text.secondary" noWrap>
-                                                    {formatDateTime(change.changedAt)}
-                                                </Typography>
-                                            </Box>
-                                        }
-                                        secondary={
-                                            <Box>
-                                                {!!change.surfaces?.length && (
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                                        {change.surfaces.map((surface) => (
-                                                            <Chip
-                                                                key={surface}
-                                                                label={t(surfaceTranslationMap[surface] || surface)}
-                                                                size="small"
-                                                                variant="outlined"
-                                                            />
-                                                        ))}
-                                                    </Box>
-                                                )}
-                                                {change.notes && (
-                                                    <Typography
-                                                        variant="caption"
-                                                        color="text.secondary"
-                                                        sx={{
-                                                            mt: 0.5,
-                                                            display: 'block',
-                                                            overflowWrap: 'anywhere',
-                                                        }}
-                                                    >
-                                                        {change.notes}
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    )}
-
-                    <Divider sx={{ my: 3 }} />
-                    <Typography variant="subtitle2" fontWeight={600} gutterBottom>
-                        {t('dental.treatmentHistory')}
-                    </Typography>
-                    {!activeToothHistory?.treatments?.length ? (
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {t('dental.noTreatmentsYet')}
-                        </Typography>
-                    ) : (
-                        <List dense disablePadding>
-                            {activeToothHistory.treatments.map((entry) => (
-                                <ListItem key={entry._id} sx={{ px: 0, borderBottom: '1px solid', borderColor: 'divider' }}>
-                                    <ListItemText
-                                        disableTypography
-                                        primary={
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 1 }}>
-                                                <Typography variant="body2" fontWeight={600}>{entry.treatmentName}</Typography>
-                                                <Typography variant="caption" color="text.secondary" noWrap>
-                                                    {formatDate(entry.date)}
-                                                </Typography>
-                                            </Box>
-                                        }
-                                        secondary={
-                                            <Box>
-                                                <Box
-                                                    sx={{
-                                                        display: 'flex',
-                                                        justifyContent: 'space-between',
-                                                        gap: 1,
-                                                        mt: 0.25,
-                                                    }}
-                                                >
-                                                    <Typography variant="caption" color="text.secondary">
-                                                        {entryDentistName(entry.dentistId) || '—'}
-                                                    </Typography>
-                                                    {entry.cost !== undefined && entry.cost !== null && (
-                                                        <Typography
-                                                            variant="caption"
-                                                            fontWeight={600}
-                                                            color="text.primary"
-                                                        >
-                                                            {formatCurrency(entry.cost, entry.currency)}
-                                                        </Typography>
-                                                    )}
-                                                </Box>
-                                                {!!entry.surfaces?.length && (
-                                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                                                        {entry.surfaces.map((surface) => (
-                                                            <Chip
-                                                                key={surface}
-                                                                label={t(surfaceTranslationMap[surface] || surface)}
-                                                                size="small"
-                                                                variant="outlined"
-                                                            />
-                                                        ))}
-                                                    </Box>
-                                                )}
-                                                {entry.notes && (
-                                                    <Typography
-                                                        variant="caption"
-                                                        color="text.secondary"
-                                                        sx={{ mt: 0.5, display: 'block', overflowWrap: 'anywhere' }}
-                                                    >
-                                                        {entry.notes}
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                        }
-                                    />
-                                </ListItem>
-                            ))}
-                        </List>
-                    )}
-                </Drawer>
+            <TabPanel value={tabValue} index={TABS.treatments}>
+                <PatientTreatmentsTab patientId={patient._id} />
             </TabPanel>
 
             {/* Appointments Tab */}
-            <TabPanel value={tabValue} index={2}>
+            <TabPanel value={tabValue} index={TABS.appointments}>
                 <PatientAppointmentsTab
                     patientId={patient._id}
                     bookable={!['archived', 'deceased'].includes(currentStatus)}
@@ -752,7 +351,7 @@ const PatientDetailPage: React.FC = () => {
             </TabPanel>
 
             {/* Billing Tab */}
-            <TabPanel value={tabValue} index={3}>
+            <TabPanel value={tabValue} index={TABS.billing}>
                 {invoicesLoading && patientInvoices.length === 0 ? (
                     <LoadingSpinner />
                 ) : patientInvoices.length === 0 ? (
@@ -802,25 +401,6 @@ const PatientDetailPage: React.FC = () => {
                     </TableContainer>
                 )}
             </TabPanel>
-
-            <ConfirmDialog
-                open={!!pendingChartType}
-                title={t('dental.changeChartType')}
-                message={
-                    pendingChartType
-                        ? t('dental.confirmChartTypeChange', {
-                              type: t(
-                                  pendingChartType === 'pediatric'
-                                      ? 'dental.pediatricChart'
-                                      : 'dental.adultChart',
-                              ),
-                          })
-                        : ''
-                }
-                variant="danger"
-                onConfirm={confirmChartTypeChange}
-                onCancel={() => setPendingChartType(null)}
-            />
 
             <PatientStatusDialog
                 patientId={pendingStatus ? patient._id : null}

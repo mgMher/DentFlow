@@ -13,6 +13,8 @@ const SILENT = new Set([
     'CREATE_APPOINTMENT',
     'CREATE_RECURRING',
     'UPDATE_APPOINTMENT',
+    'CREATE_TREATMENT',
+    'UPDATE_TREATMENT',
 ]);
 
 /**
@@ -43,11 +45,14 @@ const SUCCESS_TOAST_KEYS: Record<string, string> = {
     DELETE_BLOCKED: 'toast.deleteSuccess',
     UPDATE_TOOTH: 'toast.saveSuccess',
     SET_CHART_TYPE: 'toast.updateSuccess',
-    UPDATE_TEETH: 'toast.saveSuccess',
     ADD_ENTRY: 'toast.saveSuccess',
+    COMPLETE_ENTRY: 'toast.updateSuccess',
+    VOID_ENTRY: 'toast.updateSuccess',
     CREATE_TREATMENT: 'toast.saveSuccess',
     UPDATE_TREATMENT: 'toast.updateSuccess',
-    DELETE_TREATMENT: 'toast.deleteSuccess',
+    DELETE_TREATMENT: 'toast.updateSuccess',
+    REACTIVATE_TREATMENT: 'toast.updateSuccess',
+    SEED_TREATMENTS: 'toast.saveSuccess',
     UPDATE_CLINIC: 'toast.saveSuccess',
     UPDATE_WORKING_HOURS: 'toast.saveSuccess',
     UPDATE_SETTINGS: 'toast.saveSuccess',

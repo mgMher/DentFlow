@@ -149,12 +149,12 @@ These preconditions are easy to miss and cause false failures.
 |---|---|---|---|---|
 | DEN-01 | Chart loads | Open the chart tab | Odontogram renders, no `Cannot GET /api/dental-records/.../history` error | — |
 | DEN-02 | Tooth click | Click a tooth | Drawer opens with that tooth's status, surfaces, notes | — |
-| DEN-03 | Save status | Change status to Filled, save | Tooth changes colour on the chart | — |
+| DEN-03 | Save status | Change "Whole tooth" to Crown, save | Tooth gets a coloured outline and the mark under it | — |
 | DEN-04 | **Status history** | Reopen the same tooth | "Status History" shows `Healthy → Filled`, timestamp | — |
 | DEN-05 | **History accumulates** | Change to Crown, then Root canal | Three entries, newest first — **old status is not lost** (this was the main bug) | — |
 | DEN-06 | Notes in history | Change status with a note | Note appears under the entry | — |
-| DEN-07 | Surfaces | Open the surfaces list | **8 options**: Mesial, Distal, Occlusal, Incisal, Buccal, Lingual, Palatal, Cervical — all translated | — |
-| DEN-08 | Legend | Below the chart | All 10 statuses with colours, translated | — |
+| DEN-07 | Surfaces | Tooth drawer → surface diagram | Centre is Occlusal (molars/premolars) or Incisal (front teeth); sides Mesial / Distal / Buccal / Lingual or Palatal; bar = Cervical — hover names, all translated | — |
+| DEN-08 | Legend | Below the chart | Whole-tooth statuses (outline + mark) and surface findings (fill), translated | — |
 | DEN-09 | Drawer on narrow window | Shrink the window | Drawer is full width, no page overflow | — |
 
 ### Record treatment (new form)
@@ -163,12 +163,12 @@ These preconditions are easy to miss and cause false failures.
 |---|---|---|---|---|
 | DEN-20 | Form present | Tooth drawer → "Record Treatment" | Collapsible section opens | — |
 | DEN-21 | Catalogue autofill | Pick a treatment from the dropdown | Name **and price + currency** auto-fill from the catalogue | — |
-| DEN-22 | Custom treatment | Pick "Other (type manually)", type a name | Accepted | — |
+| DEN-22 | Custom treatment | Leave the catalogue empty, type a name | Accepted | — |
 | DEN-23 | Name required | Submit with an empty name | Inline required error | — |
 | DEN-24 | Dentist default | Open the form as a dentist | Your own name preselected | — |
 | DEN-25 | Dentist choice | Pick another dentist | Accepted | — |
-| DEN-26 | Date | Defaults to today; try a future date | Today by default; future dates blocked | — |
-| DEN-27 | Surfaces prefilled | Tooth already has surfaces | Same surfaces ticked in the treatment form | — |
+| DEN-26 | Date | Defaults to today; try a future date | Done: future blocked. Planned: future allowed | — |
+| DEN-27 | Surfaces prefilled | Tooth has caries on some surfaces | Those surfaces ticked in the treatment form | — |
 | DEN-28 | Save | Fill and submit | Success toast; form collapses and clears | — |
 | DEN-29 | **Appears in history** | Look at "Treatment History" below | New entry with name, date, **dentist name and cost** | — |
 | DEN-30 | Currency | Clinic currency vs catalogue currency | Cost shows with the right symbol (֏ / $ / ₽) | — |
@@ -178,10 +178,10 @@ These preconditions are easy to miss and cause false failures.
 
 | ID | What to test | Steps | Expected | Status |
 |---|---|---|---|---|
-| DEN-40 | Child default | Create a patient **under 13**, open the chart tab | Chart created as **pediatric** — 20 teeth (51–70), two arches of 10 | — |
-| DEN-41 | Adult default | Patient 13 or older | 32 teeth (1–32) | — |
+| DEN-40 | Child default | Create a patient **under 13**, open the chart tab | Chart created as **primary teeth** — 20 teeth, FDI 55…51 / 61…65 over 85…81 / 71…75 | — |
+| DEN-41 | Adult default | Patient 13 or older | 32 teeth, FDI 18…11 / 21…28 over 48…41 / 31…38 | — |
 | DEN-42 | Toggle present | Above the chart | Adult / Child toggle showing the current type | — |
-| DEN-43 | Switch warns | Click the other type | Confirm dialog explains statuses and history reset, treatments are kept | — |
+| DEN-43 | Switch warns | Click the other type | Confirm dialog says the current chart is kept and comes back on switching again | — |
 | DEN-44 | Switch works | Confirm | Teeth renumber; drawer closes | — |
 | DEN-45 | Treatments survive | After switching, check a recorded treatment | Treatment entries still exist (separate collection) | — |
 | DEN-46 | Cancel switch | Open the dialog, cancel | Nothing changes; toggle stays put | — |
@@ -413,6 +413,38 @@ Set the clinic's working hours first (Settings → Working hours), e.g. Mon–Fr
 | F3-25 | Room names | Add a room with an existing name (any case) | Translated "already exists" | — |
 | F3-26 | Status labels | In progress / no-show chips in hy, ru, en | Translated, never `in_progress` | — |
 | F3-27 | After midnight | Clock 01:00, open Appointments | "Today" is today; free time correct | — |
+
+## 17. Phase 4 — treatments catalogue & dental chart
+
+Log in as the clinic admin and as a dentist; some rows need a receptionist or assistant too.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F4-01 | FDI layout | Open an adult chart | Upper row 18…11 \| 21…28, lower row 48…41 \| 31…38; "Patient's right" on the left. Lower arch no longer mirrored | — |
+| F4-02 | Old charts converted | Existing database, first start after deploy | Log: "Converted N charts/entries to FDI numbering"; a tooth that was #3 is now 16 with the same status and history | — |
+| F4-03 | Per-surface findings | Tooth 26: Caries brush → mesial, Filling brush → occlusal, save | Both shown on the tooth; mesial red, occlusal blue | — |
+| F4-04 | Clear a surface | Click a marked surface again (or use "Sound") | Surface cleared | — |
+| F4-05 | Who changed it | Tooth drawer → status history | Every change shows "Changed by" with a name | — |
+| F4-06 | Planned treatment | Record treatment → Planned, catalogue filling, mesial | In the tooth's list as Planned; chart unchanged | — |
+| F4-07 | Mark done | "Mark done" on it | Mesial turns from caries to filling, tooth Filled, history "via treatment" | — |
+| F4-08 | Catalogue default | Record a done "Simple Tooth Extraction" on 38 | "Tooth becomes" prefilled Missing; 38 crossed out | — |
+| F4-09 | No tooth | Patient → Treatments → Add treatment, no teeth (exam) | Saved as "Whole mouth" | — |
+| F4-10 | Several teeth | Add a bridge on 14, 15, 16 | One entry; shows in each of those teeth's drawers | — |
+| F4-11 | Void | Treatments tab → Void, reason "Wrong patient" | Hidden from the list; "Show voided" shows it struck through with who, when, why | — |
+| F4-12 | Void needs a reason | Void with fewer than 3 characters | Confirm disabled | — |
+| F4-13 | Switch and back | Mark some teeth, switch to Primary teeth, then back | Primary chart fresh; switching back restores the permanent chart exactly | — |
+| F4-14 | Roles | Receptionist / assistant: open chart | "View only"; no Save, no Record treatment, toggle disabled; API returns 403 | — |
+| F4-15 | Switch patients | Open patient A's chart, then patient B's | Never shows A's teeth under B | — |
+| F4-16 | Two people at once | Two browsers edit different teeth of one chart | Both kept; if a clash remains: "changed at the same time", chart reloads | — |
+| F4-17 | Keyboard | Tab to a tooth, press Enter | Drawer opens; screen reader reads "Tooth 26, Filled, Mesial: Filling…" | — |
+| F4-18 | Dark mode | Header → dark theme, open chart | Numbers, outlines, surfaces readable | — |
+| F4-19 | Catalogue paging | Treatments page | Real total, pages of 20/50/100, search on the server (try `(((`) | — |
+| F4-20 | Localized names | Switch UI to hy / ru | Catalogue and pickers show nameHy / nameRu when set | — |
+| F4-21 | Deactivate / reactivate | Deactivate an item, filter Inactive, Reactivate | Hidden from pickers while inactive; back after reactivate | — |
+| F4-22 | Unique code | Add an item with code `d0150` (exists) | "Another treatment already uses this code" on the code field; dialog stays open | — |
+| F4-23 | Clear fields | Edit an item, empty description and Armenian name, save | They are gone after reload | — |
+| F4-24 | Catalogue roles | Dentist opens Treatments | List only, "Only the clinic admin can change the catalogue" | — |
+| F4-25 | Empty catalogue | Clinic with no items (admin) | "Add the standard catalogue" button creates 20 items | — |
 
 ---
 

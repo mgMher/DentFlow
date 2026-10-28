@@ -82,6 +82,18 @@ export class ClinicRefsService {
         await this.assertExists(this.treatmentModel, clinicId, treatmentId, {}, 'treatmentNotFound', 'Treatment');
     }
 
+    /** A catalogue treatment of this clinic, for its defaults (resulting tooth status, price). */
+    async getTreatment(clinicId: Id, treatmentId: Id) {
+        const treatment = await this.treatmentModel
+            .findOne({ _id: toObjectId(treatmentId), clinicId: toObjectId(clinicId) })
+            .select('name toothStatus price isActive')
+            .lean();
+        if (!treatment) {
+            throw new NotFoundException(errorBody('treatmentNotFound', 'Treatment not found'));
+        }
+        return treatment;
+    }
+
     /** All ids exist in this clinic. Duplicates are allowed (an item can repeat on an invoice). */
     async assertTreatments(clinicId: Id, treatmentIds: Id[]): Promise<void> {
         const unique = [...new Set(treatmentIds.map((id) => id.toString()))];

@@ -16,7 +16,6 @@ import PatientDetailPage from '../pages/patients/PatientDetailPage';
 import PatientEditPage from '../pages/patients/PatientEditPage';
 import AppointmentsPage from '../pages/appointments/AppointmentsPage';
 import AppointmentDetailPage from '../pages/appointments/AppointmentDetailPage';
-import DentalChartPage from '../pages/dental-records/DentalChartPage';
 import TreatmentsPage from '../pages/treatments/TreatmentsPage';
 import BillingListPage from '../pages/billing/BillingListPage';
 import InvoiceDetailPage from '../pages/billing/InvoiceDetailPage';
@@ -49,7 +48,6 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     <Route path="/patients/new" element={<PatientCreatePage />} />
                     <Route path="/patients/:id" element={<PatientDetailPage />} />
                     <Route path="/patients/:id/edit" element={<PatientEditPage />} />
-                    <Route path="/patients/:id/chart" element={<DentalChartPage />} />
 
                     <Route path="/appointments" element={<AppointmentsPage />} />
                     <Route path="/appointments/:id" element={<AppointmentDetailPage />} />

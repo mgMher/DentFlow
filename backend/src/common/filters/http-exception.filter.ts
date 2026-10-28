@@ -121,6 +121,15 @@ export class GlobalExceptionFilter implements ExceptionFilter {
             };
         }
 
+        // Optimistic concurrency: the document changed between read and save.
+        if (exception instanceof MongooseError.VersionError) {
+            return {
+                status: HttpStatus.CONFLICT,
+                message: 'This record was changed by someone else. Reload and try again.',
+                code: 'recordChanged',
+            };
+        }
+
         // `new Types.ObjectId('not-an-id')` in a service.
         if (exception instanceof Error && exception.name === 'BSONError') {
             return { status: HttpStatus.BAD_REQUEST, message: 'Invalid id', code: 'invalidId' };

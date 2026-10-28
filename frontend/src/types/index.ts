@@ -261,11 +261,13 @@ export interface Treatment {
     code?: string;
     duration: number;
     price: { amount: number; currency: Currency };
+    /** What a tooth becomes once this is done; prefills chart entries. */
+    toothStatus?: ToothStatus;
     isCustom: boolean;
     isActive: boolean;
 }
 
-// Dental Record types
+// Dental Record types — tooth numbers are FDI (11–48, primary 51–85)
 export type ToothStatus =
     | 'healthy' | 'filled' | 'crown' | 'missing' | 'implant'
     | 'needs_treatment' | 'root_canal' | 'decayed' | 'bridge' | 'veneer';
@@ -274,25 +276,38 @@ export type ToothSurface =
     | 'mesial' | 'distal' | 'occlusal' | 'incisal'
     | 'buccal' | 'lingual' | 'palatal' | 'cervical';
 
+export type SurfaceStatus = 'decayed' | 'filled' | 'sealant';
+
+export interface SurfaceState {
+    surface: ToothSurface;
+    status: SurfaceStatus;
+}
+
+export type ChartType = 'adult' | 'pediatric';
+
+type PersonRef = string | { _id?: string; firstName?: string; lastName?: string };
+
 export interface ToothStatusChange {
     _id?: string;
     previousStatus?: ToothStatus;
     status: ToothStatus;
-    surfaces: ToothSurface[];
+    surfaces: SurfaceState[];
     conditions: string[];
     notes?: string;
-    changedBy?: string | UserProfile;
+    changedBy?: PersonRef;
     changedAt: string;
+    treatmentEntryId?: string;
 }
 
 export interface ToothRecord {
     toothNumber: number;
     status: ToothStatus;
-    surfaces: ToothSurface[];
+    surfaces: SurfaceState[];
     conditions: string[];
     notes?: string;
     history?: ToothStatusChange[];
     updatedAt?: string;
+    updatedBy?: string;
 }
 
 export interface DentalChart {
@@ -300,39 +315,53 @@ export interface DentalChart {
     clinicId: string;
     patientId: string;
     teeth: ToothRecord[];
-    chartType: 'adult' | 'pediatric';
+    chartType: ChartType;
+    /** Chart types switched away from; switching back restores them. */
+    archivedChartTypes: ChartType[];
     notes?: string;
 }
 
 export interface ToothHistory {
     toothNumber: number;
+    /** Null when the tooth is not on the current chart (e.g. a permanent tooth on a primary chart). */
     current: {
         status: ToothStatus;
-        surfaces: ToothSurface[];
+        surfaces: SurfaceState[];
         conditions: string[];
         notes?: string;
         updatedAt?: string;
-    };
+    } | null;
     statusHistory: ToothStatusChange[];
     treatments: TreatmentEntry[];
 }
+
+export type TreatmentEntryStatus = 'planned' | 'done';
 
 export interface TreatmentEntry {
     _id: string;
     clinicId: string;
     patientId: string;
-    toothNumber: number;
-    // These three are populated by the API on read — plain ids on write.
+    /** Empty for whole-mouth work (exam, X-ray, cleaning). */
+    teeth: number[];
+    status: TreatmentEntryStatus;
+    // These are populated by the API on read — plain ids on write.
     treatmentId?: string | Treatment;
     treatmentName: string;
-    dentistId: string | UserProfile;
+    dentistId: PersonRef;
     appointmentId?: string | Appointment;
     date: string;
     surfaces: ToothSurface[];
+    resultStatus?: ToothStatus;
     notes?: string;
     images: { url: string; description: string; uploadedAt: string }[];
     cost?: number;
     currency?: Currency;
+    createdBy?: PersonRef;
+    completedAt?: string;
+    completedBy?: PersonRef;
+    voidedAt?: string;
+    voidedBy?: PersonRef;
+    voidReason?: string;
 }
 
 // Billing types

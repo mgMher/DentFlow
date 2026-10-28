@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { ToothStatus } from 'src/modules/dental-records/dental-record.schema';
 
 export enum TreatmentCategory {
     GENERAL = 'general',
@@ -61,7 +62,8 @@ export class Treatment {
     @Prop({ trim: true })
     description: string;
 
-    @Prop({ trim: true })
+    /** Unique per clinic when set; stored upper-case. */
+    @Prop({ trim: true, uppercase: true })
     code: string;
 
     @Prop({ default: 30, min: 5 })
@@ -69,6 +71,10 @@ export class Treatment {
 
     @Prop({ type: TreatmentPriceSchema, default: () => ({ amount: 0, currency: Currency.AMD }) })
     price: TreatmentPrice;
+
+    /** What a tooth becomes once this is done (filling → filled). Prefills chart entries. */
+    @Prop({ enum: ToothStatus })
+    toothStatus: ToothStatus;
 
     @Prop({ default: false })
     isCustom: boolean;
@@ -79,7 +85,12 @@ export class Treatment {
 
 export const TreatmentSchema = SchemaFactory.createForClass(Treatment);
 
+export const CODE_INDEX = 'clinicId_code_unique';
+
 TreatmentSchema.index({ clinicId: 1, name: 1 });
 TreatmentSchema.index({ clinicId: 1, category: 1 });
-TreatmentSchema.index({ clinicId: 1, code: 1 });
+TreatmentSchema.index(
+    { clinicId: 1, code: 1 },
+    { name: CODE_INDEX, unique: true, partialFilterExpression: { code: { $type: 'string', $gt: '' } } },
+);
 TreatmentSchema.index({ clinicId: 1, isActive: 1 });

@@ -26,16 +26,10 @@ const statusColorMap: Record<string, { bg: string; color: string }> = {
     inactive: { bg: '#F7FAFC', color: '#A0AEC0' },
     archived: { bg: '#FAF5FF', color: '#805AD5' },
     deceased: { bg: '#EDF2F7', color: '#4A5568' },
-    healthy: { bg: '#F0FFF4', color: '#38A169' },
-    filled: { bg: '#EBF4FF', color: '#3182CE' },
-    crown: { bg: '#FFFFF0', color: '#D69E2E' },
-    missing: { bg: '#F7FAFC', color: '#A0AEC0' },
-    implant: { bg: '#FAF5FF', color: '#805AD5' },
-    needs_treatment: { bg: '#FFF5F5', color: '#E53E3E' },
-    root_canal: { bg: '#FFFAF0', color: '#ED8936' },
-    decayed: { bg: '#FFF5F5', color: '#C53030' },
-    bridge: { bg: '#EBF8FF', color: '#2B6CB0' },
-    veneer: { bg: '#E6FFFA', color: '#319795' },
+    // Treatment entries (the dental chart's tooth statuses use ToothStatusChip)
+    planned: { bg: '#EBF4FF', color: '#3182CE' },
+    done: { bg: '#E6FFFA', color: '#0B5E6E' },
+    voided: { bg: '#F7FAFC', color: '#718096' },
 };
 
 const StatusChip: React.FC<StatusChipProps> = ({ status, translationPrefix = 'appointments', label: customLabel, sx, ...props }) => {

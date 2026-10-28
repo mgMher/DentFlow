@@ -12,24 +12,6 @@ export const APPOINTMENT_STATUS_COLORS: Record<string, string> = {
 };
 
 
-export const TOOTH_SURFACES = [
-    'mesial', 'distal', 'occlusal', 'incisal',
-    'buccal', 'lingual', 'palatal', 'cervical',
-] as const;
-
-export const TOOTH_STATUS_COLORS: Record<string, string> = {
-    healthy: '#38A169',
-    filled: '#3182CE',
-    crown: '#D69E2E',
-    missing: '#A0AEC0',
-    implant: '#805AD5',
-    needs_treatment: '#E53E3E',
-    root_canal: '#ED8936',
-    decayed: '#C53030',
-    bridge: '#2B6CB0',
-    veneer: '#4FD1C5',
-};
-
 export const CURRENCY_SYMBOLS: Record<string, string> = {
     AMD: '֏',
     USD: '$',

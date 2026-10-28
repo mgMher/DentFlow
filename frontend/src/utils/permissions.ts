@@ -15,10 +15,10 @@ export const PERMISSIONS = {
     manageClinic: ['clinic_admin'],
     /** POST/PATCH/DELETE /schedule/rooms */
     manageRooms: ['clinic_admin'],
-    /** POST/PATCH /treatments */
-    editTreatments: ['clinic_admin', 'dentist'],
-    /** DELETE /treatments/:id */
-    deleteTreatments: ['clinic_admin'],
+    /** POST/PATCH/DELETE /treatments, /treatments/:id/reactivate — treatments.controller CATALOG_EDITORS */
+    editTreatments: ['clinic_admin'],
+    /** Chart, tooth and treatment-entry writes — dental-records.controller CHART_EDITORS */
+    editDentalChart: ['super_admin', 'clinic_admin', 'dentist'],
     /** /reports/* */
     viewReports: ['super_admin', 'clinic_admin', 'dentist'],
     /** POST /patients, PATCH /patients/:id — patients.controller PATIENT_EDITORS */

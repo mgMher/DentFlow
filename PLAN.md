@@ -19,10 +19,10 @@ the first 20 records. There are **zero automated tests**, and TypeScript `strict
 | Clinic settings | Half works | Room edit and room delete are both broken; subscription is editable by the clinic |
 | Patients | ✅ Cleaned | "Active" stat always 0; founding admin has no staff profile |
 | Staff | ✅ Cleaned | Two ways around the "last admin" guard; deactivated staff keep access 24h |
-| Appointments | Half works | **P0** tenant leak; calendar view always empty; only the 20 oldest appointments load; patient #21+ can't be booked |
-| Schedule | Half works | Availability 4h off (UTC vs Yerevan); booking ignores blocked times and working hours |
-| Treatments catalog | Half works | Only 20 items shown; "delete" can't be undone; ReDoS in search |
-| Dental chart | Works, but wrong for the market | **P0** switching adult/pediatric deletes the whole chart + history, any role can do it. Lower jaw drawn mirrored. US numbering instead of FDI |
+| Appointments | ✅ Cleaned | Week/day view per chair not built yet (F2) |
+| Schedule | ✅ Cleaned | — |
+| Treatments catalog | ✅ Cleaned | — |
+| Dental chart | ✅ Cleaned | FDI, per-surface, planned/done; no periodontal chart yet (F12) |
 | Billing | Works only in AMD, only via UI | **P0** tenant leak, payment race, currencies summed together. Invoice creation often impossible (patient picker empty) |
 | Reports | **Broken** | Every revenue request returns 400; charts always empty |
 | Dashboard | Mostly broken | 2 cards always 0; receptionists get "Insufficient permissions" on login |
@@ -144,26 +144,31 @@ built from treatment entries. Reports come after billing because they read billi
 - [x] Verified on local MongoDB: 48 booking-rule checks (`smoke3.mjs`) + browser (calendar, booking dialog with free time, detail actions, cancel dialog)
 - [ ] Not built yet (feature list): week / day view per chair with drag-to-reschedule (F2), reminders (F3), waitlist, buffer time between visits
 
-### Phase 4 — Treatments catalog & Dental chart
+### Phase 4 — Treatments catalog & Dental chart — ✅ done 2026-10-29 (not committed yet)
 
-- [ ] **P0** `setChartType` wipes the chart + history → snapshot instead (D6); `@Roles(dentist, admin)`
-- [ ] **P0** Verify dentist/treatment/appointment ids belong to the clinic
-- [ ] **P1** `@Roles` on all chart write endpoints (receptionist can record clinical treatments now)
-- [ ] **P1** Odontogram lower arch mirrored (clinicians click the wrong tooth)
-- [ ] **P1** FDI numbering + migration (D1)
-- [ ] **P1** Per-surface status (mesial decayed + occlusal filled is impossible now)
-- [ ] **P1** Treatment entry: planned / done status; "done" updates tooth status
-- [ ] **P1** Tooth optional on entry (exam, X-ray, cleaning); multi-tooth (bridge)
-- [ ] **P1** Chart shows previous patient's teeth when switching patients; create-chart race → 500
-- [ ] **P1** Catalog: total always 0, only 20 items, no pagination; reactivate after "delete"
-- [ ] **P1** Treatment picker shows inactive items; search regex not escaped (500 / ReDoS)
-- [ ] **P2** `createdBy` + void (not delete) for entries; show who changed each tooth
-- [ ] **P2** Concurrent chart edits → 500 (VersionError) → 409 + refetch
-- [ ] **P2** Unique catalog code; seed default catalog on clinic register (endpoint URL is wrong too)
-- [ ] **P2** Localized treatment names (hy/ru); can't clear optional fields on edit
-- [ ] **P2** Odontogram accessibility + dark mode + distinct colors
-- [ ] **P2** Patient "Treatment history" tab (data is fetched, never shown)
-- [ ] **P3** Delete orphan `DentalChartPage` route; one copy of status/surface maps
+- [x] **P0** `setChartType` no longer wipes anything (D6): the current teeth go to `archivedCharts`, switching back restores them; `@Roles(admin, dentist)`
+- [x] **P0** Dentist / treatment / appointment ids checked against the clinic (Phase 0 helper; catalogue defaults via `ClinicRefsService.getTreatment`)
+- [x] **P1** `@Roles(super_admin, clinic_admin, dentist)` on every chart and entry write (`CHART_EDITORS`); receptionist / assistant view only, UI shows "View only"
+- [x] **P1** Odontogram rewritten (`components/dental/`): FDI rows as the dentist faces the patient (lower arch no longer mirrored), five-part surface diagram per tooth
+- [x] **P1 / D1** FDI numbering (`tooth-numbering.ts`, 5 unit tests); one-off migration converts charts, tooth history and entries from Universal (`2026-10-dental-fdi-numbering`, idempotent per document)
+- [x] **P1** Per-surface findings: `surfaces: [{ surface, status: decayed / filled / sealant }]`; old surface lists migrated (decayed tooth → caries, otherwise filling). Paint-brush surface editor in the drawer
+- [x] **P1** Entries are `planned` or `done`; done applies `resultStatus` to the chart (filling turns the treated surfaces from caries to filling, extraction → missing, crown/implant clear surfaces). `PATCH …/treatment-entry/:id/complete`; chart is updated before the entry is stored / the entry is rolled back if the chart save fails
+- [x] **P1** `teeth: number[]` — none (exam, X-ray, cleaning), one, or several (bridge); any FDI tooth, mixed dentition allowed
+- [x] **P1** Chart tab checks `chart.patientId` (no previous patient's teeth); create-chart race reads the winner instead of a 500
+- [x] **P1** Catalogue: server-side search / category / active filter / pages (20/50/100, `limit` ≤ 100); real total; `PATCH /treatments/:id/reactivate`
+- [x] **P1** Pickers load active items only (`GET_ACTIVE_TREATMENTS`); search regex escaped (Phase 0)
+- [x] **P2** Entries record `createdBy`, `completedBy`; void (`PATCH …/void`, reason ≥ 3) instead of delete, hidden unless "Show voided"; tooth history shows who changed it and "via treatment"
+- [x] **P2** Concurrent chart edits: optimistic concurrency, reload + re-apply up to 5 times (different teeth both survive), then 409 `chartChanged` and the UI reloads the chart. `VersionError` → 409 `recordChanged` globally
+- [x] **P2** Unique catalogue code per clinic (partial unique index, upper-cased, 409 `treatmentCodeTaken`); existing duplicates renamed `-2`, `-3` by migration. Seed URL fixed (`/treatments/seed-defaults`) + "Add the standard catalogue" on an empty catalogue
+- [x] **P2** Names shown in the UI language (`localizedTreatmentName`, also `references.treatmentName`); empty optional fields clear on edit; dialog stays open until the server accepts
+- [x] **P2** Odontogram: every tooth a keyboard button with a spoken label, focus ring, theme colours (dark mode), distinct colours + letter marks (not colour alone)
+- [x] **P2** Patient "Treatments" tab (`PatientTreatmentsTab`): plan + record, filters, pagination, mark done, void, add without a tooth
+- [x] **P3** Orphan `DentalChartPage` + `/patients/:id/chart` route deleted; one copy of the maps in `utils/dental.ts`; old `Odontogram` / `ToothTreatmentForm` removed
+- [x] **D5 (catalogue)** Only the clinic admin edits the catalogue (dentists could before) — `CATALOG_EDITORS`
+- [x] **NEW** Catalogue items carry `toothStatus` ("tooth becomes"), prefilled into entries; default items backfilled by code
+- [x] Verified on local MongoDB: 53 checks (`test/smoke/04-dental-treatments.mjs`) + suites 01–03 + legacy-data migration + browser (FDI chart, surface editor, planned → done, treatments tab, void, catalogue, dark mode)
+- [ ] Voiding an entry does not undo its chart change (by design; correct the tooth by hand). Revisit with the audit log (F7)
+- [ ] Catalogue grid view dropped (table only, with search and paging)
 
 ### Phase 5 — Billing
 

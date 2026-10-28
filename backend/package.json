@@ -17,7 +17,7 @@
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed": "ts-node -r tsconfig-paths/register src/seed.ts",
-    "test:smoke": "node test/smoke/01-auth-tenancy.mjs && node test/smoke/02-patients-staff.mjs && node test/smoke/03-appointments-schedule.mjs"
+    "test:smoke": "node test/smoke/01-auth-tenancy.mjs && node test/smoke/02-patients-staff.mjs && node test/smoke/03-appointments-schedule.mjs && node test/smoke/04-dental-treatments.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^9.0.0",

@@ -82,7 +82,7 @@ r = await call('POST', '/appointments', { token: A1.accessToken, body: { patient
 check('A books own patient/dentist', r.status === 201, r.body);
 r = await call('POST', '/billing/invoices', { token: A1.accessToken, body: { patientId: patientB, currency: 'AMD', items: [{ description: 'x', quantity: 1, unitPrice: 100 }] } });
 check('A cannot invoice B patient -> 404', r.status === 404 && r.body.code === 'patientNotFound', r.body);
-r = await call('POST', `/dental-records/${patientB}/treatment-entry`, { token: A1.accessToken, body: { toothNumber: 1, treatmentName: 'x' } });
+r = await call('POST', `/dental-records/${patientB}/treatment-entry`, { token: A1.accessToken, body: { teeth: [11], treatmentName: 'x' } });
 check('A cannot chart B patient -> 404', r.status === 404, r.body);
 
 // --- API-created patient in B is bookable (was broken by string clinicIds)
