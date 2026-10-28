@@ -2,6 +2,7 @@ export { Public, IS_PUBLIC_KEY } from './public.decorator';
 export { Roles, Role, ROLES_KEY } from './roles.decorator';
 export { CurrentUser } from './current-user.decorator';
 export {
+    IsOptionalNotNull,
     IsPassword,
     IsTimeZone,
     PASSWORD_MAX_LENGTH,

@@ -177,7 +177,14 @@
     "statusHistory": "История статусов",
     "statusReason": "Причина (необязательно)",
     "statusReasonHint": "напр. переехал в другой город",
-    "registered": "Зарегистрирован"
+    "registered": "Зарегистрирован",
+    "medicalHistoryReadOnly": "Медицинскую историю могут изменять только стоматологи и администраторы",
+    "confirmStatusChangeFor": "Изменить статус пациента {{name}} на «{{status}}»?",
+    "cancelUpcomingAppointments": "Отменить эти приёмы",
+    "upcomingAppointments_one": "У пациента {{count}} предстоящий приём.",
+    "upcomingAppointments_few": "У пациента {{count}} предстоящих приёма.",
+    "upcomingAppointments_many": "У пациента {{count}} предстоящих приёмов.",
+    "upcomingAppointments_other": "У пациента {{count}} предстоящих приёмов."
   },
   "appointments": {
     "title": "Записи",
@@ -354,7 +361,12 @@
       "cosmetic_dentistry": "Эстетическая стоматология"
     },
     "resetPassword": "Сбросить пароль",
-    "resetPasswordHint": "{{name}} выйдет из системы на всех устройствах и должен войти с новым паролем."
+    "resetPasswordHint": "{{name}} выйдет из системы на всех устройствах и должен войти с новым паролем.",
+    "cancelUpcomingAppointments": "Отменить эти приёмы (пациентов нужно будет перезаписать)",
+    "upcomingAppointments_one": "К этому стоматологу записан {{count}} предстоящий приём.",
+    "upcomingAppointments_few": "К этому стоматологу записано {{count}} предстоящих приёма.",
+    "upcomingAppointments_many": "К этому стоматологу записано {{count}} предстоящих приёмов.",
+    "upcomingAppointments_other": "К этому стоматологу записано {{count}} предстоящих приёмов."
   },
   "reports": {
     "title": "Отчёты",
@@ -437,7 +449,9 @@
     "invalidArmenianPhone": "Введите армянский номер, напр. +374 93 123456",
     "futureDate": "Дата не может быть в будущем",
     "invalidDate": "Неверная дата",
-    "passwordMax": "Не более {{max}} символов"
+    "passwordMax": "Не более {{max}} символов",
+    "emergencyNameRequired": "Укажите имя контакта или очистите телефон и степень родства",
+    "insuranceProviderRequired": "Укажите страховую компанию или очистите данные полиса"
   },
   "toast": {
     "saveSuccess": "Успешно сохранено",
@@ -589,6 +603,8 @@
     "sessionRevoked": "Сеанс завершён. Войдите снова.",
     "accountLocked": "Слишком много неудачных попыток. Повторите через {{minutes}} мин. или попросите администратора сбросить пароль.",
     "clinicInactive": "Аккаунт клиники приостановлен. Обратитесь в поддержку DentFlow.",
-    "clinicNotFound": "Клиника не найдена"
+    "clinicNotFound": "Клиника не найдена",
+    "medicalHistoryForbidden": "Медицинскую историю могут изменять только стоматологи и администраторы",
+    "patientStatusChanged": "Статус пациента уже изменил кто-то другой. Обновите страницу и попробуйте снова."
   }
 }

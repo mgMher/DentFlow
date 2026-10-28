@@ -177,7 +177,12 @@
     "statusHistory": "Status History",
     "statusReason": "Reason (optional)",
     "statusReasonHint": "e.g. moved to another city",
-    "registered": "Registered"
+    "registered": "Registered",
+    "medicalHistoryReadOnly": "Only dentists and administrators can change the medical history",
+    "confirmStatusChangeFor": "Change the status of {{name}} to “{{status}}”?",
+    "cancelUpcomingAppointments": "Cancel these appointments",
+    "upcomingAppointments_one": "This patient has {{count}} upcoming appointment.",
+    "upcomingAppointments_other": "This patient has {{count}} upcoming appointments."
   },
   "appointments": {
     "title": "Appointments",
@@ -354,7 +359,10 @@
       "cosmetic_dentistry": "Cosmetic Dentistry"
     },
     "resetPassword": "Reset password",
-    "resetPasswordHint": "{{name}} will be signed out on every device and must sign in with the new password."
+    "resetPasswordHint": "{{name}} will be signed out on every device and must sign in with the new password.",
+    "cancelUpcomingAppointments": "Cancel these appointments (patients must be rebooked)",
+    "upcomingAppointments_one": "{{count}} upcoming appointment is booked with this dentist.",
+    "upcomingAppointments_other": "{{count}} upcoming appointments are booked with this dentist."
   },
   "reports": {
     "title": "Reports",
@@ -437,7 +445,9 @@
     "invalidArmenianPhone": "Enter an Armenian number, e.g. +374 93 123456",
     "futureDate": "Date cannot be in the future",
     "invalidDate": "Invalid date",
-    "passwordMax": "At most {{max}} characters"
+    "passwordMax": "At most {{max}} characters",
+    "emergencyNameRequired": "Enter the contact's name, or clear the phone and relationship",
+    "insuranceProviderRequired": "Enter the insurance company, or clear the policy details"
   },
   "toast": {
     "saveSuccess": "Saved successfully",
@@ -589,6 +599,8 @@
     "sessionRevoked": "You were signed out. Please sign in again.",
     "accountLocked": "Too many failed attempts. Try again in {{minutes}} min, or ask your administrator to reset your password.",
     "clinicInactive": "This clinic's account is suspended. Contact DentFlow support.",
-    "clinicNotFound": "Clinic not found"
+    "clinicNotFound": "Clinic not found",
+    "medicalHistoryForbidden": "Only dentists and administrators can change the medical history",
+    "patientStatusChanged": "Someone else changed this patient's status. Reload and try again."
   }
 }

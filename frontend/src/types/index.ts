@@ -440,13 +440,6 @@ export interface ActivityItem {
 }
 
 // Pagination
-export interface PaginatedResponse<T> {
-    data: T[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
 
 // API Response wrapper
 export interface ApiResponse<T> {

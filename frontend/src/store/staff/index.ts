@@ -16,7 +16,6 @@ const UPDATE_STAFF = 'UPDATE_STAFF';
 const UPDATE_STAFF_STATUS = 'UPDATE_STAFF_STATUS';
 const RESET_STAFF_PASSWORD = 'RESET_STAFF_PASSWORD';
 const UPDATE_STAFF_AVAILABILITY = 'UPDATE_STAFF_AVAILABILITY';
-const DELETE_STAFF = 'DELETE_STAFF';
 const GET_DENTISTS = 'GET_DENTISTS';
 const GET_DENTISTS_SUCCESS = 'GET_DENTISTS_SUCCESS';
 
@@ -36,7 +35,7 @@ export const staffActions = {
     clearStaffMember: () => ({ type: CLEAR_STAFF_MEMBER }),
     createStaff: (payload: any) => ({ type: CREATE_STAFF, payload }),
     updateStaff: (payload: { id: string; data: any }) => ({ type: UPDATE_STAFF, payload }),
-    updateStaffStatus: (payload: { id: string; isActive: boolean }) => ({
+    updateStaffStatus: (payload: { id: string; isActive: boolean; cancelUpcomingAppointments?: boolean }) => ({
         type: UPDATE_STAFF_STATUS,
         payload,
     }),
@@ -44,7 +43,6 @@ export const staffActions = {
         type: UPDATE_STAFF_AVAILABILITY,
         payload,
     }),
-    deleteStaff: (payload: string) => ({ type: DELETE_STAFF, payload }),
     /** Admin sets a new password; the member is signed out on every device. */
     resetStaffPassword: (payload: { id: string; newPassword: string }) => ({ type: RESET_STAFF_PASSWORD, payload }),
     getDentists: () => ({ type: GET_DENTISTS }),
@@ -57,8 +55,8 @@ const service = {
     getById: (id: string) => api.get(`/users/${id}`),
     create: (data: any) => api.post('/users', data),
     update: (id: string, data: any) => api.patch(`/users/${id}`, data),
-    updateStatus: (id: string, isActive: boolean) =>
-        api.patch(`/users/${id}/status`, { isActive }),
+    updateStatus: (id: string, isActive: boolean, cancelUpcomingAppointments?: boolean) =>
+        api.patch(`/users/${id}/status`, { isActive, cancelUpcomingAppointments }),
     updateAvailability: (id: string, defaultAvailability: DayAvailability[]) =>
         api.patch(`/users/${id}/availability`, { defaultAvailability }),
     remove: (id: string) => api.delete(`/users/${id}`),
@@ -161,6 +159,7 @@ function* updateStaffStatusSaga(action: any) {
             service.updateStatus,
             action.payload.id,
             action.payload.isActive,
+            action.payload.cancelUpcomingAppointments,
         );
         yield put({ type: GET_STAFF_MEMBER_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
@@ -194,22 +193,6 @@ function* updateStaffAvailabilitySaga(action: any) {
     }
 }
 
-function* deleteStaffSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        yield call(service.remove, action.payload);
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendSuccess(action.type));
-        yield call(refreshList);
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(
-            httpActions.appendError(action.type, errorMessage(err, 'errors.updateStaffStatus')),
-        );
-    }
-}
-
 function* getDentistsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
@@ -231,7 +214,6 @@ export function* watchStaff() {
     yield takeLatest(UPDATE_STAFF_STATUS, updateStaffStatusSaga);
     yield takeLatest(RESET_STAFF_PASSWORD, resetStaffPasswordSaga);
     yield takeLatest(UPDATE_STAFF_AVAILABILITY, updateStaffAvailabilitySaga);
-    yield takeLatest(DELETE_STAFF, deleteStaffSaga);
     yield takeLatest(GET_DENTISTS, getDentistsSaga);
 }
 

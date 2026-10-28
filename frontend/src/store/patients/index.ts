@@ -47,7 +47,13 @@ export const patientsActions = {
         type: UPDATE_PATIENT,
         payload,
     }),
-    updatePatientStatus: (payload: { id: string; status: PatientStatus; reason?: string }) => ({
+    updatePatientStatus: (payload: {
+        id: string;
+        status: PatientStatus;
+        reason?: string;
+        /** Also cancel the patient's booked future appointments. */
+        cancelUpcomingAppointments?: boolean;
+    }) => ({
         type: UPDATE_PATIENT_STATUS,
         payload,
     }),
@@ -65,8 +71,8 @@ const service = {
     getById: (id: string) => api.get(`/patients/${id}`),
     create: (data: Partial<Patient>) => api.post('/patients', data),
     update: (id: string, data: Partial<Patient>) => api.patch(`/patients/${id}`, data),
-    updateStatus: (id: string, status: PatientStatus, reason?: string) =>
-        api.patch(`/patients/${id}/status`, reason ? { status, reason } : { status }),
+    updateStatus: (id: string, status: PatientStatus, reason?: string, cancelUpcomingAppointments?: boolean) =>
+        api.patch(`/patients/${id}/status`, { status, reason: reason || undefined, cancelUpcomingAppointments }),
     getStats: () => api.get('/patients/stats'),
 };
 
@@ -158,11 +164,14 @@ function* updatePatientStatusSaga(action: any) {
             action.payload.id,
             action.payload.status,
             action.payload.reason,
+            action.payload.cancelUpcomingAppointments,
         );
         yield put({ type: GET_PATIENT_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
         yield call(refreshList);
+        // The stat cards on the list page count by status.
+        yield put({ type: GET_PATIENT_STATS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
         yield put(

@@ -29,6 +29,10 @@ async function bootstrap() {
 
     app.setGlobalPrefix('api');
 
+    // Explicit, so it matches the largest field we accept (a ~110 KB photo as a
+    // data URL). Express's implicit 100 KB rejected those with a bare 413.
+    app.useBodyParser('json', { limit: '300kb' });
+
     app.useGlobalPipes(
         new ValidationPipe({
             transform: true,

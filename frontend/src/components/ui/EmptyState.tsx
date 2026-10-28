@@ -8,9 +8,11 @@ interface EmptyStateProps {
     actionLabel?: string;
     onAction?: () => void;
     icon?: React.ReactNode;
+    /** Icon on the action button; defaults to "+" (e.g. pass a reset icon for "Clear filters"). */
+    actionIcon?: React.ReactNode;
 }
 
-const EmptyState: React.FC<EmptyStateProps> = ({ title, description, actionLabel, onAction, icon }) => {
+const EmptyState: React.FC<EmptyStateProps> = ({ title, description, actionLabel, onAction, icon, actionIcon }) => {
     return (
         <Box sx={{
             display: 'flex', flexDirection: 'column', alignItems: 'center',
@@ -28,7 +30,7 @@ const EmptyState: React.FC<EmptyStateProps> = ({ title, description, actionLabel
                 </Typography>
             )}
             {actionLabel && onAction && (
-                <Button variant="contained" startIcon={<AddIcon />} onClick={onAction}>
+                <Button variant="contained" startIcon={actionIcon ?? <AddIcon />} onClick={onAction}>
                     {actionLabel}
                 </Button>
             )}

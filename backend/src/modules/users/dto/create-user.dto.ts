@@ -11,11 +11,13 @@ import {
     Max,
     MaxLength,
     Min,
+    ValidateIf,
     ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
 import { IsPassword, PASSWORD_MIN_LENGTH, Role, TIME_OF_DAY } from 'src/common/decorators';
-import { STAFF_ROLES } from './query-user.dto';
+import { AVATAR_PATTERN, DENTIST_SPECIALIZATIONS, MAX_AVATAR_LENGTH, STAFF_ROLES } from './query-user.dto';
+import { normalizeArmenianPhone } from 'src/common/utils';
 
 /** `+374` followed by the 8-digit national significant number. */
 export const ARMENIAN_PHONE = /^\+374\d{8}$/;
@@ -82,7 +84,7 @@ export class CreateUserDto {
 
     @ApiPropertyOptional({ example: '+37493123456' })
     @IsOptional()
-    @Transform(trim)
+    @Transform(({ value }) => normalizeArmenianPhone(value) || undefined)
     @IsString()
     @Matches(ARMENIAN_PHONE, { message: 'phone must be an Armenian number, e.g. +37493123456' })
     phone?: string;
@@ -95,8 +97,7 @@ export class CreateUserDto {
     @ApiPropertyOptional({ example: 'orthodontics' })
     @IsOptional()
     @Transform(trim)
-    @IsString()
-    @MaxLength(120)
+    @IsIn(['', ...DENTIST_SPECIALIZATIONS], { message: 'specialization is not a known specialization' })
     specialization?: string;
 
     @ApiPropertyOptional({ example: 'DL-2024-12345' })
@@ -109,6 +110,9 @@ export class CreateUserDto {
     @ApiPropertyOptional({ example: 'https://cdn.example.com/avatars/armen.jpg' })
     @IsOptional()
     @IsString()
+    @MaxLength(MAX_AVATAR_LENGTH)
+    @ValidateIf((_, v) => v !== '')
+    @Matches(AVATAR_PATTERN, { message: 'avatar must be a JPEG/PNG/WebP image or an https link' })
     avatar?: string;
 
     @ApiPropertyOptional({ type: [CreateDayAvailabilityDto] })

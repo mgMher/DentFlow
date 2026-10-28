@@ -8,6 +8,8 @@ import { Patient, PatientDocument, PatientStatus } from 'src/modules/patients/pa
 import { TreatmentRoom, TreatmentRoomDocument } from 'src/modules/schedule/treatment-room.schema';
 import { Treatment, TreatmentDocument } from 'src/modules/treatments/treatment.schema';
 import { Appointment, AppointmentDocument } from 'src/modules/appointments/appointment.schema';
+import { Clinic, ClinicDocument } from 'src/modules/clinics/clinic.schema';
+import { DEFAULT_CLINIC_TIMEZONE } from 'src/common/utils';
 
 type Id = string | Types.ObjectId;
 
@@ -33,7 +35,14 @@ export class ClinicRefsService {
         @InjectModel(TreatmentRoom.name) private readonly roomModel: Model<TreatmentRoomDocument>,
         @InjectModel(Treatment.name) private readonly treatmentModel: Model<TreatmentDocument>,
         @InjectModel(Appointment.name) private readonly appointmentModel: Model<AppointmentDocument>,
+        @InjectModel(Clinic.name) private readonly clinicModel: Model<ClinicDocument>,
     ) {}
+
+    /** The clinic's IANA timezone, for "today" / "this month" / date filters. */
+    async timezoneOf(clinicId: Id): Promise<string> {
+        const clinic = await this.clinicModel.findById(toObjectId(clinicId)).select('timezone').lean();
+        return clinic?.timezone || DEFAULT_CLINIC_TIMEZONE;
+    }
 
     /** The patient exists in this clinic. With `forBooking`, it must also not be archived or deceased. */
     async assertPatient(clinicId: Id, patientId: Id, opts: { forBooking?: boolean } = {}): Promise<void> {

@@ -11,12 +11,6 @@ export const APPOINTMENT_STATUS_COLORS: Record<string, string> = {
     no_show: '#A0AEC0',
 };
 
-export const PATIENT_STATUS_COLORS: Record<string, string> = {
-    active: '#38A169',
-    inactive: '#A0AEC0',
-    archived: '#805AD5',
-    deceased: '#4A5568',
-};
 
 export const TOOTH_SURFACES = [
     'mesial', 'distal', 'occlusal', 'incisal',

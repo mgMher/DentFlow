@@ -12,6 +12,8 @@ import { Role } from 'src/common/decorators';
 import { errorBody, escapeRegex } from 'src/common/utils';
 import { User, UserDocument } from '../auth/auth.schema';
 import { SessionsService } from '../auth/sessions.service';
+import { Clinic, ClinicDocument } from '../clinics/clinic.schema';
+import { UpcomingAppointmentsService } from 'src/common/clinic-refs';
 import { PASSWORD_HASH_COST } from '../auth/auth.service';
 import { ResetPasswordDto } from '../auth/dto';
 import { UserProfile, UserProfileDocument } from './user.schema';
@@ -64,6 +66,8 @@ export class UsersService {
         @InjectModel(UserProfile.name) private readonly userProfileModel: Model<UserProfileDocument>,
         @InjectModel(User.name) private readonly authModel: Model<UserDocument>,
         private readonly sessions: SessionsService,
+        @InjectModel(Clinic.name) private readonly clinicModel: Model<ClinicDocument>,
+        private readonly upcoming: UpcomingAppointmentsService,
     ) {}
 
     /**
@@ -91,7 +95,9 @@ export class UsersService {
             );
         }
 
-        const availability = dto.defaultAvailability || [];
+        // Without hours a new dentist had no bookable time until an admin set
+        // them. Start from the clinic's opening hours; they can be edited later.
+        const availability = dto.defaultAvailability ?? (await this.clinicOpeningHours(clinicId));
         assertValidAvailability(availability);
 
         const hashedPassword = await bcrypt.hash(dto.password, PASSWORD_HASH_COST);
@@ -130,6 +136,13 @@ export class UsersService {
             await this.authModel.findByIdAndDelete(authRecord._id);
             throw err;
         }
+    }
+
+    private async clinicOpeningHours(clinicId: string) {
+        const clinic = await this.clinicModel.findById(clinicId).select('workingHours').lean();
+        return (clinic?.workingHours ?? [])
+            .filter((day) => day.isOpen !== false && day.endTime > day.startTime)
+            .map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime }));
     }
 
     /**
@@ -252,9 +265,6 @@ export class UsersService {
         if (dto.role && dto.role !== existingProfile.role) {
             await this.assertNotLastAdmin(clinicId, existingProfile, 'roleChange');
         }
-        if (dto.isActive === false && existingProfile.isActive) {
-            await this.assertNotLastAdmin(clinicId, existingProfile, 'deactivate');
-        }
 
         if (dto.defaultAvailability) {
             assertValidAvailability(dto.defaultAvailability);
@@ -270,7 +280,6 @@ export class UsersService {
         if (dto.role !== undefined) profileUpdate.role = dto.role;
         if (dto.licenseNumber !== undefined) profileUpdate.licenseNumber = dto.licenseNumber;
         if (dto.avatar !== undefined) profileUpdate.avatar = dto.avatar;
-        if (dto.isActive !== undefined) profileUpdate.isActive = dto.isActive;
         if (dto.defaultAvailability !== undefined) {
             profileUpdate['schedule.defaultAvailability'] = dto.defaultAvailability;
         }
@@ -301,7 +310,6 @@ export class UsersService {
         if (dto.patronymic !== undefined) authUpdate.patronymic = dto.patronymic;
         if (dto.email !== undefined) authUpdate.email = dto.email;
         if (dto.role !== undefined) authUpdate.role = dto.role;
-        if (dto.isActive !== undefined) authUpdate.isActive = dto.isActive;
 
         if (Object.keys(authUpdate).length > 0) {
             await this.authModel.findByIdAndUpdate(existingProfile.authId, { $set: authUpdate });
@@ -319,7 +327,8 @@ export class UsersService {
         userId: string,
         isActive: boolean,
         actingAuthId: string,
-    ): Promise<UserProfileDocument> {
+        cancelUpcomingAppointments = false,
+    ): Promise<UserProfileDocument & { cancelledAppointments?: number }> {
         const profile = await this.userProfileModel
             .findOne({
                 _id: new Types.ObjectId(userId),
@@ -354,7 +363,25 @@ export class UsersService {
             !isActive && profile.authId && this.sessions.revokeAllForUser(profile.authId),
         ]);
 
-        return updated as UserProfileDocument;
+        // Appointments reference the dentist's auth id.
+        const cancelledAppointments =
+            !isActive && cancelUpcomingAppointments && profile.authId
+                ? await this.upcoming.cancel(clinicId, { dentistId: profile.authId }, 'Dentist deactivated')
+                : undefined;
+
+        return { ...(updated as UserProfileDocument), cancelledAppointments } as UserProfileDocument & {
+            cancelledAppointments?: number;
+        };
+    }
+
+    /** Booked appointments still ahead for this member (as dentist), for the deactivate dialog. */
+    async countUpcomingAppointments(clinicId: string, userId: string): Promise<{ count: number }> {
+        const profile = await this.userProfileModel
+            .findOne({ _id: new Types.ObjectId(userId), clinicId: new Types.ObjectId(clinicId) })
+            .select('authId')
+            .lean();
+        if (!profile) throw new NotFoundException(errorBody('staffNotFound', 'User not found'));
+        return { count: profile.authId ? await this.upcoming.count(clinicId, { dentistId: profile.authId }) : 0 };
     }
 
     /**

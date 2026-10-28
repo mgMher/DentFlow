@@ -31,7 +31,7 @@ const emptyToUndefined = ({ value }: { value: unknown }) => blankToUndefined(val
 const toEmail = ({ value }: { value: unknown }) =>
     typeof value === 'string' ? blankToUndefined(value.trim().toLowerCase()) : value;
 
-const toArmenianPhone = ({ value }: { value: unknown }) => {
+export const toArmenianPhone = ({ value }: { value: unknown }) => {
     const cleaned = blankToUndefined(value);
     return typeof cleaned === 'string' ? normalizeArmenianPhone(cleaned) : cleaned;
 };
@@ -210,7 +210,8 @@ export class CreatePatientDto {
     @Matches(/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=\s]+$/, {
         message: 'photo must be a base64 data URL of type image/jpeg, image/png or image/webp',
     })
-    @MaxLength(2_000_000, { message: 'photo must be smaller than ~1.5MB' })
+    // The browser resizes photos to 192 px (~10 KB); 150k characters is ~110 KB of image.
+    @MaxLength(150_000, { message: 'photo is too large' })
     photo?: string | null;
 
     @ApiPropertyOptional({ type: AddressDto })

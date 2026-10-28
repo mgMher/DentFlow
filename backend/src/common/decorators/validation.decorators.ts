@@ -1,6 +1,6 @@
 import { applyDecorators } from '@nestjs/common';
 import { Transform } from 'class-transformer';
-import { IsString, MaxLength, MinLength, registerDecorator, ValidationOptions } from 'class-validator';
+import { IsString, MaxLength, MinLength, registerDecorator, ValidateIf, ValidationOptions } from 'class-validator';
 
 /**
  * One password rule for every place a password is set (register, staff
@@ -42,3 +42,12 @@ export function IsTimeZone(options?: ValidationOptions) {
             validator: { validate: isTimeZone },
         });
 }
+
+/**
+ * Like `@IsOptional()`, but only for `undefined`. Use it on update DTOs for
+ * fields that are required on the document: `@IsOptional()` also lets `null`
+ * through, which the services treat as "clear this field" — so
+ * `{ firstName: null }` reached the database and failed there with a 500,
+ * and `{ isActive: null }` slipped past the last-admin guard.
+ */
+export const IsOptionalNotNull = () => ValidateIf((_, value) => value !== undefined);

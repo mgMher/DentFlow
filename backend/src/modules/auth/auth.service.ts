@@ -8,8 +8,9 @@ import {
     OnModuleInit,
     UnauthorizedException,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
+import { runOnce } from 'src/common/migrations/run-once';
 import * as bcrypt from 'bcryptjs';
 import { Role } from 'src/common/decorators';
 import { errorBody } from 'src/common/utils';
@@ -41,6 +42,7 @@ export class AuthService implements OnModuleInit {
         @InjectModel(UserProfile.name) private readonly profileModel: Model<UserProfileDocument>,
         private readonly sessions: SessionsService,
         private readonly treatmentsService: TreatmentsService,
+        @InjectConnection() private readonly connection: Connection,
     ) {}
 
     /**
@@ -51,7 +53,7 @@ export class AuthService implements OnModuleInit {
      *   plaintext copies from user documents.
      */
     async onModuleInit(): Promise<void> {
-        try {
+        await runOnce(this.connection, '2026-10-founder-profile-backfill', this.logger, async () => {
             const orphans = await this.userModel.aggregate<UserDocument>([
                 { $lookup: { from: 'user_profiles', localField: '_id', foreignField: 'authId', as: 'profile' } },
                 { $match: { profile: { $size: 0 } } },
@@ -61,7 +63,10 @@ export class AuthService implements OnModuleInit {
                 await this.profileModel.insertMany(orphans.map((u) => this.profileFor(u)), { ordered: false });
                 this.logger.log(`Created staff profiles for ${orphans.length} account(s) that had none`);
             }
+            return orphans.length;
+        });
 
+        await runOnce(this.connection, '2026-10-drop-plaintext-refresh-tokens', this.logger, async () => {
             const cleared = await this.userModel.updateMany(
                 { refreshToken: { $exists: true } },
                 { $unset: { refreshToken: 1 } },
@@ -70,9 +75,8 @@ export class AuthService implements OnModuleInit {
             if (cleared.modifiedCount) {
                 this.logger.log(`Removed legacy plaintext refresh tokens from ${cleared.modifiedCount} user(s)`);
             }
-        } catch (err) {
-            this.logger.warn(`Auth startup migration failed: ${(err as Error).message}`);
-        }
+            return cleared.modifiedCount;
+        });
     }
 
     /**

@@ -97,22 +97,28 @@ built from treatment entries. Reports come after billing because they read billi
 - [ ] Deploy note: everyone signs in once after this ships (old tokens have no session id)
 - [ ] PROD: create the TTL index by hand — `db.auth_sessions.createIndex({ expiresAt: 1 }, { expireAfterSeconds: 0 })` (autoIndex is off in PROD); set `TRUST_PROXY=1` behind the load balancer
 
-### Phase 2 — Patients & Staff (finish)
+### Phase 2 — Patients & Staff — ✅ done 2026-10-28 (not committed yet)
 
-- [ ] **P1** Patient stats aggregate: `clinicId` string not cast → "Active" always 0
-- [ ] **P1** `PATCH /users/:id` with `isActive:false/null` bypasses self-deactivate and last-admin guards
-- [ ] **P2** `null` on required fields → 500 (patients + users)
-- [ ] **P2** Phone migration runs a full scan every boot and logs patient phones (PII) → one-off script
-- [ ] **P2** New staff have no working hours → dentist unbookable until admin edits
-- [ ] **P2** Specialization: free text on backend vs enum on frontend (seeded values render blank)
-- [ ] **P2** Search "Armen Hakobyan" finds nothing → token search
-- [ ] **P2** Duplicate-patient warning misses matches (substring + limit 50); add phone match
-- [ ] **P2** List spinner replaces the page → search box loses focus
-- [ ] **P2** Emergency phone without name / policy without provider silently dropped
-- [ ] **P2** Deactivating a patient or dentist leaves future appointments booked → prompt to cancel/reassign
-- [ ] **P3** Merge `PatientCreatePage` + `PatientEditPage` (~560 identical lines) into one `<PatientForm>`
-- [ ] **P3** Split `PatientDetailPage.tsx` (1402 lines) into tabs/components
-- [ ] **P3** Dead code: `formatPhone`, `deleteStaff`, unused constants; status select on edit form
+- [x] **P1** Patient stats aggregate cast (done in Phase 1)
+- [x] **P1** `isActive` removed from `PATCH /users/:id` (only `/status`, with its guards); `null` on required fields rejected (`IsOptionalNotNull`) for staff and patients
+- [x] **P2** Startup fixes run once per database (`common/migrations/run-once.ts`, `migrations` collection): patient status backfill, phone normalisation (now also emergency phones, bulk write, logs ids not numbers), appointment dentist repoint, founder backfill, token cleanup
+- [x] **P2** New staff start with the clinic's opening hours
+- [x] **P2** Specialization: backend `@IsIn` the same 8 values as the UI; legacy free text still shown in the select
+- [x] **P2** Multi-word search ("Armen Hakobyan"); `_id` sort tie-breaker
+- [x] **P2** Duplicate check: `GET /patients/duplicates` — exact name + birth date, phone or email; opens matches in a new tab; excludes the patient being edited
+- [x] **D4** Patient email no longer unique (families); index dropped by a one-off migration
+- [x] **P2** List pages keep the search box mounted while loading (patients, staff)
+- [x] **P2** Emergency phone without a name / policy without a provider → inline error instead of silently dropped
+- [x] **P2** Archive/deceased patient or deactivate dentist: dialog shows upcoming appointments and can cancel them (`UpcomingAppointmentsService`)
+- [x] **D5 (patients)** Roles: assistants read only; receptionists edit demographics but not medical history (403 `medicalHistoryForbidden`, fields read-only in the form) or status; buttons hidden per role on patient and staff pages
+- [x] **P3** `PatientCreatePage` + `PatientEditPage` → one `PatientEditor` (1 271 → 755 lines); status removed from the edit form (audited dialog only)
+- [x] **P3** `PatientDetailPage`: profile tab → `PatientProfileTab`, status → shared `PatientStatusDialog` (1 402 → ~900 lines). Chart / appointments / billing tabs are extracted in Phases 4 / 3 / 5, where they are rewritten anyway
+- [x] **P3** `DELETE /patients/:id` and `/restore` removed (deceased → inactive bug); `updateStatus` conditional on the status read (409 `patientStatusChanged`)
+- [x] **P3** "New this month" in the clinic timezone (`ClinicRefsService.timezoneOf`)
+- [x] **P3** Photo/avatar limit 150k chars with explicit 300 kb body limit (was an unreachable 2 MB and a bare 413); avatar format validated; staff phones normalised
+- [x] **P3** Dead code removed (`formatPhone`, `deleteStaff`, `PATIENT_STATUS_COLORS`, `PaginatedResponse`); `StatusChip` `sx` merge; `EmptyState` action icon; `PageHeader` wraps; emergency-contact label; formatted staff phone
+- [ ] Deferred: one login per person across clinics (auth email is global) — needs a membership model, later with the platform admin (F13)
+- [x] Verified on local MongoDB: 33 new API checks (`smoke2.mjs`) + Phase 0/1 suite; browser: duplicate warning, status dialog with appointment count
 
 ### Phase 3 — Appointments & Schedule
 

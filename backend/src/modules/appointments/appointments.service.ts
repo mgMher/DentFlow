@@ -6,8 +6,9 @@ import {
     NotFoundException,
     OnModuleInit,
 } from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { FilterQuery, Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, FilterQuery, Model, Types } from 'mongoose';
+import { runOnce } from 'src/common/migrations/run-once';
 import {
     Appointment,
     AppointmentDocument,
@@ -29,6 +30,7 @@ export class AppointmentsService implements OnModuleInit {
         private readonly userProfileModel: Model<UserProfileDocument>,
         private readonly patientsService: PatientsService,
         private readonly clinicRefs: ClinicRefsService,
+        @InjectConnection() private readonly connection: Connection,
     ) {}
 
     /**
@@ -42,12 +44,12 @@ export class AppointmentsService implements OnModuleInit {
      * rewritten to an `authId` it no longer matches anything here.
      */
     async onModuleInit(): Promise<void> {
-        try {
+        await runOnce(this.connection, '2026-09-appointment-dentist-repoint', this.logger, async () => {
             const dentistIds: Types.ObjectId[] =
                 await this.appointmentModel.distinct('dentistId');
 
             if (!dentistIds.length) {
-                return;
+                return 0;
             }
 
             const profiles = await this.userProfileModel
@@ -79,11 +81,8 @@ export class AppointmentsService implements OnModuleInit {
                     `Repointed dentistId on ${migrated} appointment(s) from UserProfile to auth User`,
                 );
             }
-        } catch (err) {
-            this.logger.warn(
-                `Could not migrate appointment dentist references: ${(err as Error).message}`,
-            );
-        }
+            return migrated;
+        });
     }
 
     /**

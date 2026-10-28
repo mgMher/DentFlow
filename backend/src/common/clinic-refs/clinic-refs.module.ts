@@ -6,6 +6,8 @@ import { TreatmentRoom, TreatmentRoomSchema } from 'src/modules/schedule/treatme
 import { Treatment, TreatmentSchema } from 'src/modules/treatments/treatment.schema';
 import { Appointment, AppointmentSchema } from 'src/modules/appointments/appointment.schema';
 import { ClinicRefsService } from './clinic-refs.service';
+import { UpcomingAppointmentsService } from './upcoming-appointments.service';
+import { Clinic, ClinicSchema } from 'src/modules/clinics/clinic.schema';
 
 /** Global so any feature module can verify body references without importing five others. */
 @Global()
@@ -17,9 +19,10 @@ import { ClinicRefsService } from './clinic-refs.service';
             { name: TreatmentRoom.name, schema: TreatmentRoomSchema },
             { name: Treatment.name, schema: TreatmentSchema },
             { name: Appointment.name, schema: AppointmentSchema },
+            { name: Clinic.name, schema: ClinicSchema },
         ]),
     ],
-    providers: [ClinicRefsService],
-    exports: [ClinicRefsService],
+    providers: [ClinicRefsService, UpcomingAppointmentsService],
+    exports: [ClinicRefsService, UpcomingAppointmentsService],
 })
 export class ClinicRefsModule {}

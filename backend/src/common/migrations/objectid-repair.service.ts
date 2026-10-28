@@ -1,6 +1,7 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { Connection, Schema, Types } from 'mongoose';
+import { runOnce } from './run-once';
 
 const MIGRATION_ID = '2026-10-28-objectid-repair';
 const HEX_ID = /^[0-9a-f]{24}$/i;
@@ -78,10 +79,7 @@ export class ObjectIdRepairService implements OnModuleInit {
     constructor(@InjectConnection() private readonly connection: Connection) {}
 
     async onModuleInit(): Promise<void> {
-        const migrations = this.connection.collection('migrations');
-        try {
-            if (await migrations.findOne({ _id: MIGRATION_ID as any })) return;
-
+        await runOnce(this.connection, MIGRATION_ID, this.logger, async () => {
             let total = 0;
             for (const model of Object.values(this.connection.models)) {
                 const paths = objectIdPaths(model.schema);
@@ -98,10 +96,7 @@ export class ObjectIdRepairService implements OnModuleInit {
                 if (fixed) this.logger.log(`Converted string ids to ObjectIds in ${fixed} ${model.collection.name} document(s)`);
                 total += fixed;
             }
-
-            await migrations.insertOne({ _id: MIGRATION_ID as any, ranAt: new Date(), documents: total });
-        } catch (err) {
-            this.logger.error(`ObjectId repair failed (will retry next start): ${(err as Error).message}`);
-        }
+            return total;
+        });
     }
 }

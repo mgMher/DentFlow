@@ -37,7 +37,7 @@ const statusColorMap: Record<string, { bg: string; color: string }> = {
     veneer: { bg: '#E6FFFA', color: '#319795' },
 };
 
-const StatusChip: React.FC<StatusChipProps> = ({ status, translationPrefix = 'appointments', label: customLabel, ...props }) => {
+const StatusChip: React.FC<StatusChipProps> = ({ status, translationPrefix = 'appointments', label: customLabel, sx, ...props }) => {
     const { t } = useTranslation();
     const colors = statusColorMap[status] || { bg: '#F7FAFC', color: '#A0AEC0' };
     const label = customLabel || t(`${translationPrefix}.${status}`, status);
@@ -51,7 +51,8 @@ const StatusChip: React.FC<StatusChipProps> = ({ status, translationPrefix = 'ap
                 color: colors.color,
                 fontWeight: 600,
                 fontSize: 12,
-                ...props.sx,
+                // Merged last; spreading `props` after `sx` used to replace the status colours entirely.
+                ...(sx as object),
             }}
             {...props}
         />

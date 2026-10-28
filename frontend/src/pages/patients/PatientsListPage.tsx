@@ -31,6 +31,7 @@ import {
     People as PeopleIcon,
     CheckCircle as CheckIcon,
     PersonAdd as PersonAddIcon,
+    RestartAlt as ResetIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -42,13 +43,14 @@ import {
     StatusChip,
     EmptyState,
     LoadingSpinner,
-    ConfirmDialog,
     StatCard,
 } from '../../components/ui';
 import { formatDate, getFullName, getInitials } from '../../utils/formatters';
 import { formatArmenianPhone } from '../../utils/validators';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
 import { PATIENT_STATUSES, Patient, PatientStatus } from '../../types';
+import { usePermission } from '../../hooks';
+import PatientStatusDialog from './PatientStatusDialog';
 
 const PatientsListPage: React.FC = () => {
     const { t } = useTranslation();
@@ -57,6 +59,9 @@ const PatientsListPage: React.FC = () => {
 
     const { list: patients, total, stats } = useSelector((state: RootState) => state.patients);
     const loading = useSelector((state: RootState) => state.http.loading.includes('GET_PATIENTS'));
+    // True once the first request has finished (or data is already in the store).
+    const startedLoading = useRef(false);
+    if (loading) startedLoading.current = true;
 
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<PatientStatus | 'all'>('all');
@@ -68,7 +73,9 @@ const PatientsListPage: React.FC = () => {
         patient: Patient;
         status: PatientStatus;
     } | null>(null);
-    const [statusReason, setStatusReason] = useState('');
+    const can = usePermission();
+    const canEdit = can('editPatients');
+    const canChangeStatus = can('editClinicalRecords');
 
     const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -135,26 +142,7 @@ const PatientsListPage: React.FC = () => {
 
     const requestStatusChange = (patient: Patient, status: PatientStatus) => {
         closeMenu();
-        setStatusReason('');
         setPendingStatus({ patient, status });
-    };
-
-    const confirmStatusChange = () => {
-        if (!pendingStatus) return;
-        dispatch(
-            patientsActions.updatePatientStatus({
-                id: pendingStatus.patient._id,
-                status: pendingStatus.status,
-                reason: statusReason.trim() || undefined,
-            }),
-        );
-        setPendingStatus(null);
-        setStatusReason('');
-    };
-
-    const cancelStatusChange = () => {
-        setPendingStatus(null);
-        setStatusReason('');
     };
 
     const isFiltered = search.trim() !== '' || statusFilter !== 'all';
@@ -178,7 +166,10 @@ const PatientsListPage: React.FC = () => {
         [t],
     );
 
-    if (loading && patients.length === 0) {
+    // Full-page spinner only before the first response. Showing it whenever the
+    // list was empty unmounted the search box mid-typing and lost its focus.
+    const hasLoaded = patients.length > 0 || (startedLoading.current && !loading);
+    if (loading && !hasLoaded) {
         return <LoadingSpinner fullPage />;
     }
 
@@ -187,8 +178,8 @@ const PatientsListPage: React.FC = () => {
             <PageHeader
                 title={t('patients.title')}
                 subtitle={`${t('patients.totalPatients')}: ${total}`}
-                actionLabel={t('patients.addPatient')}
-                onAction={() => navigate('/patients/new')}
+                actionLabel={canEdit ? t('patients.addPatient') : undefined}
+                onAction={canEdit ? () => navigate('/patients/new') : undefined}
             />
 
             <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -260,13 +251,14 @@ const PatientsListPage: React.FC = () => {
                         description={t('patients.tryDifferentFilters')}
                         actionLabel={t('common.reset')}
                         onAction={clearFilters}
+                        actionIcon={<ResetIcon />}
                     />
                 ) : (
                     <EmptyState
                         title={t('patients.noPatients')}
-                        description={t('patients.addPatient')}
-                        actionLabel={t('patients.addPatient')}
-                        onAction={() => navigate('/patients/new')}
+                        description={canEdit ? t('patients.addPatient') : undefined}
+                        actionLabel={canEdit ? t('patients.addPatient') : undefined}
+                        onAction={canEdit ? () => navigate('/patients/new') : undefined}
                     />
                 )
             ) : (
@@ -348,24 +340,28 @@ const PatientsListPage: React.FC = () => {
                                                         <ViewIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title={t('common.edit')}>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={() =>
-                                                            navigate(`/patients/${patient._id}/edit`)
-                                                        }
-                                                    >
-                                                        <EditIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
-                                                <Tooltip title={t('patients.changeStatus')}>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(e) => openMenu(e, patient)}
-                                                    >
-                                                        <MoreIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
+                                                {canEdit && (
+                                                    <Tooltip title={t('common.edit')}>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={() =>
+                                                                navigate(`/patients/${patient._id}/edit`)
+                                                            }
+                                                        >
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
+                                                {canChangeStatus && (
+                                                    <Tooltip title={t('patients.changeStatus')}>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => openMenu(e, patient)}
+                                                        >
+                                                            <MoreIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
                                             </Box>
                                         </TableCell>
                                     </TableRow>
@@ -407,32 +403,16 @@ const PatientsListPage: React.FC = () => {
                 ))}
             </Menu>
 
-            <ConfirmDialog
-                open={!!pendingStatus}
-                title={t('patients.changeStatus')}
-                message={
+            <PatientStatusDialog
+                patientId={pendingStatus?.patient._id ?? null}
+                patientName={
                     pendingStatus
-                        ? t('patients.confirmStatusChange', {
-                              status: t(`patients.${pendingStatus.status}`),
-                          })
+                        ? getFullName(pendingStatus.patient.firstName, pendingStatus.patient.lastName, pendingStatus.patient.patronymic)
                         : ''
                 }
-                variant={pendingStatus?.status === 'active' ? 'default' : 'danger'}
-                onConfirm={confirmStatusChange}
-                onCancel={cancelStatusChange}
-            >
-                <TextField
-                    fullWidth
-                    size="small"
-                    label={t('patients.statusReason')}
-                    placeholder={t('patients.statusReasonHint')}
-                    value={statusReason}
-                    onChange={(e) => setStatusReason(e.target.value)}
-                    multiline
-                    rows={2}
-                    sx={{ mt: 2 }}
-                />
-            </ConfirmDialog>
+                status={pendingStatus?.status ?? null}
+                onClose={() => setPendingStatus(null)}
+            />
         </Box>
     );
 };

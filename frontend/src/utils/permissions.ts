@@ -21,6 +21,10 @@ export const PERMISSIONS = {
     deleteTreatments: ['clinic_admin'],
     /** /reports/* */
     viewReports: ['super_admin', 'clinic_admin', 'dentist'],
+    /** POST /patients, PATCH /patients/:id — patients.controller PATIENT_EDITORS */
+    editPatients: ['super_admin', 'clinic_admin', 'dentist', 'receptionist'],
+    /** Medical history and PATCH /patients/:id/status — patients.controller CLINICAL_EDITORS */
+    editClinicalRecords: ['super_admin', 'clinic_admin', 'dentist'],
     /** POST/PATCH /appointments */
     manageAppointments: ['clinic_admin', 'dentist', 'receptionist'],
 } as const satisfies Record<string, readonly UserRole[]>;

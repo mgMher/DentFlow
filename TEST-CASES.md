@@ -356,6 +356,30 @@ each module, not just patients.
 | MIG-09 | Old data visible | Patients/appointments/invoices created through the app **before** this change | Listed, searchable, bookable and billable | — |
 | MIG-10 | No string ids left | `mongosh`: count `{clinicId: {$type: "string"}}` in every collection | 0 | — |
 
+## 15. Phase 2 — patients & staff
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F2-01 | Shared email | Create two patients (siblings) with the same email | Both saved; the second shows the "possible duplicate" warning, not an error | — |
+| F2-02 | Duplicate by phone | New patient, type an existing patient's phone as `077…` | Warning lists that patient; link opens in a new tab, form kept | — |
+| F2-03 | Duplicate on edit | Edit a patient | Never warns about itself | — |
+| F2-04 | Full-name search | Patients list: search "Firstname Lastname" | Finds the patient | — |
+| F2-05 | Search keeps focus | Type a search that returns nothing, keep typing | Search box stays, no page spinner | — |
+| F2-06 | Emergency contact | Fill emergency phone, leave name empty, save | Inline error on the name | — |
+| F2-07 | Insurance | Fill policy number, leave provider empty, save | Inline error on the provider | — |
+| F2-08 | No status on edit form | Edit patient | No status select; status only via the patient page | — |
+| F2-09 | Archive with appointments | Patient with booked future visits → Archived | Dialog says "N upcoming appointments", cancel ticked; after confirm they show Cancelled | — |
+| F2-10 | Inactive keeps appointments | Same, choose Inactive | Cancel option unticked by default | — |
+| F2-11 | Archived not bookable | Book an archived patient | Greyed out in the picker; API refuses | — |
+| F2-12 | Receptionist | Log in as receptionist, edit a patient | Medical history fields read-only with an explanation; no status select; can change phone | — |
+| F2-13 | Assistant | Log in as assistant | Patients readable; no Add / Edit / status buttons | — |
+| F2-14 | Staff list roles | Non-admin opens Staff | No "Add staff", no status menu | — |
+| F2-15 | Deactivate dentist | Dentist with booked visits → Deactivate | Dialog shows count and an opt-in to cancel them | — |
+| F2-16 | New staff hours | Add a dentist | Working hours prefilled from the clinic's opening hours | — |
+| F2-17 | Old specialization | Staff member with free-text specialization | Shown in the select (disabled option) instead of blank | — |
+| F2-18 | Stats after status change | Archive from the list page | Stat cards update without reload | — |
+| F2-19 | Startup log | Restart backend twice | Fixes log at most once; `migrations` collection lists them | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

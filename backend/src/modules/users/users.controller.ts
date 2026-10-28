@@ -98,7 +98,13 @@ export class UsersController {
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateUserStatusDto,
     ) {
-        return this.usersService.setActive(clinicId, id.toString(), dto.isActive, actingAuthId);
+        return this.usersService.setActive(
+            clinicId,
+            id.toString(),
+            dto.isActive,
+            actingAuthId,
+            dto.cancelUpcomingAppointments,
+        );
     }
 
     /**
@@ -128,6 +134,16 @@ export class UsersController {
         }
 
         return this.usersService.updateAvailability(clinicId, id.toString(), dto);
+    }
+
+    @Get(':id/upcoming-appointments')
+    @Roles(...STAFF_MANAGERS)
+    @ApiOperation({ summary: "Count of this member's booked appointments still ahead" })
+    async countUpcoming(
+        @CurrentUser('clinicId') clinicId: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    ) {
+        return this.usersService.countUpcomingAppointments(clinicId, id.toString());
     }
 
     @Post(':id/reset-password')

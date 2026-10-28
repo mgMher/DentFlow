@@ -39,7 +39,6 @@ import { RootState } from '../../store';
 import { staffActions } from '../../store/staff';
 import { reportsActions } from '../../store/reports';
 import {
-    ConfirmDialog,
     LoadingSpinner,
     PasswordDialog,
     PageHeader,
@@ -47,7 +46,9 @@ import {
     StatusChip,
 } from '../../components/ui';
 import { useAuth, useHttpState, usePermission } from '../../hooks';
+import StaffStatusDialog from './StaffStatusDialog';
 import { formatCurrency, getFullName, getInitials } from '../../utils/formatters';
+import { formatArmenianPhone } from '../../utils/validators';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
 import { staffRefId } from '../../utils/staff';
 import { DENTIST_SPECIALIZATIONS, STAFF_ROLES } from '../../types';
@@ -246,11 +247,6 @@ const StaffDetailPage: React.FC = () => {
         );
     };
 
-    const confirmStatusChange = () => {
-        if (!id || pendingStatus === null) return;
-        dispatch(staffActions.updateStaffStatus({ id, isActive: pendingStatus }));
-        setPendingStatus(null);
-    };
 
     if (loading || (!staff && !loadError)) {
         return <LoadingSpinner fullPage />;
@@ -336,7 +332,7 @@ const StaffDetailPage: React.FC = () => {
                         </Box>
                         <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                             {staff.email}
-                            {staff.phone ? ` | ${staff.phone}` : ''}
+                            {staff.phone ? ` | ${formatArmenianPhone(staff.phone)}` : ''}
                         </Typography>
                     </Box>
                 </Box>
@@ -534,6 +530,13 @@ const StaffDetailPage: React.FC = () => {
                                                         {t(`staff.specializations.${spec}`)}
                                                     </MenuItem>
                                                 ))}
+                                                {/* Older records hold free text; show it instead of a blank select until it is changed. */}
+                                                {field.value &&
+                                                    !(DENTIST_SPECIALIZATIONS as readonly string[]).includes(field.value) && (
+                                                        <MenuItem value={field.value} disabled>
+                                                            {field.value}
+                                                        </MenuItem>
+                                                    )}
                                             </TextField>
                                         )}
                                     />
@@ -796,16 +799,10 @@ const StaffDetailPage: React.FC = () => {
                 </TabPanel>
             )}
 
-            <ConfirmDialog
-                open={pendingStatus !== null}
-                title={t('staff.changeStatus')}
-                message={t('staff.confirmStatusChange', {
-                    name: getFullName(staff.firstName, staff.lastName),
-                    status: pendingStatus ? t('common.active') : t('common.inactive'),
-                })}
-                variant={pendingStatus ? 'default' : 'danger'}
-                onConfirm={confirmStatusChange}
-                onCancel={() => setPendingStatus(null)}
+            <StaffStatusDialog
+                member={pendingStatus !== null ? staff : null}
+                isActive={!!pendingStatus}
+                onClose={() => setPendingStatus(null)}
             />
 
             <PasswordDialog
