@@ -8,6 +8,9 @@ import i18n from '../locales/i18n';
  * string for it, and fall back to the server's message — then to a generic
  * key — so nothing ever surfaces as "undefined".
  */
+/** The API's stable error code, if any (e.g. `appointmentOutsideHours`). */
+export const apiErrorCode = (err: any): string | undefined => (err?.data ?? err?.response?.data)?.code;
+
 export const apiErrorMessage = (err: any, fallbackKey = 'toast.saveError'): string => {
     const body = err?.data ?? err?.response?.data;
     const code = body?.code;

@@ -4,12 +4,14 @@ import {
     IsNotEmpty,
     IsOptional,
     IsString,
+    MaxLength,
 } from 'class-validator';
 
 export class CreateRoomDto {
     @ApiProperty({ example: 'Room 1', description: 'Treatment room name' })
     @IsNotEmpty()
     @IsString()
+    @MaxLength(80)
     name: string;
 
     @ApiPropertyOptional({ example: 'Main operatory with panoramic X-ray' })

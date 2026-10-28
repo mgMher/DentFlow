@@ -6,9 +6,9 @@ import { httpActions } from '../store/http';
 export const useHttpState = (actionType: string) => {
     const dispatch = useDispatch();
     const loading = useSelector((state: RootState) => state.http.loading.includes(actionType));
-    const error = useSelector((state: RootState) =>
-        state.http.errors.find((e) => e.type === actionType)?.error || null,
-    );
+    const failure = useSelector((state: RootState) => state.http.errors.find((e) => e.type === actionType));
+    const error = failure?.error || null;
+    const errorCode = failure?.code || null;
     const success = useSelector((state: RootState) => state.http.successes.includes(actionType));
 
     // Stable identities, so callers can list them as effect dependencies
@@ -16,5 +16,5 @@ export const useHttpState = (actionType: string) => {
     const clearError = useCallback(() => dispatch(httpActions.removeError(actionType)), [dispatch, actionType]);
     const clearSuccess = useCallback(() => dispatch(httpActions.removeSuccess(actionType)), [dispatch, actionType]);
 
-    return { loading, error, success, clearError, clearSuccess };
+    return { loading, error, errorCode, success, clearError, clearSuccess };
 };

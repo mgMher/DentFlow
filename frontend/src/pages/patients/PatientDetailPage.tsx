@@ -53,7 +53,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
 import { dentalRecordsActions } from '../../store/dental-records';
-import { appointmentsActions } from '../../store/appointments';
 import { billingActions } from '../../store/billing';
 import {
     PageHeader,
@@ -75,6 +74,7 @@ import { formatArmenianPhone } from '../../utils/validators';
 import { TOOTH_STATUS_COLORS, TOOTH_SURFACES } from '../../utils/constants';
 import { usePermission } from '../../hooks';
 import PatientProfileTab from './PatientProfileTab';
+import PatientAppointmentsTab from './PatientAppointmentsTab';
 import PatientStatusDialog from './PatientStatusDialog';
 import {
     PATIENT_STATUSES,
@@ -149,13 +149,9 @@ const PatientDetailPage: React.FC = () => {
     // patients would otherwise flash the wrong person's data (allergies
     // included) for a frame before the fetch starts.
     const patient = storedPatient && storedPatient._id === id ? storedPatient : null;
-    const appointments = useSelector((state: RootState) => state.appointments.list);
     const invoices = useSelector((state: RootState) => state.billing.invoices);
     const chart = useSelector((state: RootState) => state.dentalRecords.chart);
     const toothHistory = useSelector((state: RootState) => state.dentalRecords.toothHistory);
-    const appointmentsLoading = useSelector((state: RootState) =>
-        state.http.loading.includes('GET_APPOINTMENTS'),
-    );
     const invoicesLoading = useSelector((state: RootState) =>
         state.http.loading.includes('GET_INVOICES'),
     );
@@ -204,7 +200,6 @@ const PatientDetailPage: React.FC = () => {
             );
         }
         if (tabValue === 2) {
-            dispatch(appointmentsActions.getAppointments({ patientId: id, limit: 100 }));
         }
         if (tabValue === 3) {
             dispatch(billingActions.getInvoices({ patientId: id, limit: 100 }));
@@ -285,13 +280,6 @@ const PatientDetailPage: React.FC = () => {
         return <LoadingSpinner fullPage />;
     }
 
-    const patientAppointments = appointments
-        .filter((a) => {
-            const patientId = typeof a.patientId === 'string' ? a.patientId : a.patientId?._id;
-            return patientId === id;
-        })
-        .slice()
-        .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
 
     const patientInvoices = invoices.filter((inv) => {
         const patientId = typeof inv.patientId === 'string' ? inv.patientId : inv.patientId?._id;
@@ -757,50 +745,10 @@ const PatientDetailPage: React.FC = () => {
 
             {/* Appointments Tab */}
             <TabPanel value={tabValue} index={2}>
-                {appointmentsLoading && patientAppointments.length === 0 ? (
-                    <LoadingSpinner />
-                ) : patientAppointments.length === 0 ? (
-                    <EmptyState title={t('appointments.noAppointments')} />
-                ) : (
-                    <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>{t('common.date')}</TableCell>
-                                    <TableCell>{t('appointments.dentist')}</TableCell>
-                                    <TableCell>{t('appointments.treatmentType')}</TableCell>
-                                    <TableCell>{t('appointments.duration')}</TableCell>
-                                    <TableCell>{t('common.status')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {patientAppointments.map((appt) => {
-                                    const dentist = typeof appt.dentistId === 'object' ? appt.dentistId : null;
-                                    return (
-                                        <TableRow
-                                            key={appt._id}
-                                            hover
-                                            sx={{ cursor: 'pointer' }}
-                                            onClick={() => navigate(`/appointments/${appt._id}`)}
-                                        >
-                                            <TableCell>{formatDate(appt.startTime, 'dd.MM.yyyy HH:mm')}</TableCell>
-                                            <TableCell>
-                                                {dentist
-                                                    ? getFullName(dentist.firstName, dentist.lastName)
-                                                    : '-'}
-                                            </TableCell>
-                                            <TableCell>{appt.treatmentType || '-'}</TableCell>
-                                            <TableCell>{appt.duration} {t('common.minutes')}</TableCell>
-                                            <TableCell>
-                                                <StatusChip status={appt.status} translationPrefix="appointments" />
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
+                <PatientAppointmentsTab
+                    patientId={patient._id}
+                    bookable={!['archived', 'deceased'].includes(currentStatus)}
+                />
             </TabPanel>
 
             {/* Billing Tab */}

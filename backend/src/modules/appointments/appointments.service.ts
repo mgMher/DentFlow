@@ -7,17 +7,73 @@ import {
     OnModuleInit,
 } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
-import { Connection, FilterQuery, Model, Types } from 'mongoose';
+import { Connection, FilterQuery, Model, PopulateOptions, Types } from 'mongoose';
 import { runOnce } from 'src/common/migrations/run-once';
+import { ClinicRefsService } from 'src/common/clinic-refs';
 import {
-    Appointment,
-    AppointmentDocument,
-    AppointmentStatus,
-} from './appointment.schema';
-import { CreateAppointmentDto, QueryAppointmentDto, UpdateAppointmentDto } from './dto';
+    addDays,
+    clinicTimeToUtc,
+    clinicToday,
+    errorBody,
+    toClinicDateString,
+    toClinicTimeString,
+    weekdayOf,
+} from 'src/common/utils';
+import { Appointment, AppointmentDocument, AppointmentStatus, RecurringFrequency } from './appointment.schema';
+import {
+    AppointmentFilterDto,
+    CalendarQueryDto,
+    CancelAppointmentDto,
+    CreateAppointmentDto,
+    CreateRecurringAppointmentDto,
+    MAX_SERIES_OCCURRENCES,
+    QueryAppointmentDto,
+    RecurringPatternDto,
+    UpdateAppointmentDto,
+} from './dto';
 import { PatientsService } from '../patients/patients.service';
 import { UserProfile, UserProfileDocument } from '../users/user.schema';
-import { ClinicRefsService } from 'src/common/clinic-refs';
+import { ScheduleService, SLOT_HOLDING_STATUSES } from '../schedule/schedule.service';
+
+type Id = string | Types.ObjectId;
+const oid = (id: Id) => new Types.ObjectId(id.toString());
+/** Id of a reference whether or not it was populated. */
+const refId = (ref: unknown): string =>
+    ref && typeof ref === 'object' && '_id' in (ref as object) ? String((ref as { _id: unknown })._id) : String(ref);
+
+const S = AppointmentStatus;
+
+/**
+ * Allowed status changes. Cancelling goes through PATCH /:id/cancel (it needs
+ * a reason). Scheduled → in progress / completed is allowed for walk-ins and
+ * visits recorded afterwards.
+ */
+const TRANSITIONS: Record<AppointmentStatus, AppointmentStatus[]> = {
+    [S.SCHEDULED]: [S.CONFIRMED, S.IN_PROGRESS, S.COMPLETED, S.NO_SHOW],
+    [S.CONFIRMED]: [S.SCHEDULED, S.IN_PROGRESS, S.COMPLETED, S.NO_SHOW],
+    [S.IN_PROGRESS]: [S.COMPLETED],
+    [S.COMPLETED]: [],
+    [S.CANCELLED]: [S.SCHEDULED],
+    [S.NO_SHOW]: [S.SCHEDULED],
+};
+
+const EDITABLE_STATUSES = [S.SCHEDULED, S.CONFIRMED];
+const CANCELLABLE_STATUSES = [S.SCHEDULED, S.CONFIRMED];
+/** These describe something that happened, so they can't be set before the visit starts. */
+const NEEDS_STARTED = [S.IN_PROGRESS, S.COMPLETED, S.NO_SHOW];
+/** A patient may be seen a little early. */
+const START_GRACE_MS = 30 * 60_000;
+const MAX_DURATION_MS = 12 * 3_600_000;
+const MAX_SERIES_DAYS = 366;
+const CALENDAR_LIMIT = 2000;
+
+/** One populate list for every response, so a status change no longer drops room and treatments. */
+const POPULATE: PopulateOptions[] = [
+    { path: 'patientId', select: 'firstName lastName patronymic phone email status' },
+    { path: 'dentistId', select: 'firstName lastName email' },
+    { path: 'treatmentRoomId', select: 'name isActive' },
+    { path: 'treatmentIds', select: 'name nameHy nameRu code duration price' },
+];
 
 @Injectable()
 export class AppointmentsService implements OnModuleInit {
@@ -30,6 +86,7 @@ export class AppointmentsService implements OnModuleInit {
         private readonly userProfileModel: Model<UserProfileDocument>,
         private readonly patientsService: PatientsService,
         private readonly clinicRefs: ClinicRefsService,
+        private readonly scheduleService: ScheduleService,
         @InjectConnection() private readonly connection: Connection,
     ) {}
 
@@ -85,422 +142,329 @@ export class AppointmentsService implements OnModuleInit {
         });
     }
 
-    /**
-     * Create a new appointment after checking for scheduling conflicts.
-     */
+    // ─── Create ───────────────────────────────────────────────────────
+
     async create(clinicId: string, dto: CreateAppointmentDto): Promise<AppointmentDocument> {
-        const startTime = new Date(dto.startTime);
-        const endTime = new Date(dto.endTime);
-
-        if (endTime <= startTime) {
-            throw new BadRequestException('endTime must be after startTime');
-        }
-
+        const { startTime, endTime } = this.parseRange(dto.startTime, dto.endTime);
         await this.assertRefs(clinicId, dto);
-
-        const conflict = await this.checkConflict(
-            clinicId,
-            dto.dentistId,
+        await this.assertBookable(clinicId, {
+            dentistId: dto.dentistId,
+            patientId: dto.patientId,
+            treatmentRoomId: dto.treatmentRoomId,
             startTime,
             endTime,
-        );
-
-        if (conflict) {
-            throw new ConflictException(
-                'Dentist already has an appointment during this time slot',
-            );
-        }
-
-        const duration = dto.duration || Math.round((endTime.getTime() - startTime.getTime()) / 60000);
-
-        const appointment = await this.appointmentModel.create({
-            clinicId: new Types.ObjectId(clinicId),
-            patientId: new Types.ObjectId(dto.patientId),
-            dentistId: new Types.ObjectId(dto.dentistId),
-            treatmentRoomId: dto.treatmentRoomId
-                ? new Types.ObjectId(dto.treatmentRoomId)
-                : undefined,
-            title: dto.title,
-            startTime,
-            endTime,
-            duration,
-            status: dto.status || AppointmentStatus.SCHEDULED,
-            treatmentType: dto.treatmentType,
-            treatmentIds: dto.treatmentIds?.map((id) => new Types.ObjectId(id)),
-            notes: dto.notes,
-            isRecurring: dto.isRecurring || false,
-            recurringPattern: dto.recurringPattern
-                ? {
-                      frequency: dto.recurringPattern.frequency,
-                      interval: dto.recurringPattern.interval,
-                      endDate: new Date(dto.recurringPattern.endDate),
-                      daysOfWeek: dto.recurringPattern.daysOfWeek,
-                  }
-                : undefined,
-            color: dto.color,
+            allowOutsideHours: dto.allowOutsideHours,
         });
 
-        return appointment;
+        const created = await this.appointmentModel.create(this.newAppointment(clinicId, dto, startTime, endTime));
+        await this.assertWonRace(clinicId, created);
+        return this.findById(clinicId, created._id);
     }
 
     /**
-     * Find all appointments for a clinic with pagination and optional filters.
+     * A series of appointments, generated on the clinic's calendar (so "every
+     * Monday 10:00" stays 10:00 in Yerevan). Occurrences that clash are
+     * skipped and reported, not silently dropped; the series is capped.
      */
+    async createRecurring(
+        clinicId: string,
+        dto: CreateRecurringAppointmentDto,
+    ): Promise<{ seriesId: Types.ObjectId; created: AppointmentDocument[]; skipped: { startTime: string; code: string }[] }> {
+        const { startTime, endTime } = this.parseRange(dto.startTime, dto.endTime);
+        await this.assertRefs(clinicId, dto);
+
+        const tz = await this.clinicRefs.timezoneOf(clinicId);
+        const occurrences = this.expandSeries(dto.recurringPattern, startTime, tz);
+        const durationMs = endTime.getTime() - startTime.getTime();
+        const seriesId = new Types.ObjectId();
+
+        const created: AppointmentDocument[] = [];
+        const skipped: { startTime: string; code: string }[] = [];
+
+        for (const start of occurrences) {
+            const end = new Date(start.getTime() + durationMs);
+            try {
+                await this.assertBookable(clinicId, {
+                    dentistId: dto.dentistId,
+                    patientId: dto.patientId,
+                    treatmentRoomId: dto.treatmentRoomId,
+                    startTime: start,
+                    endTime: end,
+                    allowOutsideHours: dto.allowOutsideHours,
+                });
+            } catch (err) {
+                const code = (err as { response?: { code?: string } }).response?.code;
+                if (!code) throw err;
+                skipped.push({ startTime: start.toISOString(), code });
+                continue;
+            }
+
+            const appointment = await this.appointmentModel.create({
+                ...this.newAppointment(clinicId, dto, start, end),
+                isRecurring: true,
+                seriesId,
+                recurringPattern: {
+                    frequency: dto.recurringPattern.frequency,
+                    interval: dto.recurringPattern.interval,
+                    endDate: new Date(dto.recurringPattern.endDate),
+                    daysOfWeek: dto.recurringPattern.daysOfWeek,
+                },
+            });
+            created.push(appointment);
+        }
+
+        if (!created.length) {
+            throw new ConflictException(
+                errorBody('seriesAllConflicting', 'None of the dates in this series could be booked'),
+            );
+        }
+
+        return { seriesId, created, skipped };
+    }
+
+    // ─── Read ─────────────────────────────────────────────────────────
+
     async findAll(clinicId: string, query: QueryAppointmentDto) {
         const page = query.page || 1;
         const limit = query.limit || 20;
-        const skip = (page - 1) * limit;
-
-        const filter: FilterQuery<AppointmentDocument> = {
-            clinicId: new Types.ObjectId(clinicId),
-        };
-
-        if (query.startDate) {
-            filter.startTime = { ...filter.startTime, $gte: new Date(query.startDate) };
-        }
-        if (query.endDate) {
-            filter.startTime = { ...filter.startTime, $lte: new Date(query.endDate) };
-        }
-        if (query.dentistId) {
-            filter.dentistId = new Types.ObjectId(query.dentistId);
-        }
-        if (query.patientId) {
-            filter.patientId = new Types.ObjectId(query.patientId);
-        }
-        if (query.status) {
-            filter.status = query.status;
-        }
+        const filter = this.buildFilter(clinicId, query);
 
         const [appointments, total] = await Promise.all([
             this.appointmentModel
                 .find(filter)
-                .sort({ startTime: 1 })
-                .skip(skip)
+                .sort({ startTime: query.sortOrder === 'desc' ? -1 : 1, _id: 1 })
+                .skip((page - 1) * limit)
                 .limit(limit)
-                .populate('patientId', 'firstName lastName phone')
-                .populate('dentistId', 'firstName lastName email')
-                .populate('treatmentRoomId', 'name')
+                .populate(POPULATE)
                 .lean(),
             this.appointmentModel.countDocuments(filter),
         ]);
 
         return {
             appointments,
-            pagination: {
-                page,
-                limit,
-                total,
-                totalPages: Math.ceil(total / limit),
-            },
+            pagination: { page, limit, total, totalPages: Math.ceil(total / limit) },
         };
     }
 
     /**
-     * Find a single appointment by ID, scoped to a clinic.
+     * Everything in a date range, for the calendar. Same shape as the list
+     * (the page used to read `startTime` while this returned `start`, so the
+     * calendar was empty in any month that had appointments).
      */
-    async findById(clinicId: string, appointmentId: string | Types.ObjectId): Promise<AppointmentDocument> {
+    async getCalendarData(clinicId: string, query: CalendarQueryDto) {
+        const filter = this.buildFilter(clinicId, query);
+        if (!query.status && !query.includeCancelled) {
+            filter.status = { $ne: AppointmentStatus.CANCELLED };
+        }
+        return this.appointmentModel.find(filter).sort({ startTime: 1 }).limit(CALENDAR_LIMIT).populate(POPULATE).lean();
+    }
+
+    /** Today on the clinic's calendar (the server runs in UTC). */
+    async getTodayAppointments(clinicId: string) {
+        const { start, end } = clinicToday(await this.clinicRefs.timezoneOf(clinicId));
+        return this.appointmentModel
+            .find({ clinicId: oid(clinicId), startTime: { $gte: start, $lt: end } })
+            .sort({ startTime: 1 })
+            .populate(POPULATE)
+            .lean();
+    }
+
+    async findById(clinicId: string, appointmentId: Id): Promise<AppointmentDocument> {
         const appointment = await this.appointmentModel
-            .findOne({
-                _id: new Types.ObjectId(appointmentId),
-                clinicId: new Types.ObjectId(clinicId),
-            })
-            .populate('patientId', 'firstName lastName phone email')
-            .populate('dentistId', 'firstName lastName email')
-            .populate('treatmentRoomId', 'name')
-            .populate('treatmentIds');
+            .findOne({ _id: oid(appointmentId), clinicId: oid(clinicId) })
+            .populate(POPULATE)
+            .populate('cancelledBy', 'firstName lastName');
 
         if (!appointment) {
-            throw new NotFoundException('Appointment not found');
+            throw new NotFoundException(errorBody('appointmentNotFound', 'Appointment not found'));
         }
-
         return appointment;
     }
 
-    /**
-     * Update an appointment. If start/end times change, re-check for conflicts.
-     */
-    async update(
-        clinicId: string,
-        appointmentId: string | Types.ObjectId,
-        dto: UpdateAppointmentDto,
-    ): Promise<AppointmentDocument> {
+    // ─── Update ───────────────────────────────────────────────────────
+
+    /** Reschedule or edit details. Only appointments that have not happened yet can change. */
+    async update(clinicId: string, appointmentId: Id, dto: UpdateAppointmentDto): Promise<AppointmentDocument> {
         const existing = await this.findById(clinicId, appointmentId);
 
-        if (
-            existing.status === AppointmentStatus.CANCELLED ||
-            existing.status === AppointmentStatus.COMPLETED
-        ) {
+        if (!EDITABLE_STATUSES.includes(existing.status)) {
             throw new BadRequestException(
-                `Cannot update an appointment with status "${existing.status}"`,
+                errorBody('appointmentNotEditable', `An appointment that is ${existing.status} cannot be edited`),
             );
         }
 
-        const startTime = dto.startTime ? new Date(dto.startTime) : existing.startTime;
-        const endTime = dto.endTime ? new Date(dto.endTime) : existing.endTime;
-
-        if (endTime <= startTime) {
-            throw new BadRequestException('endTime must be after startTime');
-        }
-
+        const { startTime, endTime } = this.parseRange(
+            dto.startTime ?? existing.startTime.toISOString(),
+            dto.endTime ?? existing.endTime.toISOString(),
+        );
         await this.assertRefs(clinicId, dto);
 
-        const dentistId = dto.dentistId || existing.dentistId.toString();
-        const isRescheduled =
-            dto.startTime || dto.endTime || dto.dentistId;
+        const dentistId = dto.dentistId ?? refId(existing.dentistId);
+        const treatmentRoomId = dto.treatmentRoomId ?? (existing.treatmentRoomId ? refId(existing.treatmentRoomId) : undefined);
+        const moved =
+            startTime.getTime() !== existing.startTime.getTime() ||
+            endTime.getTime() !== existing.endTime.getTime() ||
+            dentistId !== refId(existing.dentistId) ||
+            treatmentRoomId !== (existing.treatmentRoomId ? refId(existing.treatmentRoomId) : undefined);
 
-        if (isRescheduled) {
-            const conflict = await this.checkConflict(
-                clinicId,
+        if (moved) {
+            await this.assertBookable(clinicId, {
                 dentistId,
+                patientId: refId(existing.patientId),
+                treatmentRoomId,
                 startTime,
                 endTime,
-                appointmentId,
+                excludeId: existing._id,
+                allowOutsideHours: dto.allowOutsideHours,
+            });
+        }
+
+        const set: Record<string, unknown> = {
+            startTime,
+            endTime,
+            duration: Math.round((endTime.getTime() - startTime.getTime()) / 60000),
+            dentistId: oid(dentistId),
+        };
+        if (dto.treatmentRoomId !== undefined) set.treatmentRoomId = dto.treatmentRoomId ? oid(dto.treatmentRoomId) : null;
+        if (dto.title !== undefined) set.title = dto.title;
+        if (dto.treatmentType !== undefined) set.treatmentType = dto.treatmentType;
+        if (dto.treatmentIds !== undefined) set.treatmentIds = dto.treatmentIds.map(oid);
+        if (dto.notes !== undefined) set.notes = dto.notes;
+        if (dto.color !== undefined) set.color = dto.color;
+
+        await this.appointmentModel.updateOne({ _id: existing._id, clinicId: oid(clinicId) }, { $set: set });
+        return this.findById(clinicId, existing._id);
+    }
+
+    /**
+     * Move along the allowed lifecycle (see TRANSITIONS). The endpoint used
+     * to accept any string and any jump — completed back to scheduled,
+     * no-show to completed. Bringing a cancelled or no-show appointment back
+     * re-checks the slot, because it may have been given to someone else.
+     */
+    async updateStatus(clinicId: string, appointmentId: Id, status: AppointmentStatus): Promise<AppointmentDocument> {
+        const appointment = await this.findById(clinicId, appointmentId);
+        const from = appointment.status;
+
+        if (from === status) return appointment;
+
+        if (status === AppointmentStatus.CANCELLED) {
+            throw new BadRequestException(errorBody('useCancelEndpoint', 'Cancel an appointment with a reason instead'));
+        }
+        if (!TRANSITIONS[from]?.includes(status)) {
+            throw new BadRequestException(
+                errorBody('invalidStatusTransition', `Cannot change an appointment from ${from} to ${status}`),
             );
+        }
+        if (NEEDS_STARTED.includes(status) && appointment.startTime.getTime() > Date.now() + START_GRACE_MS) {
+            throw new BadRequestException(
+                errorBody('appointmentNotStarted', 'This appointment has not started yet'),
+            );
+        }
 
-            if (conflict) {
-                throw new ConflictException(
-                    'Dentist already has an appointment during this time slot',
-                );
+        if (status === AppointmentStatus.SCHEDULED && !SLOT_HOLDING_STATUSES.includes(from)) {
+            if (appointment.startTime.getTime() < Date.now()) {
+                throw new BadRequestException(errorBody('appointmentInPast', 'Book a new time instead; this one has passed'));
             }
+            await this.assertBookable(clinicId, {
+                dentistId: refId(appointment.dentistId),
+                patientId: refId(appointment.patientId),
+                treatmentRoomId: appointment.treatmentRoomId ? refId(appointment.treatmentRoomId) : undefined,
+                startTime: appointment.startTime,
+                endTime: appointment.endTime,
+                excludeId: appointment._id,
+                allowOutsideHours: true,
+            });
         }
 
-        const updateData: Record<string, any> = {};
-
-        if (dto.patientId) updateData.patientId = new Types.ObjectId(dto.patientId);
-        if (dto.dentistId) updateData.dentistId = new Types.ObjectId(dto.dentistId);
-        if (dto.treatmentRoomId !== undefined) {
-            updateData.treatmentRoomId = dto.treatmentRoomId
-                ? new Types.ObjectId(dto.treatmentRoomId)
-                : null;
-        }
-        if (dto.title !== undefined) updateData.title = dto.title;
-        if (dto.startTime) updateData.startTime = startTime;
-        if (dto.endTime) updateData.endTime = endTime;
-        if (dto.startTime || dto.endTime) {
-            updateData.duration =
-                dto.duration || Math.round((endTime.getTime() - startTime.getTime()) / 60000);
-        } else if (dto.duration !== undefined) {
-            updateData.duration = dto.duration;
-        }
-        if (dto.status) updateData.status = dto.status;
-        if (dto.treatmentType !== undefined) updateData.treatmentType = dto.treatmentType;
-        if (dto.treatmentIds) {
-            updateData.treatmentIds = dto.treatmentIds.map((id) => new Types.ObjectId(id));
-        }
-        if (dto.notes !== undefined) updateData.notes = dto.notes;
-        if (dto.isRecurring !== undefined) updateData.isRecurring = dto.isRecurring;
-        if (dto.recurringPattern !== undefined) {
-            updateData.recurringPattern = dto.recurringPattern
-                ? {
-                      frequency: dto.recurringPattern.frequency,
-                      interval: dto.recurringPattern.interval,
-                      endDate: new Date(dto.recurringPattern.endDate),
-                      daysOfWeek: dto.recurringPattern.daysOfWeek,
-                  }
-                : null;
-        }
-        if (dto.color !== undefined) updateData.color = dto.color;
-
-        const updated = await this.appointmentModel
-            .findOneAndUpdate(
-                {
-                    _id: new Types.ObjectId(appointmentId),
-                    clinicId: new Types.ObjectId(clinicId),
-                },
-                { $set: updateData },
-                { new: true },
-            )
-            .populate('patientId', 'firstName lastName phone email')
-            .populate('dentistId', 'firstName lastName email')
-            .populate('treatmentRoomId', 'name');
-
-        if (!updated) {
-            throw new NotFoundException('Appointment not found');
-        }
-
-        if (dto.status === AppointmentStatus.COMPLETED) {
-            await this.recordVisit(clinicId, updated);
-        }
-
-        return updated;
-    }
-
-    /**
-     * Cancel an appointment with an optional reason.
-     */
-    async cancel(
-        clinicId: string,
-        appointmentId: string | Types.ObjectId,
-        reason?: string,
-    ): Promise<AppointmentDocument> {
-        const appointment = await this.findById(clinicId, appointmentId);
-
-        if (appointment.status === AppointmentStatus.CANCELLED) {
-            throw new BadRequestException('Appointment is already cancelled');
-        }
-        if (appointment.status === AppointmentStatus.COMPLETED) {
-            throw new BadRequestException('Cannot cancel a completed appointment');
-        }
-
-        const updated = await this.appointmentModel
-            .findOneAndUpdate(
-                {
-                    _id: new Types.ObjectId(appointmentId),
-                    clinicId: new Types.ObjectId(clinicId),
-                },
-                {
-                    $set: {
-                        status: AppointmentStatus.CANCELLED,
-                        cancelReason: reason || '',
-                    },
-                },
-                { new: true },
-            )
-            .populate('patientId', 'firstName lastName phone email')
-            .populate('dentistId', 'firstName lastName email');
-
-        return updated;
-    }
-
-    /**
-     * Update only the status of an appointment.
-     */
-    async updateStatus(
-        clinicId: string,
-        appointmentId: string | Types.ObjectId,
-        status: AppointmentStatus,
-    ): Promise<AppointmentDocument> {
-        const appointment = await this.findById(clinicId, appointmentId);
-
-        if (appointment.status === AppointmentStatus.CANCELLED) {
-            throw new BadRequestException('Cannot change status of a cancelled appointment');
-        }
-
-        const updated = await this.appointmentModel
-            .findOneAndUpdate(
-                {
-                    _id: new Types.ObjectId(appointmentId),
-                    clinicId: new Types.ObjectId(clinicId),
-                },
-                { $set: { status } },
-                { new: true },
-            )
-            .populate('patientId', 'firstName lastName phone email')
-            .populate('dentistId', 'firstName lastName email');
-
-        if (!updated) {
-            throw new NotFoundException('Appointment not found');
+        // Conditional on the status we validated against, so two people
+        // clicking different buttons at once cannot both win.
+        const updated = await this.appointmentModel.updateOne(
+            { _id: appointment._id, clinicId: oid(clinicId), status: from },
+            {
+                $set: { status },
+                ...(status === AppointmentStatus.SCHEDULED
+                    ? { $unset: { cancelReason: 1, cancelNote: 1, cancelledAt: 1, cancelledBy: 1 } }
+                    : {}),
+            },
+        );
+        if (!updated.modifiedCount) {
+            throw new ConflictException(errorBody('appointmentChanged', 'The appointment was changed by someone else; reload'));
         }
 
         if (status === AppointmentStatus.COMPLETED) {
-            await this.recordVisit(clinicId, updated);
+            await this.patientsService.touchLastVisit(oid(clinicId), oid(refId(appointment.patientId)), appointment.startTime);
         }
 
-        return updated;
+        return this.findById(clinicId, appointment._id);
     }
 
     /**
-     * Stamp the patient's `lastVisit` when an appointment is completed, so the
-     * patients list reflects real visit dates.
+     * Cancel with a structured reason. For a recurring series, `following`
+     * also cancels every later open appointment of the same series.
      */
-    private async recordVisit(
+    async cancel(
         clinicId: string,
-        appointment: AppointmentDocument,
-    ): Promise<void> {
-        const patientId =
-            appointment.patientId && typeof appointment.patientId === 'object'
-                ? (appointment.patientId as any)._id || appointment.patientId
-                : appointment.patientId;
+        appointmentId: Id,
+        dto: CancelAppointmentDto,
+        userId: string,
+    ): Promise<AppointmentDocument & { cancelledCount?: number }> {
+        const appointment = await this.findById(clinicId, appointmentId);
 
-        await this.patientsService.touchLastVisit(
-            new Types.ObjectId(clinicId),
-            new Types.ObjectId(String(patientId)),
-            appointment.startTime,
-        );
-    }
-
-    /**
-     * Get appointments formatted for calendar view within a date range.
-     * Optionally filter by dentist.
-     */
-    async getCalendarData(
-        clinicId: string,
-        startDate: string,
-        endDate: string,
-        dentistId?: string,
-    ) {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-
-        if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-            throw new BadRequestException('Invalid startDate or endDate');
+        if (!CANCELLABLE_STATUSES.includes(appointment.status)) {
+            throw new BadRequestException(
+                errorBody('appointmentNotCancellable', `An appointment that is ${appointment.status} cannot be cancelled`),
+            );
         }
 
-        const filter: FilterQuery<AppointmentDocument> = {
-            clinicId: new Types.ObjectId(clinicId),
-            startTime: { $gte: start },
-            endTime: { $lte: end },
-            status: { $ne: AppointmentStatus.CANCELLED },
+        const filter: FilterQuery<AppointmentDocument> =
+            dto.scope === 'following' && appointment.seriesId
+                ? {
+                      clinicId: oid(clinicId),
+                      seriesId: appointment.seriesId,
+                      startTime: { $gte: appointment.startTime },
+                      status: { $in: CANCELLABLE_STATUSES },
+                  }
+                : { _id: appointment._id, clinicId: oid(clinicId), status: { $in: CANCELLABLE_STATUSES } };
+
+        const result = await this.appointmentModel.updateMany(filter, {
+            $set: {
+                status: AppointmentStatus.CANCELLED,
+                cancelReason: dto.reason,
+                cancelNote: dto.note?.trim() || undefined,
+                cancelledAt: new Date(),
+                cancelledBy: oid(userId),
+            },
+        });
+
+        const updated = await this.findById(clinicId, appointment._id);
+        return Object.assign(updated.toObject(), { cancelledCount: result.modifiedCount }) as AppointmentDocument & {
+            cancelledCount?: number;
         };
-
-        if (dentistId) {
-            filter.dentistId = new Types.ObjectId(dentistId);
-        }
-
-        const appointments = await this.appointmentModel
-            .find(filter)
-            .sort({ startTime: 1 })
-            .populate('patientId', 'firstName lastName')
-            .populate('dentistId', 'firstName lastName')
-            .populate('treatmentRoomId', 'name')
-            .lean();
-
-        return appointments.map((appt) => ({
-            _id: appt._id,
-            title: appt.title,
-            start: appt.startTime,
-            end: appt.endTime,
-            duration: appt.duration,
-            status: appt.status,
-            color: appt.color,
-            treatmentType: appt.treatmentType,
-            patient: appt.patientId,
-            dentist: appt.dentistId,
-            treatmentRoom: appt.treatmentRoomId,
-        }));
     }
 
-    /**
-     * Get all appointments for today, scoped to a clinic.
-     */
-    async getTodayAppointments(clinicId: string) {
-        const now = new Date();
-        const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+    // ─── Rules ────────────────────────────────────────────────────────
 
-        const appointments = await this.appointmentModel
-            .find({
-                clinicId: new Types.ObjectId(clinicId),
-                startTime: { $gte: startOfDay, $lte: endOfDay },
-            })
-            .sort({ startTime: 1 })
-            .populate('patientId', 'firstName lastName phone')
-            .populate('dentistId', 'firstName lastName')
-            .populate('treatmentRoomId', 'name')
-            .lean();
-
-        return appointments;
+    private parseRange(start: string, end: string): { startTime: Date; endTime: Date } {
+        const startTime = new Date(start);
+        const endTime = new Date(end);
+        if (endTime <= startTime) {
+            throw new BadRequestException(errorBody('appointmentEndBeforeStart', 'endTime must be after startTime'));
+        }
+        if (endTime.getTime() - startTime.getTime() > MAX_DURATION_MS) {
+            throw new BadRequestException(errorBody('appointmentTooLong', 'An appointment cannot be longer than 12 hours'));
+        }
+        return { startTime, endTime };
     }
 
     /**
      * Every id in the body must belong to this clinic — otherwise a caller
      * could attach another clinic's patient or dentist and read their details
-     * back through populate. Only the fields present are checked, so this
-     * works for both create and partial update.
+     * back through populate. Only the fields present are checked.
      */
     private async assertRefs(
         clinicId: string,
-        dto: Pick<UpdateAppointmentDto, 'patientId' | 'dentistId' | 'treatmentRoomId' | 'treatmentIds'>,
+        dto: Partial<Pick<CreateAppointmentDto, 'patientId' | 'dentistId' | 'treatmentRoomId' | 'treatmentIds'>>,
     ): Promise<void> {
         await Promise.all([
             dto.patientId && this.clinicRefs.assertPatient(clinicId, dto.patientId, { forBooking: true }),
@@ -511,156 +475,162 @@ export class AppointmentsService implements OnModuleInit {
     }
 
     /**
-     * Check whether a dentist has a conflicting appointment in the given time range.
-     * Optionally exclude a specific appointment (for updates/reschedules).
-     * Returns true if a conflict exists.
+     * The slot must be free for the dentist, the room and the patient, and the
+     * dentist must be working (not blocked, within hours unless overridden).
+     * Booking used to check the dentist's other appointments only.
      */
-    async checkConflict(
+    private async assertBookable(
         clinicId: string,
-        dentistId: string | Types.ObjectId,
-        startTime: Date,
-        endTime: Date,
-        excludeId?: string | Types.ObjectId,
-    ): Promise<boolean> {
-        const filter: FilterQuery<AppointmentDocument> = {
-            clinicId: new Types.ObjectId(clinicId),
-            dentistId: new Types.ObjectId(dentistId),
-            status: { $nin: [AppointmentStatus.CANCELLED, AppointmentStatus.NO_SHOW] },
-            $or: [
-                // New appointment starts during an existing one
-                { startTime: { $lt: endTime }, endTime: { $gt: startTime } },
-            ],
-        };
+        slot: {
+            dentistId: string;
+            patientId: string;
+            treatmentRoomId?: string;
+            startTime: Date;
+            endTime: Date;
+            excludeId?: Id;
+            allowOutsideHours?: boolean;
+        },
+    ): Promise<void> {
+        const clash = await this.findClash(clinicId, slot);
+        if (clash) throw new ConflictException(clash);
 
-        if (excludeId) {
-            filter._id = { $ne: new Types.ObjectId(excludeId) };
+        await this.scheduleService.assertDentistAvailable(clinicId, slot.dentistId, slot.startTime, slot.endTime, {
+            allowOutsideHours: slot.allowOutsideHours,
+        });
+    }
+
+    /** The first overlapping appointment for the same dentist, room or patient, as an error body. */
+    private async findClash(
+        clinicId: string,
+        slot: { dentistId: string; patientId: string; treatmentRoomId?: string; startTime: Date; endTime: Date; excludeId?: Id },
+        onlyEarlierThan?: Types.ObjectId,
+    ): Promise<{ code: string; message: string } | null> {
+        const who: FilterQuery<AppointmentDocument>[] = [
+            { dentistId: oid(slot.dentistId) },
+            { patientId: oid(slot.patientId) },
+        ];
+        if (slot.treatmentRoomId) who.push({ treatmentRoomId: oid(slot.treatmentRoomId) });
+
+        const ids: FilterQuery<AppointmentDocument>['_id'] = {};
+        if (slot.excludeId) ids.$ne = oid(slot.excludeId);
+        if (onlyEarlierThan) ids.$lt = onlyEarlierThan;
+
+        const other = await this.appointmentModel
+            .findOne({
+                clinicId: oid(clinicId),
+                status: { $in: SLOT_HOLDING_STATUSES },
+                startTime: { $lt: slot.endTime },
+                endTime: { $gt: slot.startTime },
+                $or: who,
+                ...(Object.keys(ids).length ? { _id: ids } : {}),
+            })
+            .select('dentistId patientId treatmentRoomId')
+            .lean();
+
+        if (!other) return null;
+        if (other.dentistId?.toString() === slot.dentistId) {
+            return errorBody('appointmentConflictDentist', 'The dentist already has an appointment at this time');
         }
-
-        const conflicting = await this.appointmentModel.findOne(filter).lean();
-        return !!conflicting;
+        if (slot.treatmentRoomId && other.treatmentRoomId?.toString() === slot.treatmentRoomId) {
+            return errorBody('appointmentConflictRoom', 'The room is already booked at this time');
+        }
+        return errorBody('appointmentConflictPatient', 'The patient already has an appointment at this time');
     }
 
     /**
-     * Create a series of recurring appointments based on the recurring pattern.
-     * Returns all created appointments.
+     * Two requests for the same slot can both pass the check before either is
+     * saved. After saving, the later document (higher _id) yields to an
+     * earlier one that overlaps, so exactly one booking survives.
      */
-    async createRecurring(
-        clinicId: string,
-        dto: CreateAppointmentDto,
-    ): Promise<AppointmentDocument[]> {
-        if (!dto.recurringPattern) {
-            throw new BadRequestException('recurringPattern is required for recurring appointments');
-        }
-
-        const { frequency, interval, endDate, daysOfWeek } = dto.recurringPattern;
-        const seriesEndDate = new Date(endDate);
-        const baseStartTime = new Date(dto.startTime);
-        const baseEndTime = new Date(dto.endTime);
-        const durationMs = baseEndTime.getTime() - baseStartTime.getTime();
-
-        if (durationMs <= 0) {
-            throw new BadRequestException('endTime must be after startTime');
-        }
-
-        await this.assertRefs(clinicId, dto);
-
-        const dates: { start: Date; end: Date }[] = [];
-        let currentDate = new Date(baseStartTime);
-
-        while (currentDate <= seriesEndDate) {
-            if (frequency === 'weekly' && daysOfWeek?.length) {
-                // For weekly with specific days, find matching days in the current week
-                const weekStart = new Date(currentDate);
-                for (const dayOfWeek of daysOfWeek) {
-                    const target = new Date(weekStart);
-                    const diff = dayOfWeek - target.getDay();
-                    target.setDate(target.getDate() + diff);
-                    target.setHours(
-                        baseStartTime.getHours(),
-                        baseStartTime.getMinutes(),
-                        baseStartTime.getSeconds(),
-                        baseStartTime.getMilliseconds(),
-                    );
-
-                    if (target >= baseStartTime && target <= seriesEndDate) {
-                        const targetEnd = new Date(target.getTime() + durationMs);
-                        dates.push({ start: new Date(target), end: targetEnd });
-                    }
-                }
-                // Advance by interval weeks
-                currentDate.setDate(currentDate.getDate() + 7 * interval);
-            } else {
-                const slotEnd = new Date(currentDate.getTime() + durationMs);
-                dates.push({ start: new Date(currentDate), end: slotEnd });
-
-                // Advance by the appropriate interval
-                switch (frequency) {
-                    case 'daily':
-                        currentDate.setDate(currentDate.getDate() + interval);
-                        break;
-                    case 'weekly':
-                        currentDate.setDate(currentDate.getDate() + 7 * interval);
-                        break;
-                    case 'monthly':
-                        currentDate.setMonth(currentDate.getMonth() + interval);
-                        break;
-                }
-            }
-        }
-
-        // Deduplicate dates by start time
-        const uniqueDates = dates.filter(
-            (date, index, self) =>
-                index === self.findIndex((d) => d.start.getTime() === date.start.getTime()),
+    private async assertWonRace(clinicId: string, created: AppointmentDocument): Promise<void> {
+        const clash = await this.findClash(
+            clinicId,
+            {
+                dentistId: refId(created.dentistId),
+                patientId: refId(created.patientId),
+                treatmentRoomId: created.treatmentRoomId ? refId(created.treatmentRoomId) : undefined,
+                startTime: created.startTime,
+                endTime: created.endTime,
+                excludeId: created._id,
+            },
+            created._id,
         );
+        if (clash) {
+            await this.appointmentModel.deleteOne({ _id: created._id });
+            throw new ConflictException(clash);
+        }
+    }
 
-        // Sort chronologically
-        uniqueDates.sort((a, b) => a.start.getTime() - b.start.getTime());
+    private newAppointment(clinicId: string, dto: CreateAppointmentDto, startTime: Date, endTime: Date) {
+        return {
+            clinicId: oid(clinicId),
+            patientId: oid(dto.patientId),
+            dentistId: oid(dto.dentistId),
+            treatmentRoomId: dto.treatmentRoomId ? oid(dto.treatmentRoomId) : undefined,
+            title: dto.title?.trim() || undefined,
+            startTime,
+            endTime,
+            duration: Math.round((endTime.getTime() - startTime.getTime()) / 60000),
+            status: AppointmentStatus.SCHEDULED,
+            treatmentType: dto.treatmentType,
+            treatmentIds: dto.treatmentIds?.map(oid),
+            notes: dto.notes,
+            color: dto.color,
+            isRecurring: false,
+        };
+    }
 
-        const created: AppointmentDocument[] = [];
-        const conflicts: string[] = [];
+    private buildFilter(clinicId: string, query: AppointmentFilterDto): FilterQuery<AppointmentDocument> {
+        const filter: FilterQuery<AppointmentDocument> = { clinicId: oid(clinicId) };
+        if (query.startDate) filter.endTime = { $gt: new Date(query.startDate) };
+        if (query.endDate) filter.startTime = { $lt: new Date(query.endDate) };
+        if (query.dentistId) filter.dentistId = oid(query.dentistId);
+        if (query.patientId) filter.patientId = oid(query.patientId);
+        if (query.status) filter.status = query.status;
+        return filter;
+    }
 
-        for (const { start, end } of uniqueDates) {
-            const hasConflict = await this.checkConflict(
-                clinicId,
-                dto.dentistId,
-                start,
-                end,
-            );
+    /**
+     * Occurrence start instants for a series, computed on the clinic's
+     * calendar: same wall-clock time every time, months clamped to their last
+     * day (Jan 31 → Feb 28, not Mar 3).
+     */
+    private expandSeries(pattern: RecurringPatternDto, first: Date, tz: string): Date[] {
+        const firstDate = toClinicDateString(first, tz);
+        const time = toClinicTimeString(first, tz);
+        const lastDate = pattern.endDate.slice(0, 10);
 
-            if (hasConflict) {
-                conflicts.push(start.toISOString());
-                continue;
-            }
-
-            const appointment = await this.appointmentModel.create({
-                clinicId: new Types.ObjectId(clinicId),
-                patientId: new Types.ObjectId(dto.patientId),
-                dentistId: new Types.ObjectId(dto.dentistId),
-                treatmentRoomId: dto.treatmentRoomId
-                    ? new Types.ObjectId(dto.treatmentRoomId)
-                    : undefined,
-                title: dto.title,
-                startTime: start,
-                endTime: end,
-                duration: dto.duration || Math.round(durationMs / 60000),
-                status: AppointmentStatus.SCHEDULED,
-                treatmentType: dto.treatmentType,
-                treatmentIds: dto.treatmentIds?.map((id) => new Types.ObjectId(id)),
-                notes: dto.notes,
-                isRecurring: true,
-                recurringPattern: {
-                    frequency,
-                    interval,
-                    endDate: seriesEndDate,
-                    daysOfWeek,
-                },
-                color: dto.color,
-            });
-
-            created.push(appointment);
+        if (lastDate < firstDate) {
+            throw new BadRequestException(errorBody('seriesEndBeforeStart', 'The series must end after its first appointment'));
+        }
+        if (lastDate > addDays(firstDate, MAX_SERIES_DAYS)) {
+            throw new BadRequestException(errorBody('seriesTooLong', 'A series can run for at most one year'));
         }
 
-        return created;
+        const dates: string[] = [];
+        const push = (d: string) => d >= firstDate && d <= lastDate && dates.length < MAX_SERIES_OCCURRENCES && dates.push(d);
+
+        if (pattern.frequency === RecurringFrequency.DAILY) {
+            for (let d = firstDate; d <= lastDate && dates.length < MAX_SERIES_OCCURRENCES; d = addDays(d, pattern.interval)) push(d);
+        } else if (pattern.frequency === RecurringFrequency.WEEKLY) {
+            const days = pattern.daysOfWeek?.length ? [...pattern.daysOfWeek].sort() : [weekdayOf(firstDate)];
+            const weekStart = addDays(firstDate, -weekdayOf(firstDate));
+            for (let w = weekStart; w <= lastDate && dates.length < MAX_SERIES_OCCURRENCES; w = addDays(w, 7 * pattern.interval)) {
+                for (const day of days) push(addDays(w, day));
+            }
+        } else {
+            const [y, m, d] = firstDate.split('-').map(Number);
+            for (let i = 0; dates.length < MAX_SERIES_OCCURRENCES; i += pattern.interval) {
+                const monthIndex = m - 1 + i;
+                const year = y + Math.floor(monthIndex / 12);
+                const month = (monthIndex % 12) + 1;
+                const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+                const date = `${year}-${String(month).padStart(2, '0')}-${String(Math.min(d, lastDay)).padStart(2, '0')}`;
+                if (date > lastDate) break;
+                push(date);
+            }
+        }
+
+        return dates.map((date) => clinicTimeToUtc(date, time, tz));
     }
 }

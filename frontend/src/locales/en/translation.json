@@ -43,7 +43,9 @@
     "notProvided": "Not provided",
     "retry": "Try again",
     "noResults": "No matches",
-    "typeToSearch": "Type a name or phone to search"
+    "typeToSearch": "Type a name or phone to search",
+    "none": "None",
+    "previous": "Previous"
   },
   "nav": {
     "dashboard": "Dashboard",
@@ -213,7 +215,65 @@
     "listView": "List View",
     "noAppointments": "No appointments",
     "bookAppointment": "Book Appointment",
-    "conflictWarning": "Time conflict with another appointment"
+    "conflictWarning": "Time conflict with another appointment",
+    "actions": {
+      "complete": "Mark as completed",
+      "confirm": "Confirm",
+      "noShow": "Mark as no-show",
+      "rebook": "Book again at this time",
+      "start": "Start visit"
+    },
+    "bookAnyway": "Book anyway",
+    "bookThisDay": "Book on this day",
+    "calendar": "Calendar",
+    "cancelAppointment": "Cancel appointment",
+    "cancelFollowing": "This and all following in the series",
+    "cancelThisOnly": "Only this appointment",
+    "cancelNote": "Note (optional)",
+    "cancelReasons": {
+      "patient_request": "Patient asked to cancel",
+      "patient_illness": "Patient is ill",
+      "clinic_rescheduled": "Rescheduled by the clinic",
+      "dentist_unavailable": "Dentist unavailable",
+      "patient_left": "Patient archived",
+      "dentist_left": "Dentist no longer works here",
+      "other": "Other"
+    },
+    "changeStatus": "Change status",
+    "confirmStatusChange": "Change the status to “{{status}}”?",
+    "createdAt": "Created",
+    "date": "Date",
+    "freeTime": "Free time — click to use:",
+    "noFreeTime": "No free time on this day (not working, fully booked or blocked)",
+    "list": "List",
+    "noActions": "No further actions for this appointment",
+    "viewOnly": "You can view appointments but not change them",
+    "noAppointmentsDay": "No appointments on this day",
+    "noAppointmentsMonth": "No appointments this month",
+    "notFound": "Appointment not found",
+    "partOfSeries": "Recurring",
+    "plannedTreatments": "Planned treatments",
+    "repeat": "Repeat",
+    "repeatOptions": {
+      "none": "Does not repeat",
+      "daily": "Every day",
+      "weekly": "Every week",
+      "monthly": "Every month"
+    },
+    "repeatUntil": "Until",
+    "repeatUntilAfterStart": "Pick a date on or after the first appointment",
+    "repeatLimit": "At most 52 appointments, up to one year",
+    "time": "Time",
+    "visit": "Visit",
+    "visitFor": "Visit for",
+    "minutes_one": "{{count}} min",
+    "minutes_other": "{{count}} min",
+    "more_one": "+{{count}} more",
+    "more_other": "+{{count}} more",
+    "countForDay_one": "{{count}} appointment",
+    "countForDay_other": "{{count}} appointments",
+    "seriesSkipped_one": "{{created}} booked; {{count}} date was skipped (busy, blocked or outside hours)",
+    "seriesSkipped_other": "{{created}} booked; {{count}} dates were skipped (busy, blocked or outside hours)"
   },
   "dental": {
     "title": "Dental Records",
@@ -477,7 +537,11 @@
     "noBlockedTimes": "No blocked times",
     "selectDentist": "Select a dentist",
     "noDentists": "No dentists in this clinic yet",
-    "endAfterStart": "End time must be after start time"
+    "endAfterStart": "End time must be after start time",
+    "deleteBlockedTime": "Delete blocked time",
+    "deleteBlockedTimeConfirm": "The dentist will be bookable at this time again.",
+    "blockOverlapsAppointments_one": "Blocked. {{count}} booked appointment falls in this time — move or cancel it.",
+    "blockOverlapsAppointments_other": "Blocked. {{count}} booked appointments fall in this time — move or cancel them."
   },
   "notifications": {
     "markAllRead": "Mark All Read",
@@ -601,6 +665,25 @@
     "clinicInactive": "This clinic's account is suspended. Contact DentFlow support.",
     "clinicNotFound": "Clinic not found",
     "medicalHistoryForbidden": "Only dentists and administrators can change the medical history",
-    "patientStatusChanged": "Someone else changed this patient's status. Reload and try again."
+    "patientStatusChanged": "Someone else changed this patient's status. Reload and try again.",
+    "appointmentConflictDentist": "The dentist already has an appointment at this time",
+    "appointmentConflictRoom": "The room is already booked at this time",
+    "appointmentConflictPatient": "The patient already has an appointment at this time",
+    "appointmentInBlockedTime": "The dentist is unavailable then (blocked time)",
+    "appointmentOutsideHours": "This is outside the dentist's working hours",
+    "appointmentNotEditable": "This appointment can no longer be changed",
+    "appointmentNotCancellable": "This appointment can no longer be cancelled",
+    "invalidStatusTransition": "This status change is not allowed",
+    "appointmentNotStarted": "This appointment has not started yet",
+    "appointmentInPast": "This time has passed; book a new appointment instead",
+    "appointmentChanged": "Someone else just changed this appointment. Reload and try again.",
+    "useCancelEndpoint": "Use “Cancel appointment” and choose a reason",
+    "appointmentEndBeforeStart": "The end must be after the start",
+    "appointmentTooLong": "An appointment cannot be longer than 12 hours",
+    "seriesAllConflicting": "None of the dates in this series could be booked",
+    "seriesEndBeforeStart": "The series must end after its first appointment",
+    "seriesTooLong": "A series can run for at most one year",
+    "roomNameTaken": "A room with this name already exists",
+    "blockOwnTimeOnly": "You can only block or unblock your own time"
   }
 }

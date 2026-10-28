@@ -2,835 +2,359 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { useForm, Controller } from 'react-hook-form';
 import {
     Box,
-    Typography,
-    ToggleButtonGroup,
-    ToggleButton,
+    Button,
+    IconButton,
+    MenuItem,
+    Paper,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
+    TablePagination,
     TableRow,
-    Paper,
-    IconButton,
-    Tooltip,
     TextField,
-    MenuItem,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    Grid,
-    Select,
-    FormControl,
-    InputLabel,
+    ToggleButton,
+    ToggleButtonGroup,
+    Tooltip,
+    Typography,
 } from '@mui/material';
 import {
+    Add as AddIcon,
     CalendarMonth as CalendarIcon,
-    ViewList as ListIcon,
-    Visibility as ViewIcon,
     ChevronLeft as ChevronLeftIcon,
     ChevronRight as ChevronRightIcon,
-    AccessTime as ClockIcon,
+    Today as TodayIcon,
+    ViewList as ListIcon,
 } from '@mui/icons-material';
 import { RootState } from '../../store';
-import { appointmentsActions } from '../../store/appointments';
+import { appointmentsActions, AppointmentFilters } from '../../store/appointments';
 import { staffActions } from '../../store/staff';
-import { treatmentsActions } from '../../store/treatments';
-import { scheduleActions } from '../../store/schedule';
-import { httpActions } from '../../store/http';
-import { PageHeader, StatusChip, EmptyState, LoadingSpinner, PatientPicker } from '../../components/ui';
+import { EmptyState, LoadingSpinner, PageHeader, StatusChip } from '../../components/ui';
+import AppointmentFormDialog from '../../components/appointments/AppointmentFormDialog';
+import { usePermission } from '../../hooks';
 import { formatDate, formatTime } from '../../utils/formatters';
-import { staffRefId } from '../../utils/staff';
 import { patientName, staffName } from '../../utils/references';
-import { APPOINTMENT_STATUS_COLORS } from '../../utils/constants';
-import { Appointment } from '../../types';
+import { staffRefId } from '../../utils/staff';
+import { APPOINTMENT_STATUS_COLORS, DEFAULT_PAGE_SIZE } from '../../utils/constants';
+import { APPOINTMENT_STATUSES, appointmentLabel, statusKey } from '../../utils/appointments';
 import { toLocalDateString } from '../../utils/dates';
+import { Appointment, AppointmentStatus } from '../../types';
 
-// ── Helper: extract name from populated or raw field ────────────────────────
+const MAX_PER_DAY_CELL = 3;
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
 
-// ── Form types ──────────────────────────────────────────────────────────────
-
-interface NewAppointmentForm {
-    patientId: string;
-    dentistId: string;
-    treatmentRoomId: string;
-    date: string;
-    startTime: string;
-    endTime: string;
-    treatmentType: string;
-    notes: string;
-}
-
-// ── Calendar helpers ────────────────────────────────────────────────────────
-
-const getDaysInMonth = (year: number, month: number): number => {
-    return new Date(year, month + 1, 0).getDate();
-};
-
-const getFirstDayOfMonth = (year: number, month: number): number => {
-    return new Date(year, month, 1).getDay();
-};
-
-const isSameDay = (d1: Date, d2: Date): boolean => {
-    return d1.getFullYear() === d2.getFullYear()
-        && d1.getMonth() === d2.getMonth()
-        && d1.getDate() === d2.getDate();
-};
-
-// ── Status options ──────────────────────────────────────────────────────────
-
-const APPOINTMENT_STATUSES = [
-    'scheduled',
-    'confirmed',
-    'in_progress',
-    'completed',
-    'cancelled',
-    'no_show',
-] as const;
-
-// ── Component ───────────────────────────────────────────────────────────────
+/** `[first day of month 00:00, first day of next month 00:00)` in the browser's (the clinic's) time. */
+const monthRange = (month: Date) => ({
+    startDate: new Date(month.getFullYear(), month.getMonth(), 1).toISOString(),
+    endDate: new Date(month.getFullYear(), month.getMonth() + 1, 1).toISOString(),
+});
 
 const AppointmentsPage: React.FC = () => {
-    const { t } = useTranslation();
+    const { t, i18n } = useTranslation();
     const navigate = useNavigate();
     const dispatch = useDispatch();
+    const can = usePermission();
+    const canBook = can('manageAppointments');
 
-    const { list: appointments, calendar: calendarAppointments, total } = useSelector(
-        (state: RootState) => state.appointments,
+    const { list, total, calendar } = useSelector((state: RootState) => state.appointments);
+    const dentists = useSelector((state: RootState) => state.staff.dentists);
+    const listLoading = useSelector((state: RootState) => state.http.loading.includes('GET_APPOINTMENTS'));
+    const calendarLoading = useSelector((state: RootState) => state.http.loading.includes('GET_CALENDAR'));
+
+    const [view, setView] = useState<'calendar' | 'list'>('calendar');
+    const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+    const [status, setStatus] = useState<AppointmentStatus | 'all'>('all');
+    const [dentistId, setDentistId] = useState('all');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(DEFAULT_PAGE_SIZE);
+    const [selectedDay, setSelectedDay] = useState<string>(toLocalDateString());
+    const [bookingDate, setBookingDate] = useState<string | null>(null);
+
+    // Filters go to the server: the old page fetched the 20 oldest appointments
+    // ever and filtered those in the browser.
+    const filters = useMemo<AppointmentFilters & { startDate: string; endDate: string }>(
+        () => ({
+            ...monthRange(month),
+            ...(status !== 'all' ? { status } : {}),
+            ...(dentistId !== 'all' ? { dentistId } : {}),
+        }),
+        [month, status, dentistId],
     );
-    const { dentists } = useSelector((state: RootState) => state.staff);
-    const { list: treatments } = useSelector((state: RootState) => state.treatments);
-    const { rooms } = useSelector((state: RootState) => state.schedule);
-    const { loading, successes } = useSelector((state: RootState) => state.http);
-
-    const isLoading = loading.includes('GET_APPOINTMENTS') || loading.includes('GET_CALENDAR');
-    const isCreating = loading.includes('CREATE_APPOINTMENT');
-    const createSuccess = successes.includes('CREATE_APPOINTMENT');
-
-    // ── Local state ─────────────────────────────────────────────────────────
-
-    const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [filterStatus, setFilterStatus] = useState<string>('all');
-    const [filterDentist, setFilterDentist] = useState<string>('all');
-    const [calendarDate, setCalendarDate] = useState(new Date());
-    const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-
-    // ── Form ────────────────────────────────────────────────────────────────
-
-    const {
-        control,
-        handleSubmit,
-        reset,
-        watch,
-        formState: { errors },
-    } = useForm<NewAppointmentForm>({
-        defaultValues: {
-            patientId: '',
-            dentistId: '',
-            treatmentRoomId: '',
-            date: toLocalDateString(),
-            startTime: '09:00',
-            endTime: '10:00',
-            treatmentType: '',
-            notes: '',
-        },
-    });
-
-    const watchStart = watch('startTime');
-    const watchEnd = watch('endTime');
-
-    const calculatedDuration = useMemo(() => {
-        if (!watchStart || !watchEnd) return 0;
-        const [sh, sm] = watchStart.split(':').map(Number);
-        const [eh, em] = watchEnd.split(':').map(Number);
-        const diff = (eh * 60 + em) - (sh * 60 + sm);
-        return diff > 0 ? diff : 0;
-    }, [watchStart, watchEnd]);
-
-    // ── Effects ─────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        dispatch(appointmentsActions.getAppointments());
-        const year = calendarDate.getFullYear();
-        const month = calendarDate.getMonth();
-        dispatch(appointmentsActions.getCalendar({
-            startDate: new Date(year, month, 1).toISOString(),
-            endDate: new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString(),
-        }));
         dispatch(staffActions.getDentists());
-        dispatch(treatmentsActions.getTreatments());
-        dispatch(scheduleActions.getRooms());
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [dispatch]);
 
     useEffect(() => {
-        const year = calendarDate.getFullYear();
-        const month = calendarDate.getMonth();
-        dispatch(appointmentsActions.getCalendar({
-            startDate: new Date(year, month, 1).toISOString(),
-            endDate: new Date(year, month + 1, 0, 23, 59, 59, 999).toISOString(),
-        }));
-    }, [calendarDate]); // eslint-disable-line react-hooks/exhaustive-deps
+        dispatch(appointmentsActions.getCalendar(filters));
+    }, [dispatch, filters]);
 
-    // Close dialog on success
     useEffect(() => {
-        if (createSuccess) {
-            setDialogOpen(false);
-            reset();
-            dispatch(httpActions.removeSuccess('CREATE_APPOINTMENT'));
+        if (view === 'list') {
+            dispatch(appointmentsActions.getAppointments({ ...filters, page: page + 1, limit: rowsPerPage }));
         }
-    }, [createSuccess, reset, dispatch]);
+    }, [dispatch, filters, view, page, rowsPerPage]);
 
-    // ── Filtered list ───────────────────────────────────────────────────────
+    useEffect(() => setPage(0), [filters]);
 
-    const filteredAppointments = useMemo(() => {
-        let result = [...appointments];
-        if (filterStatus !== 'all') {
-            result = result.filter((a) => a.status === filterStatus);
-        }
-        if (filterDentist !== 'all') {
-            result = result.filter((a) => {
-                const dentistId = typeof a.dentistId === 'string' ? a.dentistId : a.dentistId?._id;
-                return dentistId === filterDentist;
-            });
-        }
-        return result;
-    }, [appointments, filterStatus, filterDentist]);
-
-    // ── Calendar data: group appointments by day ────────────────────────────
-
-    const appointmentsByDay = useMemo(() => {
+    const byDay = useMemo(() => {
         const map = new Map<string, Appointment[]>();
-        const source = calendarAppointments.length > 0 ? calendarAppointments : appointments;
-        source.forEach((appt) => {
-            const key = new Date(appt.startTime).toDateString();
-            if (!map.has(key)) map.set(key, []);
-            map.get(key)!.push(appt);
-        });
+        for (const appt of calendar) {
+            const key = toLocalDateString(new Date(appt.startTime));
+            map.set(key, [...(map.get(key) || []), appt]);
+        }
         return map;
-    }, [calendarAppointments, appointments]);
+    }, [calendar]);
 
-    // ── Selected day appointments ───────────────────────────────────────────
-
-    const selectedDayAppointments = useMemo(() => {
-        if (!selectedDay) return [];
-        const key = selectedDay.toDateString();
-        return appointmentsByDay.get(key) || [];
-    }, [selectedDay, appointmentsByDay]);
-
-    // ── Handlers ────────────────────────────────────────────────────────────
-
-    const handleViewChange = (_: React.MouseEvent<HTMLElement>, value: 'calendar' | 'list' | null) => {
-        if (value) setViewMode(value);
+    const shiftMonth = (delta: number) => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + delta, 1));
+    const goToday = () => {
+        const now = new Date();
+        setMonth(new Date(now.getFullYear(), now.getMonth(), 1));
+        setSelectedDay(toLocalDateString(now));
     };
 
-    const handlePrevMonth = () => {
-        setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
-        setSelectedDay(null);
-    };
+    // date-fns locales, not Intl: browsers often lack Armenian and fall back to English.
+    const monthTitle = formatDate(month, 'LLLL yyyy', i18n.language);
+    const today = toLocalDateString();
 
-    const handleNextMonth = () => {
-        setCalendarDate((prev) => new Date(prev.getFullYear(), prev.getMonth() + 1, 1));
-        setSelectedDay(null);
-    };
-
-    const handleDayClick = (day: Date) => {
-        setSelectedDay(day);
-    };
-
-    const handleOpenDialog = () => {
-        reset();
-        setDialogOpen(true);
-    };
-
-    const handleCloseDialog = () => {
-        setDialogOpen(false);
-        reset();
-    };
-
-    const onSubmit = (data: NewAppointmentForm) => {
-        const startTime = new Date(`${data.date}T${data.startTime}:00`).toISOString();
-        const endTime = new Date(`${data.date}T${data.endTime}:00`).toISOString();
-        dispatch(appointmentsActions.createAppointment({
-            patientId: data.patientId,
-            dentistId: data.dentistId,
-            treatmentRoomId: data.treatmentRoomId || undefined,
-            startTime,
-            endTime,
-            duration: calculatedDuration,
-            treatmentType: data.treatmentType,
-            notes: data.notes,
-            status: 'scheduled',
-            title: data.treatmentType || 'Appointment',
-        }));
-    };
-
-    // ── Calendar grid render ────────────────────────────────────────────────
-
-    const renderCalendarGrid = () => {
-        const year = calendarDate.getFullYear();
-        const month = calendarDate.getMonth();
-        const daysInMonth = getDaysInMonth(year, month);
-        const firstDay = getFirstDayOfMonth(year, month);
-        const today = new Date();
-        const weekDays = [
-            t('days.sunday'), t('days.monday'), t('days.tuesday'),
-            t('days.wednesday'), t('days.thursday'), t('days.friday'), t('days.saturday'),
+    const renderCalendar = () => {
+        const firstWeekday = month.getDay();
+        const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+        const cells: (string | null)[] = [
+            ...Array(firstWeekday).fill(null),
+            ...Array.from({ length: daysInMonth }, (_, i) =>
+                toLocalDateString(new Date(month.getFullYear(), month.getMonth(), i + 1)),
+            ),
         ];
 
-        const cells: React.ReactNode[] = [];
-
-        // Blank cells for days before the first of the month
-        for (let i = 0; i < firstDay; i++) {
-            cells.push(
-                <Box
-                    key={`blank-${i}`}
-                    sx={{
-                        p: 1,
-                        minHeight: 80,
-                        borderRight: '1px solid',
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                    }}
-                />,
-            );
-        }
-
-        // Day cells
-        for (let day = 1; day <= daysInMonth; day++) {
-            const date = new Date(year, month, day);
-            const dateKey = date.toDateString();
-            const dayAppointments = appointmentsByDay.get(dateKey) || [];
-            const isToday = isSameDay(date, today);
-            const isSelected = selectedDay ? isSameDay(date, selectedDay) : false;
-
-            cells.push(
-                <Box
-                    key={day}
-                    onClick={() => handleDayClick(date)}
-                    sx={{
-                        p: 1,
-                        minHeight: 80,
-                        borderRight: '1px solid',
-                        borderBottom: '1px solid',
-                        borderColor: 'divider',
-                        cursor: 'pointer',
-                        bgcolor: isSelected
-                            ? 'primary.main'
-                            : isToday
-                                ? 'action.hover'
-                                : 'transparent',
-                        '&:hover': {
-                            bgcolor: isSelected ? 'primary.dark' : 'action.hover',
-                        },
-                        transition: 'background-color 0.15s',
-                    }}
-                >
-                    <Typography
-                        variant="body2"
-                        fontWeight={isToday ? 700 : 400}
-                        sx={{
-                            color: isSelected ? 'primary.contrastText' : isToday ? 'primary.main' : 'text.primary',
-                        }}
-                    >
-                        {day}
-                    </Typography>
-                    {dayAppointments.length > 0 && (
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.5 }}>
-                            {dayAppointments.slice(0, 3).map((appt) => (
-                                <Box
-                                    key={appt._id}
-                                    sx={{
-                                        width: '100%',
-                                        px: 0.5,
-                                        py: 0.25,
-                                        borderRadius: 0.5,
-                                        bgcolor: APPOINTMENT_STATUS_COLORS[appt.status] || '#A0AEC0',
-                                        color: '#fff',
-                                        fontSize: 10,
-                                        lineHeight: 1.3,
-                                        overflow: 'hidden',
-                                        textOverflow: 'ellipsis',
-                                        whiteSpace: 'nowrap',
-                                    }}
-                                >
-                                    {formatTime(appt.startTime)} {patientName(appt.patientId)}
-                                </Box>
-                            ))}
-                            {dayAppointments.length > 3 && (
-                                <Typography
-                                    variant="caption"
-                                    sx={{
-                                        color: isSelected ? 'primary.contrastText' : 'text.secondary',
-                                        fontSize: 10,
-                                    }}
-                                >
-                                    +{dayAppointments.length - 3}
-                                </Typography>
-                            )}
-                        </Box>
-                    )}
-                </Box>,
-            );
-        }
-
         return (
-            <Box>
-                {/* Month navigation */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 2 }}>
-                    <IconButton onClick={handlePrevMonth} size="small">
-                        <ChevronLeftIcon />
-                    </IconButton>
-                    <Typography variant="h6" sx={{ mx: 2, minWidth: 180, textAlign: 'center' }}>
-                        {formatDate(calendarDate, 'LLLL yyyy')}
-                    </Typography>
-                    <IconButton onClick={handleNextMonth} size="small">
-                        <ChevronRightIcon />
-                    </IconButton>
-                </Box>
-
-                {/* Weekday headers */}
-                <Box
-                    sx={{
-                        display: 'grid',
-                        gridTemplateColumns: 'repeat(7, 1fr)',
-                        borderLeft: '1px solid',
-                        borderTop: '1px solid',
-                        borderColor: 'divider',
-                    }}
-                >
-                    {weekDays.map((wd) => (
-                        <Box
-                            key={wd}
-                            sx={{
-                                p: 1,
-                                textAlign: 'center',
-                                fontWeight: 700,
-                                fontSize: 12,
-                                color: 'text.secondary',
-                                borderRight: '1px solid',
-                                borderBottom: '1px solid',
-                                borderColor: 'divider',
-                                bgcolor: 'action.hover',
-                            }}
-                        >
-                            {wd.slice(0, 3)}
+            <Paper sx={{ overflow: 'hidden' }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))' }}>
+                    {WEEKDAYS.map((d) => (
+                        <Box key={d} sx={{ p: 1, textAlign: 'center', borderBottom: 1, borderColor: 'divider' }}>
+                            <Typography variant="caption" fontWeight={600} color="text.secondary">
+                                {t(`days.${d}`).slice(0, 3)}
+                            </Typography>
                         </Box>
                     ))}
-
-                    {/* Calendar cells */}
-                    {cells}
-                </Box>
-
-                {/* Selected day detail */}
-                {selectedDay && (
-                    <Paper sx={{ mt: 2, p: 2 }}>
-                        <Typography variant="h6" gutterBottom>
-                            {formatDate(selectedDay, 'EEEE, dd MMMM yyyy')}
-                        </Typography>
-                        {selectedDayAppointments.length === 0 ? (
-                            <Typography variant="body2" color="text.secondary">
-                                {t('appointments.noAppointments')}
-                            </Typography>
-                        ) : (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-                                {selectedDayAppointments.map((appt) => (
-                                    <Paper
+                    {cells.map((day, i) => {
+                        if (!day) return <Box key={`blank-${i}`} sx={{ minHeight: 96, borderRight: 1, borderBottom: 1, borderColor: 'divider' }} />;
+                        const items = byDay.get(day) || [];
+                        const selected = day === selectedDay;
+                        return (
+                            <Box
+                                key={day}
+                                onClick={() => setSelectedDay(day)}
+                                onDoubleClick={() => canBook && day >= today && setBookingDate(day)}
+                                sx={{
+                                    minHeight: 96,
+                                    p: 0.5,
+                                    minWidth: 0,
+                                    cursor: 'pointer',
+                                    borderRight: 1,
+                                    borderBottom: 1,
+                                    borderColor: 'divider',
+                                    bgcolor: selected ? 'action.selected' : 'transparent',
+                                    '&:hover': { bgcolor: 'action.hover' },
+                                }}
+                            >
+                                <Typography
+                                    variant="caption"
+                                    fontWeight={day === today ? 800 : 500}
+                                    color={day === today ? 'primary.main' : 'text.primary'}
+                                >
+                                    {Number(day.slice(8))}
+                                </Typography>
+                                {items.slice(0, MAX_PER_DAY_CELL).map((appt) => (
+                                    <Box
                                         key={appt._id}
-                                        variant="outlined"
-                                        sx={{
-                                            p: 1.5,
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'space-between',
-                                            cursor: 'pointer',
-                                            '&:hover': { bgcolor: 'action.hover' },
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigate(`/appointments/${appt._id}`);
                                         }}
-                                        onClick={() => navigate(`/appointments/${appt._id}`)}
+                                        sx={{
+                                            mt: 0.25,
+                                            px: 0.5,
+                                            borderRadius: 0.5,
+                                            fontSize: 11,
+                                            lineHeight: 1.6,
+                                            whiteSpace: 'nowrap',
+                                            overflow: 'hidden',
+                                            textOverflow: 'ellipsis',
+                                            color: '#fff',
+                                            bgcolor: APPOINTMENT_STATUS_COLORS[appt.status] || 'primary.main',
+                                            opacity: appt.status === 'cancelled' ? 0.5 : 1,
+                                        }}
                                     >
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <ClockIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                                <Typography variant="body2" fontWeight={600}>
-                                                    {formatTime(appt.startTime)} - {formatTime(appt.endTime)}
-                                                </Typography>
-                                            </Box>
-                                            <Typography variant="body2">
-                                                {patientName(appt.patientId)}
-                                            </Typography>
-                                            <Typography variant="body2" color="text.secondary">
-                                                {staffName(appt.dentistId)}
-                                            </Typography>
-                                        </Box>
-                                        <StatusChip status={appt.status} />
-                                    </Paper>
+                                        {formatTime(appt.startTime)} {patientName(appt.patientId)}
+                                    </Box>
                                 ))}
+                                {items.length > MAX_PER_DAY_CELL && (
+                                    <Typography variant="caption" color="text.secondary">
+                                        {t('appointments.more', { count: items.length - MAX_PER_DAY_CELL })}
+                                    </Typography>
+                                )}
                             </Box>
-                        )}
-                    </Paper>
-                )}
-            </Box>
+                        );
+                    })}
+                </Box>
+            </Paper>
         );
     };
 
-    // ── Render ───────────────────────────────────────────────────────────────
+    const dayItems = byDay.get(selectedDay) || [];
 
-    if (isLoading && appointments.length === 0) {
-        return <LoadingSpinner fullPage />;
-    }
+    const renderRows = (items: Appointment[], showDate: boolean) => (
+        <TableContainer>
+            <Table size="small">
+                <TableHead>
+                    <TableRow>
+                        <TableCell>{showDate ? t('appointments.date') : t('appointments.time')}</TableCell>
+                        <TableCell>{t('appointments.patient')}</TableCell>
+                        <TableCell>{t('appointments.dentist')}</TableCell>
+                        <TableCell>{t('appointments.visitFor')}</TableCell>
+                        <TableCell>{t('common.status')}</TableCell>
+                    </TableRow>
+                </TableHead>
+                <TableBody>
+                    {items.map((appt) => (
+                        <TableRow key={appt._id} hover sx={{ cursor: 'pointer' }} onClick={() => navigate(`/appointments/${appt._id}`)}>
+                            <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                {showDate && `${formatDate(appt.startTime)} `}
+                                {formatTime(appt.startTime)}–{formatTime(appt.endTime)}
+                            </TableCell>
+                            <TableCell>{patientName(appt.patientId)}</TableCell>
+                            <TableCell>{staffName(appt.dentistId)}</TableCell>
+                            <TableCell sx={{ maxWidth: 260, overflowWrap: 'anywhere' }}>{appointmentLabel(appt)}</TableCell>
+                            <TableCell>
+                                <StatusChip status={appt.status} label={t(statusKey(appt.status))} />
+                            </TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </TableContainer>
+    );
 
     return (
         <Box>
             <PageHeader
                 title={t('appointments.title')}
-                actionLabel={t('appointments.newAppointment')}
-                onAction={handleOpenDialog}
-            >
-                <ToggleButtonGroup
-                    value={viewMode}
-                    exclusive
-                    onChange={handleViewChange}
+                actionLabel={canBook ? t('appointments.newAppointment') : undefined}
+                onAction={canBook ? () => setBookingDate(selectedDay >= today ? selectedDay : today) : undefined}
+                actionIcon={<AddIcon />}
+            />
+
+            <Paper sx={{ p: 2, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <IconButton size="small" onClick={() => shiftMonth(-1)} aria-label={t('common.previous')}>
+                        <ChevronLeftIcon />
+                    </IconButton>
+                    <Typography variant="subtitle1" fontWeight={600} sx={{ minWidth: 160, textAlign: 'center', textTransform: 'capitalize' }}>
+                        {monthTitle}
+                    </Typography>
+                    <IconButton size="small" onClick={() => shiftMonth(1)} aria-label={t('common.next')}>
+                        <ChevronRightIcon />
+                    </IconButton>
+                    <Button size="small" startIcon={<TodayIcon />} onClick={goToday}>
+                        {t('appointments.today')}
+                    </Button>
+                </Box>
+                <TextField
+                    select
                     size="small"
+                    label={t('common.status')}
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value as AppointmentStatus | 'all')}
+                    sx={{ minWidth: 160 }}
                 >
-                    <ToggleButton value="calendar">
-                        <Tooltip title={t('appointments.calendarView')}>
-                            <CalendarIcon />
+                    <MenuItem value="all">{t('common.all')}</MenuItem>
+                    {APPOINTMENT_STATUSES.map((s) => (
+                        <MenuItem key={s} value={s}>
+                            {t(statusKey(s))}
+                        </MenuItem>
+                    ))}
+                </TextField>
+                <TextField
+                    select
+                    size="small"
+                    label={t('appointments.dentist')}
+                    value={dentistId}
+                    onChange={(e) => setDentistId(e.target.value)}
+                    sx={{ minWidth: 180 }}
+                >
+                    <MenuItem value="all">{t('common.all')}</MenuItem>
+                    {dentists.map((d) => (
+                        <MenuItem key={d._id} value={staffRefId(d)}>
+                            {staffName(d)}
+                        </MenuItem>
+                    ))}
+                </TextField>
+                <Box sx={{ flexGrow: 1 }} />
+                <ToggleButtonGroup size="small" exclusive value={view} onChange={(_, v) => v && setView(v)}>
+                    <ToggleButton value="calendar" aria-label={t('appointments.calendar')}>
+                        <Tooltip title={t('appointments.calendar')}>
+                            <CalendarIcon fontSize="small" />
                         </Tooltip>
                     </ToggleButton>
-                    <ToggleButton value="list">
-                        <Tooltip title={t('appointments.listView')}>
-                            <ListIcon />
+                    <ToggleButton value="list" aria-label={t('appointments.list')}>
+                        <Tooltip title={t('appointments.list')}>
+                            <ListIcon fontSize="small" />
                         </Tooltip>
                     </ToggleButton>
                 </ToggleButtonGroup>
-            </PageHeader>
-
-            {/* Filter bar */}
-            <Paper sx={{ p: 2, mb: 3, display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center' }}>
-                <FormControl size="small" sx={{ minWidth: 160 }}>
-                    <InputLabel>{t('appointments.status')}</InputLabel>
-                    <Select
-                        value={filterStatus}
-                        onChange={(e) => setFilterStatus(e.target.value)}
-                        label={t('appointments.status')}
-                    >
-                        <MenuItem value="all">{t('common.all')}</MenuItem>
-                        {APPOINTMENT_STATUSES.map((s) => (
-                            <MenuItem key={s} value={s}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Box
-                                        sx={{
-                                            width: 8,
-                                            height: 8,
-                                            borderRadius: '50%',
-                                            bgcolor: APPOINTMENT_STATUS_COLORS[s] || '#A0AEC0',
-                                        }}
-                                    />
-                                    {t(`appointments.${s === 'in_progress' ? 'inProgress' : s === 'no_show' ? 'noShow' : s}`)}
-                                </Box>
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-
-                <FormControl size="small" sx={{ minWidth: 160 }}>
-                    <InputLabel>{t('appointments.dentist')}</InputLabel>
-                    <Select
-                        value={filterDentist}
-                        onChange={(e) => setFilterDentist(e.target.value)}
-                        label={t('appointments.dentist')}
-                    >
-                        <MenuItem value="all">{t('common.all')}</MenuItem>
-                        {dentists.map((d: any) => (
-                            <MenuItem key={d._id} value={staffRefId(d)}>
-                                {d.lastName} {d.firstName}
-                            </MenuItem>
-                        ))}
-                    </Select>
-                </FormControl>
-
-                <Box sx={{ flex: 1 }} />
-
-                <Typography variant="body2" color="text.secondary">
-                    {total} {t('appointments.title').toLowerCase()}
-                </Typography>
             </Paper>
 
-            {/* View content */}
-            {viewMode === 'calendar' ? (
-                <Paper sx={{ p: 2 }}>{renderCalendarGrid()}</Paper>
-            ) : filteredAppointments.length === 0 ? (
-                <EmptyState
-                    title={t('appointments.noAppointments')}
-                    actionLabel={t('appointments.newAppointment')}
-                    onAction={handleOpenDialog}
-                />
+            {view === 'calendar' ? (
+                <>
+                    {calendarLoading && !calendar.length ? <LoadingSpinner /> : renderCalendar()}
+                    <Paper sx={{ mt: 2 }}>
+                        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                            <Typography variant="subtitle1" fontWeight={600}>
+                                {formatDate(selectedDay)} · {t('appointments.countForDay', { count: dayItems.length })}
+                            </Typography>
+                            {canBook && selectedDay >= today && (
+                                <Button size="small" startIcon={<AddIcon />} onClick={() => setBookingDate(selectedDay)}>
+                                    {t('appointments.bookThisDay')}
+                                </Button>
+                            )}
+                        </Box>
+                        {dayItems.length ? renderRows(dayItems, false) : <EmptyState title={t('appointments.noAppointmentsDay')} />}
+                    </Paper>
+                </>
             ) : (
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>{t('appointments.dateTime')}</TableCell>
-                                <TableCell>{t('appointments.patient')}</TableCell>
-                                <TableCell>{t('appointments.dentist')}</TableCell>
-                                <TableCell>{t('appointments.treatmentType')}</TableCell>
-                                <TableCell>{t('appointments.duration')}</TableCell>
-                                <TableCell>{t('appointments.status')}</TableCell>
-                                <TableCell align="right">{t('common.actions')}</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {filteredAppointments.map((appt) => (
-                                <TableRow
-                                    key={appt._id}
-                                    hover
-                                    sx={{ cursor: 'pointer' }}
-                                    onClick={() => navigate(`/appointments/${appt._id}`)}
-                                >
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight={600}>
-                                            {formatDate(appt.startTime)}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary">
-                                            {formatTime(appt.startTime)} - {formatTime(appt.endTime)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>{patientName(appt.patientId)}</TableCell>
-                                    <TableCell>{staffName(appt.dentistId)}</TableCell>
-                                    <TableCell>{appt.treatmentType || '-'}</TableCell>
-                                    <TableCell>
-                                        {appt.duration} {t('common.minutes').toLowerCase()}
-                                    </TableCell>
-                                    <TableCell>
-                                        <StatusChip status={appt.status} />
-                                    </TableCell>
-                                    <TableCell align="right">
-                                        <Tooltip title={t('common.edit')}>
-                                            <IconButton
-                                                size="small"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    navigate(`/appointments/${appt._id}`);
-                                                }}
-                                            >
-                                                <ViewIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                        </TableBody>
-                    </Table>
-                </TableContainer>
+                <Paper>
+                    {listLoading && !list.length ? (
+                        <LoadingSpinner />
+                    ) : list.length ? (
+                        renderRows(list, true)
+                    ) : (
+                        <EmptyState title={t('appointments.noAppointmentsMonth')} />
+                    )}
+                    <TablePagination
+                        component="div"
+                        count={total}
+                        page={page}
+                        onPageChange={(_, p) => setPage(p)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(parseInt(e.target.value, 10));
+                            setPage(0);
+                        }}
+                        rowsPerPageOptions={[10, 20, 50, 100]}
+                        labelRowsPerPage={t('common.rowsPerPage')}
+                    />
+                </Paper>
             )}
 
-            {/* New Appointment Dialog */}
-            <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <DialogTitle>{t('appointments.newAppointment')}</DialogTitle>
-                    <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                            {/* Patient selector */}
-                            <Grid item xs={12}>
-                                <Controller
-                                    name="patientId"
-                                    control={control}
-                                    rules={{ required: t('validation.required') }}
-                                    render={({ field }) => (
-                                        <PatientPicker
-                                            value={field.value || null}
-                                            onChange={(id) => field.onChange(id || '')}
-                                            error={!!errors.patientId}
-                                            helperText={errors.patientId?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Dentist selector */}
-                            <Grid item xs={12}>
-                                <Controller
-                                    name="dentistId"
-                                    control={control}
-                                    rules={{ required: t('validation.required') }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            select
-                                            fullWidth
-                                            label={t('appointments.dentist')}
-                                            error={!!errors.dentistId}
-                                            helperText={errors.dentistId?.message}
-                                        >
-                                            {dentists.map((d: any) => (
-                                                <MenuItem key={d._id} value={staffRefId(d)}>
-                                                    {d.lastName} {d.firstName}
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Treatment Room selector */}
-                            <Grid item xs={12}>
-                                <Controller
-                                    name="treatmentRoomId"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            select
-                                            fullWidth
-                                            label={t('schedule.treatmentRoom')}
-                                        >
-                                            <MenuItem value="">-</MenuItem>
-                                            {rooms.filter((r) => r.isActive).map((room) => (
-                                                <MenuItem key={room._id} value={room._id}>
-                                                    {room.name}
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Date */}
-                            <Grid item xs={12} sm={4}>
-                                <Controller
-                                    name="date"
-                                    control={control}
-                                    rules={{ required: t('validation.required') }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            type="date"
-                                            label={t('common.date')}
-                                            InputLabelProps={{ shrink: true }}
-                                            error={!!errors.date}
-                                            helperText={errors.date?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Start time */}
-                            <Grid item xs={6} sm={4}>
-                                <Controller
-                                    name="startTime"
-                                    control={control}
-                                    rules={{ required: t('validation.required') }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            type="time"
-                                            label={t('appointments.startTime')}
-                                            InputLabelProps={{ shrink: true }}
-                                            error={!!errors.startTime}
-                                            helperText={errors.startTime?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* End time */}
-                            <Grid item xs={6} sm={4}>
-                                <Controller
-                                    name="endTime"
-                                    control={control}
-                                    rules={{ required: t('validation.required') }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            type="time"
-                                            label={t('appointments.endTime')}
-                                            InputLabelProps={{ shrink: true }}
-                                            error={!!errors.endTime}
-                                            helperText={errors.endTime?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Auto-calculated duration */}
-                            <Grid item xs={12}>
-                                <Box
-                                    sx={{
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        gap: 1,
-                                        px: 2,
-                                        py: 1,
-                                        bgcolor: 'action.hover',
-                                        borderRadius: 1,
-                                    }}
-                                >
-                                    <ClockIcon sx={{ fontSize: 18, color: 'text.secondary' }} />
-                                    <Typography variant="body2" color="text.secondary">
-                                        {t('appointments.duration')}: {calculatedDuration} {t('common.minutes').toLowerCase()}
-                                    </Typography>
-                                </Box>
-                            </Grid>
-
-                            {/* Treatment type */}
-                            <Grid item xs={12}>
-                                <Controller
-                                    name="treatmentType"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            select
-                                            fullWidth
-                                            label={t('appointments.treatmentType')}
-                                        >
-                                            <MenuItem value="">-</MenuItem>
-                                            {treatments.map((tr) => (
-                                                <MenuItem key={tr._id} value={tr.name}>
-                                                    {tr.name}
-                                                </MenuItem>
-                                            ))}
-                                        </TextField>
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Notes */}
-                            <Grid item xs={12}>
-                                <Controller
-                                    name="notes"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            multiline
-                                            rows={3}
-                                            label={t('appointments.notes')}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-                        </Grid>
-                    </DialogContent>
-                    <DialogActions sx={{ px: 3, pb: 2 }}>
-                        <Button onClick={handleCloseDialog} color="inherit">
-                            {t('common.cancel')}
-                        </Button>
-                        <Button type="submit" variant="contained" disabled={isCreating}>
-                            {isCreating ? t('common.loading') : t('common.save')}
-                        </Button>
-                    </DialogActions>
-                </form>
-            </Dialog>
+            <AppointmentFormDialog
+                open={!!bookingDate}
+                defaultDate={bookingDate || undefined}
+                onClose={() => setBookingDate(null)}
+            />
         </Box>
     );
 };

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Chip, ChipProps } from '@mui/material';
 import { useTranslation } from 'react-i18next';
+import { statusKey } from '../../utils/appointments';
 
 
 export interface StatusChipProps extends Omit<ChipProps, 'label'> {
@@ -40,7 +41,9 @@ const statusColorMap: Record<string, { bg: string; color: string }> = {
 const StatusChip: React.FC<StatusChipProps> = ({ status, translationPrefix = 'appointments', label: customLabel, sx, ...props }) => {
     const { t } = useTranslation();
     const colors = statusColorMap[status] || { bg: '#F7FAFC', color: '#A0AEC0' };
-    const label = customLabel || t(`${translationPrefix}.${status}`, status);
+    // Appointment statuses are snake_case in the API but camelCase in the locale files.
+    const key = translationPrefix === 'appointments' ? statusKey(status) : `${translationPrefix}.${status}`;
+    const label = customLabel || t(key, { defaultValue: status });
 
     return (
         <Chip

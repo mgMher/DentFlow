@@ -1,19 +1,27 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-} from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Roles, Role } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { Types } from 'mongoose';
-import { AppointmentStatus } from './appointment.schema';
 import { AppointmentsService } from './appointments.service';
-import { CreateAppointmentDto, QueryAppointmentDto, UpdateAppointmentDto } from './dto';
+import {
+    CalendarQueryDto,
+    CancelAppointmentDto,
+    CreateAppointmentDto,
+    CreateRecurringAppointmentDto,
+    QueryAppointmentDto,
+    UpdateAppointmentDto,
+    UpdateAppointmentStatusDto,
+} from './dto';
+
+interface AuthUser {
+    userId: string;
+    clinicId: string;
+    role: string;
+}
+
+/** Who books and runs appointments. Assistants see the schedule but don't change it. */
+const BOOKERS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST];
 
 @ApiTags('Appointments')
 @ApiBearerAuth()
@@ -22,65 +30,49 @@ export class AppointmentsController {
     constructor(private readonly appointmentsService: AppointmentsService) {}
 
     @Post()
-    @ApiOperation({ summary: 'Create a new appointment' })
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
-    async create(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Body() dto: CreateAppointmentDto,
-    ) {
+    @Roles(...BOOKERS)
+    @ApiOperation({ summary: 'Book an appointment' })
+    @ApiResponse({ status: 409, description: 'Dentist, room or patient already booked; blocked time; outside hours' })
+    create(@CurrentUser() user: AuthUser, @Body() dto: CreateAppointmentDto) {
         return this.appointmentsService.create(user.clinicId, dto);
     }
 
+    @Post('recurring')
+    @Roles(...BOOKERS)
+    @ApiOperation({ summary: 'Book a recurring series (returns created and skipped dates)' })
+    createRecurring(@CurrentUser() user: AuthUser, @Body() dto: CreateRecurringAppointmentDto) {
+        return this.appointmentsService.createRecurring(user.clinicId, dto);
+    }
+
     @Get()
-    @ApiOperation({ summary: 'List appointments with optional filters' })
-    async findAll(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Query() query: QueryAppointmentDto,
-    ) {
+    @ApiOperation({ summary: 'List appointments (date range overlap, filters, pagination)' })
+    findAll(@CurrentUser() user: AuthUser, @Query() query: QueryAppointmentDto) {
         return this.appointmentsService.findAll(user.clinicId, query);
     }
 
     @Get('today')
-    @ApiOperation({ summary: "Get today's appointments" })
-    async getTodayAppointments(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-    ) {
+    @ApiOperation({ summary: "Today's appointments (clinic calendar day)" })
+    getToday(@CurrentUser() user: AuthUser) {
         return this.appointmentsService.getTodayAppointments(user.clinicId);
     }
 
     @Get('calendar')
-    @ApiOperation({ summary: 'Get appointments for calendar view' })
-    @ApiQuery({ name: 'startDate', required: true, type: String })
-    @ApiQuery({ name: 'endDate', required: true, type: String })
-    @ApiQuery({ name: 'dentistId', required: false, type: String })
-    async getCalendarData(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Query('startDate') startDate: string,
-        @Query('endDate') endDate: string,
-        @Query('dentistId') dentistId?: string,
-    ) {
-        return this.appointmentsService.getCalendarData(
-            user.clinicId,
-            startDate,
-            endDate,
-            dentistId,
-        );
+    @ApiOperation({ summary: 'All appointments in a date range, same shape as the list' })
+    getCalendar(@CurrentUser() user: AuthUser, @Query() query: CalendarQueryDto) {
+        return this.appointmentsService.getCalendarData(user.clinicId, query);
     }
 
     @Get(':id')
     @ApiOperation({ summary: 'Get appointment by ID' })
-    async findById(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-    ) {
+    findById(@CurrentUser() user: AuthUser, @Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
         return this.appointmentsService.findById(user.clinicId, id);
     }
 
     @Patch(':id')
-    @ApiOperation({ summary: 'Update an appointment' })
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
-    async update(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
+    @Roles(...BOOKERS)
+    @ApiOperation({ summary: 'Reschedule or edit an upcoming appointment' })
+    update(
+        @CurrentUser() user: AuthUser,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateAppointmentDto,
     ) {
@@ -88,34 +80,24 @@ export class AppointmentsController {
     }
 
     @Patch(':id/status')
-    @ApiOperation({ summary: 'Update appointment status only' })
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
-    async updateStatus(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
+    @Roles(...BOOKERS)
+    @ApiOperation({ summary: 'Move the appointment along its lifecycle' })
+    updateStatus(
+        @CurrentUser() user: AuthUser,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-        @Body('status') status: AppointmentStatus,
+        @Body() dto: UpdateAppointmentStatusDto,
     ) {
-        return this.appointmentsService.updateStatus(user.clinicId, id, status);
+        return this.appointmentsService.updateStatus(user.clinicId, id, dto.status);
     }
 
     @Patch(':id/cancel')
-    @ApiOperation({ summary: 'Cancel an appointment' })
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
-    async cancel(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
+    @Roles(...BOOKERS)
+    @ApiOperation({ summary: 'Cancel with a reason (optionally the rest of its series)' })
+    cancel(
+        @CurrentUser() user: AuthUser,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
-        @Body('reason') reason?: string,
+        @Body() dto: CancelAppointmentDto,
     ) {
-        return this.appointmentsService.cancel(user.clinicId, id, reason);
-    }
-
-    @Post('recurring')
-    @ApiOperation({ summary: 'Create a recurring appointment series' })
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST, Role.RECEPTIONIST)
-    async createRecurring(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Body() dto: CreateAppointmentDto,
-    ) {
-        return this.appointmentsService.createRecurring(user.clinicId, dto);
+        return this.appointmentsService.cancel(user.clinicId, id, dto, user.userId);
     }
 }

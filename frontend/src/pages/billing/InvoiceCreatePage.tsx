@@ -32,7 +32,8 @@ import { httpActions } from '../../store/http';
 import { PageHeader, PatientPicker } from '../../components/ui';
 import { formatCurrency, formatDate, formatTime } from '../../utils/formatters';
 import { CURRENCY_SYMBOLS } from '../../utils/constants';
-import { Currency, Patient } from '../../types';
+import { Currency } from '../../types';
+import { appointmentLabel } from '../../utils/appointments';
 
 interface LineItem {
     description: string;
@@ -55,7 +56,7 @@ const InvoiceCreatePage: React.FC = () => {
     const navigate = useNavigate();
     const dispatch = useDispatch();
 
-    const { list: allAppointments } = useSelector((state: RootState) => state.appointments);
+    const byPatient = useSelector((state: RootState) => state.appointments.byPatient);
     const loading = useSelector((state: RootState) => state.http.loading.includes('CREATE_INVOICE'));
     const success = useSelector((state: RootState) => state.http.successes.includes('CREATE_INVOICE'));
 
@@ -66,9 +67,10 @@ const InvoiceCreatePage: React.FC = () => {
     const [notes, setNotes] = useState('');
     const [lineItems, setLineItems] = useState<LineItem[]>([{ ...EMPTY_LINE_ITEM }]);
 
+    // Only the chosen patient's appointments (the API caps a page at 100).
     useEffect(() => {
-        dispatch(appointmentsActions.getAppointments({ limit: 1000 }));
-    }, [dispatch]);
+        if (selectedPatient) dispatch(appointmentsActions.getPatientAppointments({ patientId: selectedPatient, limit: 100 }));
+    }, [dispatch, selectedPatient]);
 
     useEffect(() => {
         if (success) {
@@ -78,16 +80,13 @@ const InvoiceCreatePage: React.FC = () => {
     }, [success, navigate, dispatch]);
 
     // Filter appointments by selected patient
-    const patientAppointments = useMemo(() => {
-        if (!selectedPatient) return [];
-        return allAppointments.filter((appt) => {
-            const patientId = typeof appt.patientId === 'string' ? appt.patientId : (appt.patientId as Patient)?._id;
-            return patientId === selectedPatient;
-        });
-    }, [allAppointments, selectedPatient]);
+    const patientAppointments = useMemo(
+        () => (selectedPatient && byPatient.patientId === selectedPatient ? byPatient.list : []),
+        [byPatient, selectedPatient],
+    );
 
     const appointmentOptions = patientAppointments.map((appt) => ({
-        label: `${formatDate(appt.startTime, 'dd.MM.yyyy')} ${formatTime(appt.startTime)} - ${appt.title || appt.treatmentType || 'Appointment'}`,
+        label: `${formatDate(appt.startTime, 'dd.MM.yyyy')} ${formatTime(appt.startTime)} - ${appointmentLabel(appt)}`,
         value: appt._id,
     }));
 

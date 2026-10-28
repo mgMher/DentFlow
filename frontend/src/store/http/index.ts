@@ -12,7 +12,8 @@ export const REMOVE_SUCCESS = 'REMOVE_SUCCESS';
 export const httpActions = {
     appendLoading: (type: string) => ({ type: APPEND_LOADING, payload: type }),
     removeLoading: (type: string) => ({ type: REMOVE_LOADING, payload: type }),
-    appendError: (type: string, error: string) => ({ type: APPEND_ERROR, payload: { type, error } }),
+    /** `code` is the API's stable error code, for screens that react to a specific failure. */
+    appendError: (type: string, error: string, code?: string) => ({ type: APPEND_ERROR, payload: { type, error, code } }),
     removeError: (type: string) => ({ type: REMOVE_ERROR, payload: type }),
     appendSuccess: (type: string) => ({ type: APPEND_SUCCESS, payload: type }),
     removeSuccess: (type: string) => ({ type: REMOVE_SUCCESS, payload: type }),
@@ -21,7 +22,7 @@ export const httpActions = {
 // State
 interface HttpState {
     loading: string[];
-    errors: { type: string; error: string }[];
+    errors: { type: string; error: string; code?: string }[];
     successes: string[];
 }
 

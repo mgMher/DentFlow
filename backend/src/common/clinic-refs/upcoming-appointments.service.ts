@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { FilterQuery, Model, Types } from 'mongoose';
-import { Appointment, AppointmentDocument, AppointmentStatus } from 'src/modules/appointments/appointment.schema';
+import { Appointment, AppointmentDocument, AppointmentStatus, CancelReason } from 'src/modules/appointments/appointment.schema';
 
 type Id = string | Types.ObjectId;
 const oid = (id: Id) => new Types.ObjectId(id.toString());
@@ -28,9 +28,14 @@ export class UpcomingAppointmentsService {
     }
 
     /** Cancel them with a reason; returns how many were cancelled. */
-    async cancel(clinicId: Id, who: UpcomingFor, reason: string): Promise<number> {
+    async cancel(clinicId: Id, who: UpcomingFor, note: string): Promise<number> {
         const result = await this.appointmentModel.updateMany(this.filter(clinicId, who), {
-            $set: { status: AppointmentStatus.CANCELLED, cancelReason: reason },
+            $set: {
+                status: AppointmentStatus.CANCELLED,
+                cancelReason: who.patientId ? CancelReason.PATIENT_LEFT : CancelReason.DENTIST_LEFT,
+                cancelNote: note,
+                cancelledAt: new Date(),
+            },
         });
         return result.modifiedCount;
     }

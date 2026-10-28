@@ -64,6 +64,19 @@ export const toClinicDateString = (instant: Date, timeZone: string): string => {
     return `${w.year}-${pad(w.month)}-${pad(w.day)}`;
 };
 
+/** `HH:mm` of `instant` on the clinic's clock. */
+export const toClinicTimeString = (instant: Date, timeZone: string): string => {
+    const w = wallClock(instant, timeZone);
+    return `${pad(w.hour)}:${pad(w.minute)}`;
+};
+
+/** Day of week (0 = Sunday) of a `YYYY-MM-DD` calendar date. */
+export const weekdayOf = (date: string): number => {
+    const d = DATE_RE.exec(date);
+    if (!d) throw new Error(`Expected YYYY-MM-DD, got "${date}"`);
+    return new Date(Date.UTC(+d[1], +d[2] - 1, +d[3])).getUTCDay();
+};
+
 /** The instant at which the clinic's clock shows `date` `time` (`YYYY-MM-DD`, `HH:mm`). */
 export const clinicTimeToUtc = (date: string, time: string, timeZone: string): Date => {
     const d = DATE_RE.exec(date);

@@ -4,6 +4,7 @@ import { TreatmentRoom, TreatmentRoomSchema } from './treatment-room.schema';
 import { BlockedTime, BlockedTimeSchema } from './blocked-time.schema';
 import { Appointment, AppointmentSchema } from '../appointments/appointment.schema';
 import { UserProfile, UserProfileSchema } from '../users/user.schema';
+import { Clinic, ClinicSchema } from '../clinics/clinic.schema';
 import { ScheduleService } from './schedule.service';
 import { ScheduleController } from './schedule.controller';
 
@@ -14,6 +15,7 @@ import { ScheduleController } from './schedule.controller';
             { name: BlockedTime.name, schema: BlockedTimeSchema },
             { name: Appointment.name, schema: AppointmentSchema },
             { name: UserProfile.name, schema: UserProfileSchema },
+            { name: Clinic.name, schema: ClinicSchema },
         ]),
     ],
     controllers: [ScheduleController],

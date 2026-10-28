@@ -120,26 +120,29 @@ built from treatment entries. Reports come after billing because they read billi
 - [ ] Deferred: one login per person across clinics (auth email is global) — needs a membership model, later with the platform admin (F13)
 - [x] Verified on local MongoDB: 33 new API checks (`smoke2.mjs`) + Phase 0/1 suite; browser: duplicate warning, status dialog with appointment count
 
-### Phase 3 — Appointments & Schedule
+### Phase 3 — Appointments & Schedule — ✅ done 2026-10-28 (not committed yet)
 
-- [ ] **P0** Verify patient/dentist/room/treatment ids belong to the clinic (uses Phase 0 helper)
-- [ ] **P1** Calendar: backend returns `start/patient`, page reads `startTime/patientId` → calendar always empty
-- [ ] **P1** List: send date range/filters/page to the server + pagination (today: 20 oldest ever)
-- [ ] **P1** Status: validated DTO + server-side transition table (any string / any jump allowed now)
-- [ ] **P1** Conflict check: add room, patient, blocked times, working hours; re-check when leaving no-show
-- [ ] **P1** Availability: compute in clinic timezone (4h off now)
-- [ ] **P1** Recurring: cap occurrences (DoS), return skipped dates, `seriesId`, validate end date
-- [ ] **P1** After cancel, detail page shows stale status; bad id → endless spinner
-- [ ] **P2** Save `treatmentIds` (form saves a name string → treatments/billing links always empty)
-- [ ] **P2** Status chip shows raw `in_progress` / `no_show` (missing keys)
-- [ ] **P2** Hardcoded `title: 'Appointment'`; no end > start check in form
-- [ ] **P2** Status/cancel responses not populated → room and treatments show "-"
-- [ ] **P2** Calendar/blocked-times range filter misses items crossing the edge
-- [ ] **P2** Blocked times: `@Roles`, confirm delete, warn about booked appointments in the block
-- [ ] **P2** Rooms: disable Save while saving, unique name, gate by role
-- [ ] **P2** Patient detail writes into the shared appointments list
-- [ ] **P2** Walk-in: allow scheduled → in_progress; add reschedule dialog (endpoint exists)
-- [ ] **P3** Remove `status` from create DTO; `CancelDto`; `@Max(100)` on limit; dead code
+- [x] **P0** Body ids verified against the clinic (Phase 0 helper, now inside one `assertRefs`)
+- [x] **P1** Calendar returns the list shape (`startTime`, populated `patientId`…) with an overlap range; cancelled hidden unless asked
+- [x] **P1** List: date range / dentist / patient / status / page on the server, `limit` ≤ 100, stable sort
+- [x] **P1** Status: validated DTO + transition table (`TRANSITIONS`); completed is final; in progress / completed / no-show only once the visit has started (30 min grace); rebooking a cancelled / no-show re-checks the slot; conditional update against concurrent clicks
+- [x] **P1** Booking rules (`ScheduleService.assertDentistAvailable` + `findClash`): dentist, room **and** patient overlaps; blocked time never overridable; dentist's working hours (fallback: clinic hours) with an explicit "book anyway" override
+- [x] **P1** Double booking under concurrency: post-insert recheck, the later document yields (3 parallel requests → exactly 1 booking)
+- [x] **P1** Availability and "today" in the clinic timezone; empty intervals dropped (no free slot past closing)
+- [x] **P1** Recurring series: generated on the clinic calendar (same local time, month-end clamped), max 52 / one year, `seriesId`, skipped dates returned with a reason code, "cancel this and following"
+- [x] **P1** Detail page: never shows the previous appointment; error / not-found state; response of every action replaces the view
+- [x] **P2** `treatmentIds` from the catalogue (duration follows), no hardcoded English title (`title` optional, label derived)
+- [x] **P2** One populate list everywhere (room / treatments no longer lost after a status change)
+- [x] **P2** Status chip keys (`in_progress` / `no_show`) via `statusKey`
+- [x] **P2** Structured cancel reasons + note + who/when; system reasons when a patient / dentist leaves
+- [x] **P2** Blocked times: overlap range (multi-day vacations shown), roles (dentists: own time only, assistants: view), confirm delete, warning when a block covers booked visits; `isRecurring` removed (never implemented)
+- [x] **P2** Rooms: unique name per clinic (409 `roomNameTaken`), buttons gated, Save disabled while saving
+- [x] **P2** Patient page appointments tab → `PatientAppointmentsTab` with its own store slice, pagination and "Book appointment"
+- [x] **P2** Walk-ins: scheduled → in progress / completed allowed; reschedule dialog (shared `AppointmentFormDialog`)
+- [x] **P3** `status` / recurring fields removed from the create DTO; `CancelAppointmentDto`; patient fixed on update
+- [x] **UX** Booking dialog: free-time chips from the availability API, treatments autocomplete, duration presets, repeat; month title in the UI language
+- [x] Verified on local MongoDB: 48 booking-rule checks (`smoke3.mjs`) + browser (calendar, booking dialog with free time, detail actions, cancel dialog)
+- [ ] Not built yet (feature list): week / day view per chair with drag-to-reschedule (F2), reminders (F3), waitlist, buffer time between visits
 
 ### Phase 4 — Treatments catalog & Dental chart
 

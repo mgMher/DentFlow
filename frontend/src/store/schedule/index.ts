@@ -2,6 +2,8 @@ import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorMessage } from '../../utils/apiError';
+import { toast } from 'react-toastify';
+import i18n from '../../locales/i18n';
 import { TreatmentRoom, BlockedTime } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -127,9 +129,13 @@ function* createBlockedSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        yield call(service.createBlocked, action.payload);
+        const res: any = yield call(service.createBlocked, action.payload);
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
+        // Blocking over booked visits is allowed (sick day), but say so — the
+        // patients still need to be moved.
+        const overlapping = (res.data?.data ?? res.data)?.overlappingAppointments ?? 0;
+        if (overlapping > 0) toast.warning(i18n.t('schedule.blockOverlapsAppointments', { count: overlapping }));
         yield put({ type: GET_BLOCKED });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));

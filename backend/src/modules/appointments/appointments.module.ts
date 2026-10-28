@@ -4,6 +4,7 @@ import { Appointment, AppointmentSchema } from './appointment.schema';
 import { AppointmentsController } from './appointments.controller';
 import { AppointmentsService } from './appointments.service';
 import { PatientsModule } from '../patients/patients.module';
+import { ScheduleModule } from '../schedule/schedule.module';
 import { UserProfile, UserProfileSchema } from '../users/user.schema';
 
 @Module({
@@ -14,6 +15,7 @@ import { UserProfile, UserProfileSchema } from '../users/user.schema';
             { name: UserProfile.name, schema: UserProfileSchema },
         ]),
         PatientsModule,
+        ScheduleModule,
     ],
     controllers: [AppointmentsController],
     providers: [AppointmentsService],

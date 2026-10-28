@@ -4,7 +4,16 @@ import i18n from '../../locales/i18n';
 import { APPEND_ERROR, APPEND_SUCCESS } from './index';
 
 /** No error toast: these screens and dialogs show the error inline already. */
-const SILENT = new Set(['LOGIN', 'REGISTER', 'GET_PROFILE', 'CHANGE_PASSWORD', 'RESET_STAFF_PASSWORD']);
+const SILENT = new Set([
+    'LOGIN',
+    'REGISTER',
+    'GET_PROFILE',
+    'CHANGE_PASSWORD',
+    'RESET_STAFF_PASSWORD',
+    'CREATE_APPOINTMENT',
+    'CREATE_RECURRING',
+    'UPDATE_APPOINTMENT',
+]);
 
 /**
  * Actions that get a success toast, mapped to a translation key so the toast
@@ -14,6 +23,7 @@ const SILENT = new Set(['LOGIN', 'REGISTER', 'GET_PROFILE', 'CHANGE_PASSWORD', '
  */
 const SUCCESS_TOAST_KEYS: Record<string, string> = {
     CREATE_APPOINTMENT: 'toast.saveSuccess',
+    CREATE_RECURRING: 'toast.saveSuccess',
     UPDATE_APPOINTMENT: 'toast.updateSuccess',
     CANCEL_APPOINTMENT: 'toast.updateSuccess',
     UPDATE_STATUS: 'toast.updateSuccess',

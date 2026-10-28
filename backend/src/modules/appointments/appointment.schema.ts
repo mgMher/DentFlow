@@ -10,6 +10,22 @@ export enum AppointmentStatus {
     NO_SHOW = 'no_show',
 }
 
+/**
+ * Why an appointment was cancelled. Older records hold free text in
+ * `cancelReason`; the UI shows those as-is.
+ */
+export enum CancelReason {
+    PATIENT_REQUEST = 'patient_request',
+    PATIENT_ILLNESS = 'patient_illness',
+    CLINIC_RESCHEDULED = 'clinic_rescheduled',
+    DENTIST_UNAVAILABLE = 'dentist_unavailable',
+    /** Set by the system when the patient is archived or marked deceased. */
+    PATIENT_LEFT = 'patient_left',
+    /** Set by the system when the dentist is deactivated. */
+    DENTIST_LEFT = 'dentist_left',
+    OTHER = 'other',
+}
+
 export enum RecurringFrequency {
     DAILY = 'daily',
     WEEKLY = 'weekly',
@@ -67,7 +83,8 @@ export class Appointment {
     })
     treatmentRoomId: Types.ObjectId;
 
-    @Prop({ required: true, trim: true })
+    // Optional: the UI falls back to the planned treatments. It used to be filled with a hardcoded English "Appointment".
+    @Prop({ trim: true })
     title: string;
 
     @Prop({ required: true, index: true })
@@ -98,6 +115,19 @@ export class Appointment {
     @Prop({ trim: true })
     cancelReason: string;
 
+    @Prop({ trim: true, maxlength: 500 })
+    cancelNote: string;
+
+    @Prop()
+    cancelledAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    cancelledBy: Types.ObjectId;
+
+    /** Shared by every occurrence created from one recurring booking. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, index: true })
+    seriesId: Types.ObjectId;
+
     @Prop({ default: false })
     isRecurring: boolean;
 
@@ -111,3 +141,5 @@ export class Appointment {
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);
 
 AppointmentSchema.index({ clinicId: 1, dentistId: 1, startTime: 1 });
+AppointmentSchema.index({ clinicId: 1, patientId: 1, startTime: -1 });
+AppointmentSchema.index({ clinicId: 1, startTime: 1 });

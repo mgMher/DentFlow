@@ -84,21 +84,23 @@ export class ScheduleController {
     }
 
     @Post('blocked-times')
-    @ApiOperation({ summary: 'Create a blocked time slot' })
+    @Roles(Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST)
+    @ApiOperation({ summary: 'Block a dentist\'s time (dentists: own time only)' })
     createBlockedTime(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
         @Body() dto: CreateBlockedTimeDto,
     ) {
-        return this.scheduleService.createBlockedTime(user.clinicId, dto);
+        return this.scheduleService.createBlockedTime(user.clinicId, dto, user);
     }
 
     @Delete('blocked-times/:id')
-    @ApiOperation({ summary: 'Delete a blocked time slot' })
+    @Roles(Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST)
+    @ApiOperation({ summary: 'Delete a blocked time slot (dentists: own time only)' })
     deleteBlockedTime(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
-        return this.scheduleService.deleteBlockedTime(user.clinicId, id);
+        return this.scheduleService.deleteBlockedTime(user.clinicId, id, user);
     }
 
     // ─── Availability ─────────────────────────────────────────────────

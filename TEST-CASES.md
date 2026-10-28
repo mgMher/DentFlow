@@ -380,6 +380,40 @@ each module, not just patients.
 | F2-18 | Stats after status change | Archive from the list page | Stat cards update without reload | — |
 | F2-19 | Startup log | Restart backend twice | Fixes log at most once; `migrations` collection lists them | — |
 
+## 16. Phase 3 — appointments & schedule
+
+Set the clinic's working hours first (Settings → Working hours), e.g. Mon–Fri 09:00–18:00.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F3-01 | Calendar shows visits | Month with appointments | They appear in their day cells (used to be empty) | — |
+| F3-02 | Filters | Filter by status / dentist; switch to List | Both views filtered; list paginates past 20 | — |
+| F3-03 | Free time | New appointment → pick dentist and a working day | Chips "09:00 – 18:00" minus bookings/blocks, in local time | — |
+| F3-04 | Treatments set duration | Pick a 60-min treatment | Duration becomes 60 min (until you change it by hand) | — |
+| F3-05 | Dentist clash | Book the same dentist at an overlapping time | "The dentist already has an appointment at this time" | — |
+| F3-06 | Patient clash | Same patient with another dentist at the same time | "The patient already has an appointment…" | — |
+| F3-07 | Room clash | Same room, other dentist and patient | "The room is already booked…" | — |
+| F3-08 | Back-to-back | 09:00–09:30 then 09:30–10:00 | Both saved | — |
+| F3-09 | Outside hours | Book 19:00 | Warning with **Book anyway**; that button saves it | — |
+| F3-10 | Blocked time | Block 12–13, book 12:15 | Refused even with Book anyway | — |
+| F3-11 | Block over bookings | Block a time that has a booked visit | Saved, with a warning to move the visit | — |
+| F3-12 | Future visit actions | Open a visit next week | Only Confirm / Reschedule / Cancel (no Start / Complete / No-show) | — |
+| F3-13 | Walk-in | Visit starting now (scheduled) | Start visit and Mark as completed available | — |
+| F3-14 | Completed is final | Complete a visit | No more actions; patient's Last visit updated | — |
+| F3-15 | Cancel needs a reason | Cancel a visit | Reason required; shown with note, who and when on the detail page | — |
+| F3-16 | Rebook | Cancel, then "Book again at this time" | Works if the slot is still free; refused if someone took it | — |
+| F3-17 | Reschedule | Reschedule into a busy time / a free time | Refused / saved; duration updated | — |
+| F3-18 | Weekly series | Repeat weekly until in 5 weeks | 5 visits, same local time; toast lists skipped dates if any | — |
+| F3-19 | Cancel series | Cancel the 2nd one → "This and all following" | It and all later ones cancelled, earlier kept | — |
+| F3-20 | Series limits | Repeat daily for 2 years | Refused ("at most one year"); daily for 3 months → max 52, weekends skipped | — |
+| F3-21 | Patient tab | Patient page → Appointments | Their visits newest first, paginated, "Book appointment"; Appointments page list unaffected | — |
+| F3-22 | Dentist blocks | Log in as dentist → Schedule | Can block only own time; cannot delete a colleague's block | — |
+| F3-23 | Assistant | Log in as assistant | Sees calendar and visits; no booking / status / block buttons | — |
+| F3-24 | Delete block | Delete a blocked time | Confirmation first | — |
+| F3-25 | Room names | Add a room with an existing name (any case) | Translated "already exists" | — |
+| F3-26 | Status labels | In progress / no-show chips in hy, ru, en | Translated, never `in_progress` | — |
+| F3-27 | After midnight | Clock 01:00, open Appointments | "Today" is today; free time correct | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

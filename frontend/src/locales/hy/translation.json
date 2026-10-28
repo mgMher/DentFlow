@@ -43,7 +43,9 @@
     "notProvided": "Նշված չէ",
     "retry": "Կրկին փորձել",
     "noResults": "Համընկնումներ չկան",
-    "typeToSearch": "Որոնելու համար մուտքագրեք անուն կամ հեռախոս"
+    "typeToSearch": "Որոնելու համար մուտքագրեք անուն կամ հեռախոս",
+    "none": "Չկա",
+    "previous": "Նախորդ"
   },
   "nav": {
     "dashboard": "Վահանակ",
@@ -213,7 +215,65 @@
     "listView": "Ծանկի տեսք",
     "noAppointments": "Այցելություններ չկան",
     "bookAppointment": "Գրանցվել այցելություն",
-    "conflictWarning": "Ժամանակային հակասություն այլ այցելության հետ"
+    "conflictWarning": "Ժամանակային հակասություն այլ այցելության հետ",
+    "actions": {
+      "complete": "Նշել որպես ավարտված",
+      "confirm": "Հաստատել",
+      "noShow": "Նշել՝ չներկայացավ",
+      "rebook": "Կրկին գրանցել այս ժամին",
+      "start": "Սկսել այցը"
+    },
+    "bookAnyway": "Միևնույն է գրանցել",
+    "bookThisDay": "Գրանցել այս օրը",
+    "calendar": "Օրացույց",
+    "cancelAppointment": "Չեղարկել այցը",
+    "cancelFollowing": "Այս և շարքի բոլոր հաջորդները",
+    "cancelThisOnly": "Միայն այս այցը",
+    "cancelNote": "Նշում (ոչ պարտադիր)",
+    "cancelReasons": {
+      "patient_request": "Պացիենտի խնդրանքով",
+      "patient_illness": "Պացիենտը հիվանդ է",
+      "clinic_rescheduled": "Կլինիկան տեղափոխել է",
+      "dentist_unavailable": "Ատամնաբույժն անհասանելի է",
+      "patient_left": "Պացիենտը արխիվացված է",
+      "dentist_left": "Ատամնաբույժն այլևս չի աշխատում",
+      "other": "Այլ"
+    },
+    "changeStatus": "Փոխել կարգավիճակը",
+    "confirmStatusChange": "Փոխե՞լ կարգավիճակը «{{status}}»",
+    "createdAt": "Ստեղծվել է",
+    "date": "Ամսաթիվ",
+    "freeTime": "Ազատ ժամեր — սեղմեք ընտրելու համար՝",
+    "noFreeTime": "Այս օրը ազատ ժամ չկա (չի աշխատում, զբաղված է կամ արգելափակված)",
+    "list": "Ցանկ",
+    "noActions": "Այս այցի համար այլ գործողություններ չկան",
+    "viewOnly": "Դուք կարող եք դիտել այցերը, բայց ոչ փոխել",
+    "noAppointmentsDay": "Այս օրը այցեր չկան",
+    "noAppointmentsMonth": "Այս ամիս այցեր չկան",
+    "notFound": "Այցը չի գտնվել",
+    "partOfSeries": "Կրկնվող",
+    "plannedTreatments": "Նախատեսված բուժումներ",
+    "repeat": "Կրկնել",
+    "repeatOptions": {
+      "none": "Չկրկնել",
+      "daily": "Ամեն օր",
+      "weekly": "Ամեն շաբաթ",
+      "monthly": "Ամեն ամիս"
+    },
+    "repeatUntil": "Մինչև",
+    "repeatUntilAfterStart": "Ընտրեք առաջին այցից ոչ շուտ ամսաթիվ",
+    "repeatLimit": "Առավելագույնը 52 այց, մինչև մեկ տարի",
+    "time": "Ժամ",
+    "visit": "Այց",
+    "visitFor": "Այցի նպատակը",
+    "minutes_one": "{{count}} րոպե",
+    "minutes_other": "{{count}} րոպե",
+    "more_one": "ևս {{count}}",
+    "more_other": "ևս {{count}}",
+    "countForDay_one": "{{count}} այց",
+    "countForDay_other": "{{count}} այց",
+    "seriesSkipped_one": "Գրանցվեց {{created}}․ {{count}} ամսաթիվ բաց թողնվեց (զբաղված, արգելափակված կամ ոչ աշխատանքային)",
+    "seriesSkipped_other": "Գրանցվեց {{created}}․ {{count}} ամսաթիվ բաց թողնվեց (զբաղված, արգելափակված կամ ոչ աշխատանքային)"
   },
   "dental": {
     "title": "Ատամնաբուժական գրառումներ",
@@ -477,7 +537,11 @@
     "noBlockedTimes": "Արգելափակված ժամեր չկան",
     "selectDentist": "Ընտրեք բժիշկ",
     "noDentists": "Այս կլինիկայում բժիշկներ դեռ չկան",
-    "endAfterStart": "Ավարտը պետք է լինի սկզբից հետո"
+    "endAfterStart": "Ավարտը պետք է լինի սկզբից հետո",
+    "deleteBlockedTime": "Ջնջել արգելափակված ժամը",
+    "deleteBlockedTimeConfirm": "Ատամնաբույժին կրկին հնարավոր կլինի գրանցել այս ժամին։",
+    "blockOverlapsAppointments_one": "Արգելափակվեց։ Այս ժամին կա {{count}} գրանցված այց — տեղափոխեք կամ չեղարկեք այն։",
+    "blockOverlapsAppointments_other": "Արգելափակվեց։ Այս ժամին կա {{count}} գրանցված այց — տեղափոխեք կամ չեղարկեք դրանք։"
   },
   "notifications": {
     "markAllRead": "Նշել բոլորը կարդացված",
@@ -601,6 +665,25 @@
     "clinicInactive": "Այս կլինիկայի հաշիվը կասեցված է։ Դիմեք DentFlow-ի աջակցման ծառայությանը։",
     "clinicNotFound": "Կլինիկան չի գտնվել",
     "medicalHistoryForbidden": "Բժշկական պատմությունը կարող են փոխել միայն ատամնաբույժներն ու ադմինիստրատորները",
-    "patientStatusChanged": "Մեկ ուրիշը փոխել է այս պացիենտի կարգավիճակը։ Թարմացրեք էջը և կրկին փորձեք։"
+    "patientStatusChanged": "Մեկ ուրիշը փոխել է այս պացիենտի կարգավիճակը։ Թարմացրեք էջը և կրկին փորձեք։",
+    "appointmentConflictDentist": "Ատամնաբույժն այս ժամին արդեն այց ունի",
+    "appointmentConflictRoom": "Սենյակն այս ժամին արդեն զբաղված է",
+    "appointmentConflictPatient": "Պացիենտն այս ժամին արդեն այց ունի",
+    "appointmentInBlockedTime": "Ատամնաբույժն այդ ժամին անհասանելի է (արգելափակված ժամ)",
+    "appointmentOutsideHours": "Սա ատամնաբույժի աշխատանքային ժամերից դուրս է",
+    "appointmentNotEditable": "Այս այցն այլևս հնարավոր չէ փոխել",
+    "appointmentNotCancellable": "Այս այցն այլևս հնարավոր չէ չեղարկել",
+    "invalidStatusTransition": "Կարգավիճակի այս փոփոխությունը թույլատրված չէ",
+    "appointmentNotStarted": "Այս այցը դեռ չի սկսվել",
+    "appointmentInPast": "Այս ժամն անցել է․ գրանցեք նոր այց",
+    "appointmentChanged": "Մեկ ուրիշը հենց նոր փոխեց այս այցը։ Թարմացրեք և կրկին փորձեք։",
+    "useCancelEndpoint": "Օգտագործեք «Չեղարկել այցը» և ընտրեք պատճառը",
+    "appointmentEndBeforeStart": "Ավարտը պետք է լինի սկզբից հետո",
+    "appointmentTooLong": "Այցը չի կարող 12 ժամից երկար լինել",
+    "seriesAllConflicting": "Այս շարքի ոչ մի ամսաթիվ հնարավոր չեղավ գրանցել",
+    "seriesEndBeforeStart": "Շարքը պետք է ավարտվի առաջին այցից հետո",
+    "seriesTooLong": "Շարքը կարող է տևել առավելագույնը մեկ տարի",
+    "roomNameTaken": "Այս անունով սենյակ արդեն կա",
+    "blockOwnTimeOnly": "Կարող եք արգելափակել կամ ապաարգելափակել միայն ձեր ժամերը"
   }
 }

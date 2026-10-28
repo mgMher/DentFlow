@@ -6,6 +6,8 @@ import {
     clinicTimeToUtc,
     clinicToday,
     toClinicDateString,
+    toClinicTimeString,
+    weekdayOf,
 } from './clinic-time.util';
 
 const YEREVAN = 'Asia/Yerevan'; // UTC+4, no DST
@@ -50,6 +52,11 @@ describe('clinic-time', () => {
     it('does calendar arithmetic across month and year ends', () => {
         expect(addDays('2026-12-31', 1)).toBe('2027-01-01');
         expect(addDays('2028-02-28', 1)).toBe('2028-02-29');
+    });
+
+    it('reads the clinic wall-clock time and weekday', () => {
+        expect(toClinicTimeString(new Date('2026-10-01T05:30:00Z'), YEREVAN)).toBe('09:30');
+        expect(weekdayOf('2026-10-28')).toBe(3); // Wednesday
     });
 
     it('rejects malformed input', () => {

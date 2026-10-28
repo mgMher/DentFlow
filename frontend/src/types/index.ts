@@ -225,7 +225,7 @@ export interface Appointment {
     dentistId: string | UserProfile;
     // Populated by the API on findById/findAll — string only before it is sent.
     treatmentRoomId?: string | TreatmentRoom;
-    title: string;
+    title?: string;
     startTime: string;
     endTime: string;
     duration: number;
@@ -233,8 +233,13 @@ export interface Appointment {
     treatmentType?: string;
     treatmentIds?: (string | Treatment)[];
     notes?: string;
+    /** A code (see CANCEL_REASONS) or, on older records, free text. */
     cancelReason?: string;
+    cancelNote?: string;
+    cancelledAt?: string;
+    cancelledBy?: string | UserProfile;
     isRecurring: boolean;
+    seriesId?: string;
     color?: string;
     createdAt: string;
 }

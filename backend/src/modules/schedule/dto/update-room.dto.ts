@@ -4,12 +4,14 @@ import {
     IsBoolean,
     IsOptional,
     IsString,
+    MaxLength,
 } from 'class-validator';
 
 export class UpdateRoomDto {
     @ApiPropertyOptional({ example: 'Operatory A' })
     @IsOptional()
     @IsString()
+    @MaxLength(80)
     name?: string;
 
     @ApiPropertyOptional({ example: 'Updated description' })
