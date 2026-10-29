@@ -1,10 +1,10 @@
 import { ConflictException, Injectable, Logger, NotFoundException, OnModuleInit } from '@nestjs/common';
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { Connection, FilterQuery, Model, Types } from 'mongoose';
-import { Treatment, TreatmentDocument, TreatmentCategory, Currency, CODE_INDEX } from './treatment.schema';
+import { Treatment, TreatmentDocument, TreatmentCategory, CODE_INDEX } from './treatment.schema';
 import { ToothStatus } from 'src/modules/dental-records/dental-record.schema';
 import { runOnce } from 'src/common/migrations/run-once';
-import { errorBody, escapeRegex } from 'src/common/utils';
+import { Currency, errorBody, escapeRegex } from 'src/common/utils';
 import { CreateTreatmentDto, UpdateTreatmentDto, QueryTreatmentDto } from './dto';
 
 interface DefaultTreatment {

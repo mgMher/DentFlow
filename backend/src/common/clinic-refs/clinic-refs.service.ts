@@ -9,7 +9,7 @@ import { TreatmentRoom, TreatmentRoomDocument } from 'src/modules/schedule/treat
 import { Treatment, TreatmentDocument } from 'src/modules/treatments/treatment.schema';
 import { Appointment, AppointmentDocument } from 'src/modules/appointments/appointment.schema';
 import { Clinic, ClinicDocument } from 'src/modules/clinics/clinic.schema';
-import { DEFAULT_CLINIC_TIMEZONE } from 'src/common/utils';
+import { Currency, DEFAULT_CLINIC_TIMEZONE } from 'src/common/utils';
 
 type Id = string | Types.ObjectId;
 
@@ -40,8 +40,16 @@ export class ClinicRefsService {
 
     /** The clinic's IANA timezone, for "today" / "this month" / date filters. */
     async timezoneOf(clinicId: Id): Promise<string> {
-        const clinic = await this.clinicModel.findById(toObjectId(clinicId)).select('timezone').lean();
-        return clinic?.timezone || DEFAULT_CLINIC_TIMEZONE;
+        return (await this.localeOf(clinicId)).timezone;
+    }
+
+    /** Timezone and the one currency the clinic bills in (D3). */
+    async localeOf(clinicId: Id): Promise<{ timezone: string; currency: Currency }> {
+        const clinic = await this.clinicModel.findById(toObjectId(clinicId)).select('timezone currency').lean();
+        return {
+            timezone: clinic?.timezone || DEFAULT_CLINIC_TIMEZONE,
+            currency: (clinic?.currency as Currency) || Currency.AMD,
+        };
     }
 
     /** The patient exists in this clinic. With `forBooking`, it must also not be archived or deceased. */

@@ -1,27 +1,35 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Currency } from 'src/common/utils';
 
 export type InvoiceDocument = Invoice & Document;
 
+/**
+ * draft → issued → partial → paid, or cancelled from draft/issued while
+ * nothing is paid. "Overdue" is not stored: it is an issued or partly paid
+ * invoice past its due date, computed when read (it used to be a status
+ * nothing ever set).
+ */
 export enum InvoiceStatus {
     DRAFT = 'draft',
-    PENDING = 'pending',
+    ISSUED = 'issued',
     PARTIAL = 'partial',
     PAID = 'paid',
-    OVERDUE = 'overdue',
     CANCELLED = 'cancelled',
 }
 
-export enum InvoiceCurrency {
-    AMD = 'AMD',
-    USD = 'USD',
-    RUB = 'RUB',
-}
+/** Statuses a payment can be added to (and that can become overdue). */
+export const OPEN_STATUSES = [InvoiceStatus.ISSUED, InvoiceStatus.PARTIAL];
 
+/** All amounts on invoices and payments are integers in the currency's smallest unit (see money.util). */
 @Schema({ _id: false })
 export class InvoiceItem {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Treatment' })
     treatmentId: Types.ObjectId;
+
+    /** The chart entry this line bills; an entry is on at most one live invoice. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'TreatmentEntry' })
+    treatmentEntryId: Types.ObjectId;
 
     @Prop({ required: true, trim: true })
     description: string;
@@ -32,6 +40,7 @@ export class InvoiceItem {
     @Prop({ required: true, min: 0 })
     unitPrice: number;
 
+    /** Percent, 0–100. */
     @Prop({ default: 0, min: 0, max: 100 })
     discount: number;
 
@@ -83,15 +92,16 @@ export class Invoice {
     @Prop({ required: true, min: 0 })
     totalAmount: number;
 
+    /** Net of voided/refunded payments. */
     @Prop({ default: 0, min: 0 })
     paidAmount: number;
 
     @Prop({
         required: true,
-        enum: InvoiceCurrency,
-        default: InvoiceCurrency.AMD,
+        enum: Currency,
+        default: Currency.AMD,
     })
-    currency: InvoiceCurrency;
+    currency: Currency;
 
     @Prop({
         required: true,
@@ -100,6 +110,7 @@ export class Invoice {
     })
     status: InvoiceStatus;
 
+    /** A calendar date (UTC midnight of the day). */
     @Prop()
     dueDate: Date;
 
@@ -108,6 +119,25 @@ export class Invoice {
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     createdBy: Types.ObjectId;
+
+    @Prop()
+    issuedAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    issuedBy: Types.ObjectId;
+
+    @Prop()
+    cancelledAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    cancelledBy: Types.ObjectId;
+
+    @Prop({ trim: true })
+    cancelReason: string;
+
+    /** Invoices written before 2026-10 stored decimals; converted once at startup. */
+    @Prop({ enum: ['minor'], default: 'minor' })
+    moneyUnits: string;
 }
 
 export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
@@ -115,3 +145,4 @@ export const InvoiceSchema = SchemaFactory.createForClass(Invoice);
 InvoiceSchema.index({ clinicId: 1, invoiceNumber: 1 }, { unique: true });
 InvoiceSchema.index({ clinicId: 1, status: 1 });
 InvoiceSchema.index({ clinicId: 1, patientId: 1 });
+InvoiceSchema.index({ clinicId: 1, createdAt: -1 });

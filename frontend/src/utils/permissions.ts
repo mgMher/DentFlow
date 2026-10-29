@@ -25,6 +25,12 @@ export const PERMISSIONS = {
     editPatients: ['super_admin', 'clinic_admin', 'dentist', 'receptionist'],
     /** Medical history and PATCH /patients/:id/status — patients.controller CLINICAL_EDITORS */
     editClinicalRecords: ['super_admin', 'clinic_admin', 'dentist'],
+    /** GET /billing/* — billing.controller BILLING_VIEWERS (assistants: none) */
+    viewBilling: ['super_admin', 'clinic_admin', 'receptionist', 'dentist'],
+    /** Create / edit / issue invoices, take payments, cancel drafts — BILLING_EDITORS */
+    manageBilling: ['super_admin', 'clinic_admin', 'receptionist'],
+    /** Refunds, cancelling issued invoices, revenue — BILLING_ADMINS */
+    billingAdmin: ['super_admin', 'clinic_admin'],
     /** POST/PATCH /appointments */
     manageAppointments: ['clinic_admin', 'dentist', 'receptionist'],
 } as const satisfies Record<string, readonly UserRole[]>;

@@ -23,7 +23,7 @@ the first 20 records. There are **zero automated tests**, and TypeScript `strict
 | Schedule | ✅ Cleaned | — |
 | Treatments catalog | ✅ Cleaned | — |
 | Dental chart | ✅ Cleaned | FDI, per-surface, planned/done; no periodontal chart yet (F12) |
-| Billing | Works only in AMD, only via UI | **P0** tenant leak, payment race, currencies summed together. Invoice creation often impossible (patient picker empty) |
+| Billing | ✅ Cleaned | Fiscal receipts (F10) and deposits (F4) not built |
 | Reports | **Broken** | Every revenue request returns 400; charts always empty |
 | Dashboard | Mostly broken | 2 cards always 0; receptionists get "Insufficient permissions" on login |
 | Notifications | **Never created** | Nothing in the app ever creates a notification; bell hardcoded to 0 |
@@ -170,25 +170,29 @@ built from treatment entries. Reports come after billing because they read billi
 - [ ] Voiding an entry does not undo its chart change (by design; correct the tooth by hand). Revisit with the audit log (F7)
 - [ ] Catalogue grid view dropped (table only, with search and paging)
 
-### Phase 5 — Billing
+### Phase 5 — Billing — ✅ done 2026-10-29 (not committed yet)
 
-- [ ] **P0** Verify patient/appointment/treatment ids belong to the clinic
-- [ ] **P0** Payment: atomic balance check + `$inc` in a transaction (race → overpayment, lost payment)
-- [ ] **P0** Payment currency must equal invoice currency (D3)
-- [ ] **P1** Invoice number: atomic per-clinic counter (duplicates under concurrency → 500)
-- [ ] **P1** Status lifecycle: draft → issued → partial/paid, overdue computed from due date; missing tabs
-- [ ] **P1** Block cancelling a paid/partly paid invoice; add refund / void payment with audit
-- [ ] **P1** `@Roles` on billing (assistant can cancel invoices and read revenue now)
-- [ ] **P1** Search box sends `search` → 400 on every keystroke
-- [ ] **P1** Patient picker empty (`limit:1000` > max 100) → use `<PatientPicker>`
-- [ ] **P1** Line items from the catalog (treatmentId + price); **create invoice from done treatment entries** with double-billing guard
-- [ ] **P1** Line discount shown as money instead of %
-- [ ] **P2** Integer money (D2); float balance check rejects exact remaining amount
-- [ ] **P2** Detail page: stale data after cancel/between invoices; dialog closes before server answers
-- [ ] **P2** Wrong labels ("First name" for full name, "Amount #" for reference, etc.)
-- [ ] **P2** Printable invoice with clinic details (print stylesheet or PDF)
-- [ ] **P2** Default currency from clinic; appointments picker loads all appointments
-- [ ] **P2** Patient billing tab: cancelled invoices shown as debt; add balance summary + "Create invoice" button
+- [x] **P0** Patient / appointment / treatment ids checked against the clinic (Phase 0 helper); billed chart entries must be this patient's
+- [x] **P0** Payment: balance check, amount and status in **one conditional update** (pipeline update, no transaction — the local Mongo is standalone; works on Atlas too). Payment insert failing puts the invoice back. 3 parallel payments on a 13 500 balance → exactly 2 accepted
+- [x] **P0 / D3** One currency per clinic: invoices take the clinic's currency (another → 400 `currencyMismatch`), payments must match the invoice. Shared `Currency` enum (`common/utils/money.util.ts`) replaces five copies
+- [x] **P1** Invoice number: atomic per-clinic, per-year counter (`counters` collection) → `INV-2026-00042`; 5 parallel creates → 5 unique numbers
+- [x] **P1** Lifecycle draft → issued → partial / paid; `pending` migrated to `issued`; "overdue" computed (issued/partial past due date in the clinic's today) — `isOverdue` on every invoice and `status=overdue` filter. Payments need an issued invoice; zero total can't be issued
+- [x] **P1** Cancel only with nothing paid (`invoiceHasPayments`), with a reason, who and when. Drafts: anyone who bills; issued: admin. Refund / void a payment (admin, `refund` or `mistake`, reason) — stays on record, balance goes back
+- [x] **P1 / D5** `@Roles`: admin + receptionist bill; dentist views; assistant none (403, menu hidden); refunds and revenue admin only
+- [x] **P1** Search works on the server: invoice number, patient name (multi-word, shared `patientSearchClauses`) or phone
+- [x] **P1** `<PatientPicker>` in the invoice form (Phase 0); `?patientId=` pre-fills it from the patient page
+- [x] **P1** Lines from the catalogue (localized name, price when in the invoice currency) or **from done treatment entries** (`GET /billing/patients/:id/unbilled-treatments`); an entry is on at most one live invoice (`TreatmentEntry.invoiceId`, claimed all-or-none, 409 `treatmentAlreadyBilled`), released when the line is removed or the invoice cancelled; a billed entry can't be voided
+- [x] **P1** Line discount shown as % (was formatted as money)
+- [x] **P2 / D2** Integer money in the smallest unit (dram, cents); API keeps major units; amounts finer than the currency → 400 `amountPrecision`; exact remaining balance accepted; one-off migration (`2026-10-billing-integer-money`, per-document marker) — 0.10 + 0.20 USD pays 0.30 exactly
+- [x] **P2** Detail page: shows only the invoice in the URL; every action's response replaces it; dialogs close when the server says yes and show errors inline
+- [x] **P2** Labels: "Full name", "Reference" (was "Amount #"), "Payments", "Unit price", "Discount %", "Received by"
+- [x] **P2** Print: app chrome hidden, clinic letterhead (name, address, phone, email) printed above the invoice
+- [x] **P2** Currency from the clinic (read-only in the form); appointment picker loads only the patient's (Phase 3)
+- [x] **P2** Patient billing tab (`PatientBillingTab`): billed / paid / balance / overdue per currency without drafts or cancelled, unbilled treatments count, "Create invoice", paginated list
+- [x] **NEW** Edit drafts (`/billing/:id/edit`), Issue button, status tabs incl. Draft / Issued / Overdue / Cancelled
+- [x] Verified on local MongoDB: 53 checks (`test/smoke/05-billing.mjs`) + suites 01–04, legacy-data migration (USD decimals → cents, `pending` → `partial`), browser (invoice from treatments, totals, issue, payment, list)
+- [ ] **For Phase 6:** invoice/payment amounts are now stored in minor units — reports must divide by the currency's factor (no change for AMD) and skip voided payments. `/billing/revenue` is admin-only now; the Reports page still sends `period` (400)
+- [ ] Not built: e-HDM fiscal receipt (F10), deposits / one payment across invoices (F4), PDF export (print-to-PDF works)
 
 ### Phase 6 — Reports & Dashboard
 

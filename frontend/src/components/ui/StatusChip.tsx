@@ -18,7 +18,7 @@ const statusColorMap: Record<string, { bg: string; color: string }> = {
     cancelled: { bg: '#FFF5F5', color: '#E53E3E' },
     no_show: { bg: '#F7FAFC', color: '#A0AEC0' },
     draft: { bg: '#F7FAFC', color: '#A0AEC0' },
-    pending: { bg: '#FFFAF0', color: '#ED8936' },
+    issued: { bg: '#FFFAF0', color: '#ED8936' },
     partial: { bg: '#EBF4FF', color: '#3182CE' },
     paid: { bg: '#F0FFF4', color: '#38A169' },
     overdue: { bg: '#FFF5F5', color: '#E53E3E' },

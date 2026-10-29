@@ -15,6 +15,11 @@ const SILENT = new Set([
     'UPDATE_APPOINTMENT',
     'CREATE_TREATMENT',
     'UPDATE_TREATMENT',
+    'CREATE_INVOICE',
+    'UPDATE_INVOICE',
+    'ADD_PAYMENT',
+    'CANCEL_INVOICE',
+    'VOID_PAYMENT',
 ]);
 
 /**
@@ -33,8 +38,11 @@ const SUCCESS_TOAST_KEYS: Record<string, string> = {
     UPDATE_PATIENT: 'toast.updateSuccess',
     UPDATE_PATIENT_STATUS: 'toast.updateSuccess',
     CREATE_INVOICE: 'toast.saveSuccess',
+    UPDATE_INVOICE: 'toast.updateSuccess',
+    ISSUE_INVOICE: 'toast.updateSuccess',
     CANCEL_INVOICE: 'toast.updateSuccess',
     ADD_PAYMENT: 'toast.saveSuccess',
+    VOID_PAYMENT: 'toast.updateSuccess',
     CREATE_ROOM: 'toast.saveSuccess',
     UPDATE_ROOM: 'toast.updateSuccess',
     DEACTIVATE_ROOM: 'toast.updateSuccess',

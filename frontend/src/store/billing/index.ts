@@ -1,8 +1,8 @@
-import { call, put, takeLatest } from 'redux-saga/effects';
+import { call, put, select, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
-import { apiErrorMessage } from '../../utils/apiError';
-import { Invoice, Payment } from '../../types';
+import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
+import { Currency, Invoice, PatientBillingSummary, Payment, PaymentMethod, PaymentVoidType } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
 
@@ -10,190 +10,306 @@ const GET_INVOICES = 'GET_INVOICES';
 const GET_INVOICES_SUCCESS = 'GET_INVOICES_SUCCESS';
 const GET_INVOICE = 'GET_INVOICE';
 const GET_INVOICE_SUCCESS = 'GET_INVOICE_SUCCESS';
-const CREATE_INVOICE = 'CREATE_INVOICE';
-const CANCEL_INVOICE = 'CANCEL_INVOICE';
-const ADD_PAYMENT = 'ADD_PAYMENT';
 const GET_PAYMENTS = 'GET_PAYMENTS';
 const GET_PAYMENTS_SUCCESS = 'GET_PAYMENTS_SUCCESS';
+const CREATE_INVOICE = 'CREATE_INVOICE';
+const UPDATE_INVOICE = 'UPDATE_INVOICE';
+const ISSUE_INVOICE = 'ISSUE_INVOICE';
+const CANCEL_INVOICE = 'CANCEL_INVOICE';
+const ADD_PAYMENT = 'ADD_PAYMENT';
+const VOID_PAYMENT = 'VOID_PAYMENT';
+const GET_PATIENT_INVOICES = 'GET_PATIENT_INVOICES';
+const GET_PATIENT_INVOICES_SUCCESS = 'GET_PATIENT_INVOICES_SUCCESS';
+const GET_PATIENT_BILLING_SUMMARY = 'GET_PATIENT_BILLING_SUMMARY';
+const GET_PATIENT_BILLING_SUMMARY_SUCCESS = 'GET_PATIENT_BILLING_SUMMARY_SUCCESS';
 const GET_REVENUE = 'GET_REVENUE';
 const GET_REVENUE_SUCCESS = 'GET_REVENUE_SUCCESS';
+
+export type InvoiceStatusFilter = Invoice['status'] | 'overdue';
+
+export interface InvoicesQuery {
+    page?: number;
+    limit?: number;
+    status?: InvoiceStatusFilter;
+    search?: string;
+    patientId?: string;
+}
+
+export interface InvoiceItemInput {
+    treatmentId?: string;
+    treatmentEntryId?: string;
+    description: string;
+    quantity: number;
+    unitPrice: number;
+    discount: number;
+}
+
+export interface InvoiceInput {
+    patientId?: string;
+    appointmentId?: string;
+    items: InvoiceItemInput[];
+    /** '' clears it on a draft. */
+    dueDate?: string;
+    notes?: string;
+    currency?: Currency;
+    issue?: boolean;
+}
+
+export interface PaymentInput {
+    amount: number;
+    method: PaymentMethod;
+    date?: string;
+    reference?: string;
+    notes?: string;
+}
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 export const billingActions = {
-    getInvoices: (payload?: any) => ({ type: GET_INVOICES, payload }),
-    getInvoicesSuccess: (payload: { invoices: Invoice[]; total: number }) => ({
-        type: GET_INVOICES_SUCCESS,
-        payload,
-    }),
+    getInvoices: (payload: InvoicesQuery) => ({ type: GET_INVOICES, payload }),
+    /** The invoice and its payments. */
     getInvoice: (payload: string) => ({ type: GET_INVOICE, payload }),
-    getInvoiceSuccess: (payload: Invoice) => ({ type: GET_INVOICE_SUCCESS, payload }),
-    createInvoice: (payload: Partial<Invoice>) => ({ type: CREATE_INVOICE, payload }),
-    cancelInvoice: (payload: string) => ({ type: CANCEL_INVOICE, payload }),
-    addPayment: (payload: { invoiceId: string; data: Partial<Payment> }) => ({
-        type: ADD_PAYMENT,
+    createInvoice: (payload: InvoiceInput) => ({ type: CREATE_INVOICE, payload }),
+    updateInvoice: (payload: { id: string; data: InvoiceInput }) => ({ type: UPDATE_INVOICE, payload }),
+    issueInvoice: (payload: string) => ({ type: ISSUE_INVOICE, payload }),
+    cancelInvoice: (payload: { id: string; reason: string }) => ({ type: CANCEL_INVOICE, payload }),
+    addPayment: (payload: { invoiceId: string; data: PaymentInput }) => ({ type: ADD_PAYMENT, payload }),
+    voidPayment: (payload: { invoiceId: string; paymentId: string; type: PaymentVoidType; reason: string }) => ({
+        type: VOID_PAYMENT,
         payload,
     }),
-    getPayments: (payload: string) => ({ type: GET_PAYMENTS, payload }),
-    getPaymentsSuccess: (payload: Payment[]) => ({ type: GET_PAYMENTS_SUCCESS, payload }),
+    getPatientInvoices: (payload: { patientId: string; page?: number; limit?: number }) => ({
+        type: GET_PATIENT_INVOICES,
+        payload,
+    }),
+    getPatientSummary: (payload: string) => ({ type: GET_PATIENT_BILLING_SUMMARY, payload }),
     getRevenue: (payload?: any) => ({ type: GET_REVENUE, payload }),
-    getRevenueSuccess: (payload: any) => ({ type: GET_REVENUE_SUCCESS, payload }),
+    clearCreated: () => ({ type: CREATE_INVOICE + '_CLEAR' }),
 };
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
 const service = {
-    getInvoices: (params?: any) => api.get('/billing/invoices', { params }),
+    getInvoices: (params: InvoicesQuery) => api.get('/billing/invoices', { params }),
     getInvoice: (id: string) => api.get(`/billing/invoices/${id}`),
-    createInvoice: (data: Partial<Invoice>) => api.post('/billing/invoices', data),
-    cancelInvoice: (id: string) => api.patch(`/billing/invoices/${id}/cancel`),
-    addPayment: (invoiceId: string, data: Partial<Payment>) =>
-        api.post(`/billing/invoices/${invoiceId}/payments`, data),
-    getPayments: (invoiceId: string) => api.get(`/billing/invoices/${invoiceId}/payments`),
+    getPayments: (id: string) => api.get(`/billing/invoices/${id}/payments`),
+    createInvoice: (data: InvoiceInput) => api.post('/billing/invoices', data),
+    updateInvoice: (id: string, data: InvoiceInput) => api.patch(`/billing/invoices/${id}`, data),
+    issueInvoice: (id: string) => api.patch(`/billing/invoices/${id}/issue`),
+    cancelInvoice: (id: string, reason: string) => api.patch(`/billing/invoices/${id}/cancel`, { reason }),
+    addPayment: (id: string, data: PaymentInput) => api.post(`/billing/invoices/${id}/payments`, data),
+    voidPayment: (id: string, paymentId: string, type: PaymentVoidType, reason: string) =>
+        api.patch(`/billing/invoices/${id}/payments/${paymentId}/void`, { type, reason }),
+    getPatientSummary: (patientId: string) => api.get(`/billing/patients/${patientId}/summary`),
     getRevenue: (params?: any) => api.get('/billing/revenue', { params }),
-    getPatientHistory: (patientId: string) => api.get(`/billing/patients/${patientId}/history`),
 };
+
+const unwrap = (res: any) => res.data?.data ?? res.data;
 
 // ── Sagas ─────────────────────────────────────────────────────────────────────
 
-function* getInvoicesSaga(action: any) {
+function* read(action: any, fallbackKey: string, request: () => Promise<any>, success: (data: any) => any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getInvoices, action.payload);
-        const data = res.data?.data || res.data;
-        yield put({
-            type: GET_INVOICES_SUCCESS,
-            payload: {
-                invoices: data.data || data,
-                total: data.total || 0,
-            },
-        });
+        const res: any = yield call(request);
+        yield put(success(unwrap(res)));
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadInvoices')));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, fallbackKey), apiErrorCode(err)));
     }
+}
+
+/** After any change, the lists the user may go back to are refreshed with the query they used. */
+function* refreshLists() {
+    const state: BillingState = yield select((s: any) => s.billing);
+    if (state.list.query) yield put({ type: GET_INVOICES, payload: state.list.query });
+    if (state.byPatient.query) {
+        yield put({ type: GET_PATIENT_INVOICES, payload: state.byPatient.query });
+        yield put({ type: GET_PATIENT_BILLING_SUMMARY, payload: state.byPatient.query.patientId });
+    }
+}
+
+/**
+ * Every write returns the invoice as the server now has it; that replaces
+ * the open one, so the detail page never shows stale amounts or status.
+ */
+function* write(action: any, fallbackKey: string, request: () => Promise<any>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        const res: any = yield call(request);
+        const data = unwrap(res);
+        const invoice: Invoice = data?.invoice ?? data;
+        yield put({ type: GET_INVOICE_SUCCESS, payload: invoice });
+        if (data?.payment || action.type === VOID_PAYMENT) {
+            yield put({ type: GET_PAYMENTS, payload: invoice._id });
+        }
+        if (action.type === CREATE_INVOICE) yield put({ type: CREATE_INVOICE + '_DONE', payload: invoice._id });
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+        yield call(refreshLists);
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, fallbackKey), apiErrorCode(err)));
+    }
+}
+
+function* getInvoicesSaga(action: any) {
+    const query: InvoicesQuery = action.payload;
+    yield call(read, action, 'errors.loadInvoices', () => service.getInvoices(query), (data) => ({
+        type: GET_INVOICES_SUCCESS,
+        payload: { list: data?.data ?? [], total: data?.pagination?.total ?? 0 },
+    }));
 }
 
 function* getInvoiceSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getInvoice, action.payload);
-        yield put({ type: GET_INVOICE_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadInvoice')));
-    }
-}
-
-function* createInvoiceSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        yield call(service.createInvoice, action.payload);
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendSuccess(action.type));
-        yield put({ type: GET_INVOICES });
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createInvoice')));
-    }
-}
-
-function* cancelInvoiceSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        yield call(service.cancelInvoice, action.payload);
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendSuccess(action.type));
-        yield put({ type: GET_INVOICES });
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.cancelInvoice')));
-    }
-}
-
-function* addPaymentSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        yield call(service.addPayment, action.payload.invoiceId, action.payload.data);
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendSuccess(action.type));
-        yield put({ type: GET_INVOICE, payload: action.payload.invoiceId });
-        yield put({ type: GET_PAYMENTS, payload: action.payload.invoiceId });
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.addPayment')));
-    }
+    yield put({ type: GET_PAYMENTS, payload: action.payload });
+    yield call(read, action, 'errors.loadInvoice', () => service.getInvoice(action.payload), (invoice) => ({
+        type: GET_INVOICE_SUCCESS,
+        payload: invoice,
+    }));
 }
 
 function* getPaymentsSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getPayments, action.payload);
-        yield put({ type: GET_PAYMENTS_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadPayments')));
-    }
+    yield call(read, action, 'errors.loadPayments', () => service.getPayments(action.payload), (payments) => ({
+        type: GET_PAYMENTS_SUCCESS,
+        payload: { invoiceId: action.payload, list: payments ?? [] },
+    }));
+}
+
+function* createInvoiceSaga(action: any) {
+    yield call(write, action, 'errors.createInvoice', () => service.createInvoice(action.payload));
+}
+
+function* updateInvoiceSaga(action: any) {
+    yield call(write, action, 'errors.updateInvoice', () => service.updateInvoice(action.payload.id, action.payload.data));
+}
+
+function* issueInvoiceSaga(action: any) {
+    yield call(write, action, 'errors.issueInvoice', () => service.issueInvoice(action.payload));
+}
+
+function* cancelInvoiceSaga(action: any) {
+    const { id, reason } = action.payload;
+    yield call(write, action, 'errors.cancelInvoice', () => service.cancelInvoice(id, reason));
+}
+
+function* addPaymentSaga(action: any) {
+    const { invoiceId, data } = action.payload;
+    yield call(write, action, 'errors.addPayment', () => service.addPayment(invoiceId, data));
+}
+
+function* voidPaymentSaga(action: any) {
+    const { invoiceId, paymentId, type, reason } = action.payload;
+    yield call(write, action, 'errors.voidPayment', () => service.voidPayment(invoiceId, paymentId, type, reason));
+}
+
+function* getPatientInvoicesSaga(action: any) {
+    const { patientId, page, limit } = action.payload;
+    yield call(
+        read,
+        action,
+        'errors.loadInvoices',
+        () => service.getInvoices({ patientId, page, limit }),
+        (data) => ({
+            type: GET_PATIENT_INVOICES_SUCCESS,
+            payload: { query: action.payload, list: data?.data ?? [], total: data?.pagination?.total ?? 0 },
+        }),
+    );
+}
+
+function* getPatientSummarySaga(action: any) {
+    yield call(read, action, 'errors.loadInvoices', () => service.getPatientSummary(action.payload), (summary) => ({
+        type: GET_PATIENT_BILLING_SUMMARY_SUCCESS,
+        payload: { patientId: action.payload, summary },
+    }));
 }
 
 function* getRevenueSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getRevenue, action.payload);
-        yield put({ type: GET_REVENUE_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadRevenue')));
-    }
+    yield call(read, action, 'errors.loadRevenue', () => service.getRevenue(action.payload), (revenue) => ({
+        type: GET_REVENUE_SUCCESS,
+        payload: revenue,
+    }));
 }
 
 export function* watchBilling() {
     yield takeLatest(GET_INVOICES, getInvoicesSaga);
     yield takeLatest(GET_INVOICE, getInvoiceSaga);
+    yield takeLatest(GET_PAYMENTS, getPaymentsSaga);
     yield takeLatest(CREATE_INVOICE, createInvoiceSaga);
+    yield takeLatest(UPDATE_INVOICE, updateInvoiceSaga);
+    yield takeLatest(ISSUE_INVOICE, issueInvoiceSaga);
     yield takeLatest(CANCEL_INVOICE, cancelInvoiceSaga);
     yield takeLatest(ADD_PAYMENT, addPaymentSaga);
-    yield takeLatest(GET_PAYMENTS, getPaymentsSaga);
+    yield takeLatest(VOID_PAYMENT, voidPaymentSaga);
+    yield takeLatest(GET_PATIENT_INVOICES, getPatientInvoicesSaga);
+    yield takeLatest(GET_PATIENT_BILLING_SUMMARY, getPatientSummarySaga);
     yield takeLatest(GET_REVENUE, getRevenueSaga);
 }
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 interface BillingState {
-    invoices: Invoice[];
-    currentInvoice: Invoice | null;
-    payments: Payment[];
+    /** The Billing page, with the query it was loaded with. */
+    list: { query: InvoicesQuery | null; items: Invoice[]; total: number };
+    /** The open invoice — screens must check its `_id`. */
+    current: Invoice | null;
+    payments: { invoiceId: string | null; list: Payment[] };
+    /** One patient's invoices and balance (patient page). */
+    byPatient: {
+        query: { patientId: string; page?: number; limit?: number } | null;
+        items: Invoice[];
+        total: number;
+        summary: (PatientBillingSummary & { patientId: string }) | null;
+    };
+    /** Id of the invoice just created, for the create page to navigate to. */
+    createdId: string | null;
     revenue: any;
-    total: number;
 }
 
 const initialState: BillingState = {
-    invoices: [],
-    currentInvoice: null,
-    payments: [],
+    list: { query: null, items: [], total: 0 },
+    current: null,
+    payments: { invoiceId: null, list: [] },
+    byPatient: { query: null, items: [], total: 0, summary: null },
+    createdId: null,
     revenue: null,
-    total: 0,
 };
 
 export const billingReducer = (state = initialState, action: any): BillingState => {
     switch (action.type) {
+        case GET_INVOICES:
+            return { ...state, list: { ...state.list, query: action.payload } };
         case GET_INVOICES_SUCCESS:
-            return { ...state, invoices: action.payload.invoices, total: action.payload.total };
+            return { ...state, list: { ...state.list, items: action.payload.list, total: action.payload.total } };
         case GET_INVOICE_SUCCESS:
-            return { ...state, currentInvoice: action.payload };
+            return { ...state, current: action.payload };
         case GET_PAYMENTS_SUCCESS:
             return { ...state, payments: action.payload };
+        case GET_PATIENT_INVOICES:
+            return {
+                ...state,
+                byPatient:
+                    state.byPatient.query?.patientId === action.payload.patientId
+                        ? { ...state.byPatient, query: action.payload }
+                        : { query: action.payload, items: [], total: 0, summary: null },
+            };
+        case GET_PATIENT_INVOICES_SUCCESS:
+            return {
+                ...state,
+                byPatient: { ...state.byPatient, items: action.payload.list, total: action.payload.total },
+            };
+        case GET_PATIENT_BILLING_SUMMARY_SUCCESS:
+            return {
+                ...state,
+                byPatient: { ...state.byPatient, summary: { ...action.payload.summary, patientId: action.payload.patientId } },
+            };
+        case CREATE_INVOICE + '_DONE':
+            return { ...state, createdId: action.payload };
+        case CREATE_INVOICE + '_CLEAR':
+            return { ...state, createdId: null };
         case GET_REVENUE_SUCCESS:
             return { ...state, revenue: action.payload };
         default:

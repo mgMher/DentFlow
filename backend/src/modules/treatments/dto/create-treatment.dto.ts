@@ -15,7 +15,8 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { IsOptionalNotNull, Trim } from 'src/common/decorators';
 import { ToothStatus } from 'src/modules/dental-records/dental-record.schema';
-import { TreatmentCategory, Currency } from '../treatment.schema';
+import { Currency } from 'src/common/utils';
+import { TreatmentCategory } from '../treatment.schema';
 
 export class PriceDto {
     @ApiProperty({ example: 15000, description: 'Treatment price amount' })

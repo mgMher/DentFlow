@@ -9,12 +9,6 @@ import {
     Tab,
     Button,
     Chip,
-    Table,
-    TableBody,
-    TableCell,
-    TableContainer,
-    TableHead,
-    TableRow,
     Paper,
     FormControl,
     InputLabel,
@@ -37,7 +31,6 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
-import { billingActions } from '../../store/billing';
 import {
     PageHeader,
     StatusChip,
@@ -46,7 +39,6 @@ import {
 } from '../../components/ui';
 import {
     formatDate,
-    formatCurrency,
     getFullName,
     getInitials,
 } from '../../utils/formatters';
@@ -56,6 +48,7 @@ import PatientProfileTab from './PatientProfileTab';
 import PatientAppointmentsTab from './PatientAppointmentsTab';
 import PatientChartTab from './PatientChartTab';
 import PatientTreatmentsTab from './PatientTreatmentsTab';
+import PatientBillingTab from './PatientBillingTab';
 import PatientStatusDialog from './PatientStatusDialog';
 import { ChartType, PATIENT_STATUSES, PatientStatus } from '../../types';
 
@@ -101,10 +94,6 @@ const PatientDetailPage: React.FC = () => {
     // patients would otherwise flash the wrong person's data (allergies
     // included) for a frame before the fetch starts.
     const patient = storedPatient && storedPatient._id === id ? storedPatient : null;
-    const invoices = useSelector((state: RootState) => state.billing.invoices);
-    const invoicesLoading = useSelector((state: RootState) =>
-        state.http.loading.includes('GET_INVOICES'),
-    );
     const statusLoading = useSelector((state: RootState) =>
         state.http.loading.includes('UPDATE_PATIENT_STATUS'),
     );
@@ -125,15 +114,6 @@ const PatientDetailPage: React.FC = () => {
             dispatch(patientsActions.getPatient(id));
         }
     }, [id, dispatch]);
-
-    // Each tab loads its own data — otherwise the history tables stay empty.
-    useEffect(() => {
-        if (!id) return;
-
-        if (tabValue === TABS.billing) {
-            dispatch(billingActions.getInvoices({ patientId: id, limit: 100 }));
-        }
-    }, [tabValue, id, dispatch]);
 
     const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
         setTabValue(newValue);
@@ -160,11 +140,6 @@ const PatientDetailPage: React.FC = () => {
         return <LoadingSpinner fullPage />;
     }
 
-
-    const patientInvoices = invoices.filter((inv) => {
-        const patientId = typeof inv.patientId === 'string' ? inv.patientId : inv.patientId?._id;
-        return patientId === id;
-    });
 
     const currentStatus: PatientStatus =
         patient.status || (patient.isActive ? 'active' : 'inactive');
@@ -325,7 +300,7 @@ const PatientDetailPage: React.FC = () => {
                     <Tab label={t('dental.odontogram')} />
                     <Tab label={t('dental.treatmentsTab')} />
                     <Tab label={t('patients.appointmentHistory')} />
-                    <Tab label={t('patients.billingHistory')} />
+                    {can('viewBilling') && <Tab label={t('patients.billingHistory')} />}
                 </Tabs>
             </Paper>
 
@@ -350,57 +325,14 @@ const PatientDetailPage: React.FC = () => {
                 />
             </TabPanel>
 
-            {/* Billing Tab */}
-            <TabPanel value={tabValue} index={TABS.billing}>
-                {invoicesLoading && patientInvoices.length === 0 ? (
-                    <LoadingSpinner />
-                ) : patientInvoices.length === 0 ? (
-                    <EmptyState title={t('billing.noInvoices')} />
-                ) : (
-                    <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
-                        <Table>
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell>{t('billing.invoiceNumber')}</TableCell>
-                                    <TableCell>{t('common.date')}</TableCell>
-                                    <TableCell align="right">{t('billing.totalAmount')}</TableCell>
-                                    <TableCell align="right">{t('billing.paidAmount')}</TableCell>
-                                    <TableCell align="right">{t('billing.balance')}</TableCell>
-                                    <TableCell>{t('common.status')}</TableCell>
-                                </TableRow>
-                            </TableHead>
-                            <TableBody>
-                                {patientInvoices.map((invoice) => (
-                                    <TableRow
-                                        key={invoice._id}
-                                        hover
-                                        sx={{ cursor: 'pointer' }}
-                                        onClick={() => navigate(`/billing/${invoice._id}`)}
-                                    >
-                                        <TableCell>{invoice.invoiceNumber}</TableCell>
-                                        <TableCell>{formatDate(invoice.createdAt)}</TableCell>
-                                        <TableCell align="right">
-                                            {formatCurrency(invoice.totalAmount, invoice.currency)}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            {formatCurrency(invoice.paidAmount, invoice.currency)}
-                                        </TableCell>
-                                        <TableCell align="right">
-                                            {formatCurrency(
-                                                invoice.totalAmount - invoice.paidAmount,
-                                                invoice.currency,
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            <StatusChip status={invoice.status} translationPrefix="billing" />
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    </TableContainer>
-                )}
-            </TabPanel>
+            {can('viewBilling') && (
+                <TabPanel value={tabValue} index={TABS.billing}>
+                    <PatientBillingTab
+                        patientId={patient._id}
+                        billable={!['archived', 'deceased'].includes(currentStatus)}
+                    />
+                </TabPanel>
+            )}
 
             <PatientStatusDialog
                 patientId={pendingStatus ? patient._id : null}

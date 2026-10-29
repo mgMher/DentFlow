@@ -6,3 +6,4 @@ export {
 export { errorBody } from './error-body.util';
 export { escapeRegex } from './regex.util';
 export * from './clinic-time.util';
+export * from './money.util';

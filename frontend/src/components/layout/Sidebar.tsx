@@ -36,7 +36,7 @@ const navItems: NavItem[] = [
     { path: '/patients', labelKey: 'nav.patients', icon: <PeopleIcon /> },
     { path: '/appointments', labelKey: 'nav.appointments', icon: <CalendarIcon /> },
     { path: '/treatments', labelKey: 'nav.treatments', icon: <TreatmentIcon /> },
-    { path: '/billing', labelKey: 'nav.billing', icon: <BillingIcon /> },
+    { path: '/billing', labelKey: 'nav.billing', icon: <BillingIcon />, permission: 'viewBilling' },
     { path: '/staff', labelKey: 'nav.staff', icon: <StaffIcon /> },
     { path: '/schedule', labelKey: 'nav.schedule', icon: <ScheduleIcon /> },
     { path: '/reports', labelKey: 'nav.reports', icon: <ReportsIcon />, permission: 'viewReports' },

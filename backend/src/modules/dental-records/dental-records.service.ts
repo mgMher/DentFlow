@@ -530,7 +530,7 @@ export class DentalRecordsService implements OnModuleInit {
             },
             { new: true },
         );
-        if (!entry) throw await this.entryStateError(clinicId, patientId, entryId);
+        if (!entry) throw await this.entryStateError(clinicId, patientId, entryId, 'complete');
 
         try {
             await this.applyTreatmentResult(clinicId, patientId, entry, userId);
@@ -551,7 +551,8 @@ export class DentalRecordsService implements OnModuleInit {
     /**
      * Entries are never deleted. Voiding hides one from the history and keeps
      * who, when and why; it does not undo chart changes (the tooth history
-     * shows them, and the tooth can be corrected by hand).
+     * shows them, and the tooth can be corrected by hand). A billed entry
+     * cannot be voided until its invoice is cancelled.
      */
     async voidTreatmentEntry(
         clinicId: Types.ObjectId,
@@ -562,23 +563,33 @@ export class DentalRecordsService implements OnModuleInit {
     ) {
         const entry = await this.treatmentEntryModel
             .findOneAndUpdate(
-                { _id: entryId, clinicId, patientId, voidedAt: null },
+                { _id: entryId, clinicId, patientId, voidedAt: null, invoiceId: null },
                 { $set: { voidedAt: new Date(), voidedBy: userId, voidReason: reason } },
                 { new: true },
             )
             .populate(ENTRY_POPULATE);
-        if (!entry) throw await this.entryStateError(clinicId, patientId, entryId);
+        if (!entry) throw await this.entryStateError(clinicId, patientId, entryId, 'void');
         return entry;
     }
 
     /** Why a conditional entry update matched nothing. */
-    private async entryStateError(clinicId: Types.ObjectId, patientId: Types.ObjectId, entryId: Types.ObjectId) {
+    private async entryStateError(
+        clinicId: Types.ObjectId,
+        patientId: Types.ObjectId,
+        entryId: Types.ObjectId,
+        operation: 'complete' | 'void',
+    ) {
         const entry = await this.treatmentEntryModel.findOne({ _id: entryId, clinicId, patientId }).lean();
         if (!entry) {
             return new NotFoundException(errorBody('treatmentEntryNotFound', 'Treatment entry not found'));
         }
         if (entry.voidedAt) {
             return new BadRequestException(errorBody('treatmentEntryVoided', 'This entry was voided'));
+        }
+        if (operation === 'void' && entry.invoiceId) {
+            return new BadRequestException(
+                errorBody('treatmentEntryBilled', 'This entry is on an invoice. Cancel the invoice first.'),
+            );
         }
         return new BadRequestException(errorBody('treatmentEntryAlreadyDone', 'This treatment is already done'));
     }

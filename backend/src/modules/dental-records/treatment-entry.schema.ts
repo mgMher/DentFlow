@@ -1,14 +1,9 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { ToothStatus, ToothSurface } from './dental-record.schema';
+import { Currency } from 'src/common/utils';
 
 export type TreatmentEntryDocument = TreatmentEntry & Document;
-
-export enum Currency {
-    AMD = 'AMD',
-    USD = 'USD',
-    RUB = 'RUB',
-}
 
 @Schema({ _id: false })
 export class TreatmentImage {
@@ -106,6 +101,10 @@ export class TreatmentEntry {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     completedBy: Types.ObjectId;
 
+    /** The live invoice billing this entry; cleared when that invoice is cancelled. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Invoice' })
+    invoiceId: Types.ObjectId;
+
     /** Entries are never deleted: a mistake is voided, with who, when and why. */
     @Prop()
     voidedAt: Date;
@@ -121,3 +120,4 @@ export const TreatmentEntrySchema = SchemaFactory.createForClass(TreatmentEntry)
 
 TreatmentEntrySchema.index({ clinicId: 1, patientId: 1, date: -1 });
 TreatmentEntrySchema.index({ clinicId: 1, patientId: 1, teeth: 1 });
+TreatmentEntrySchema.index({ invoiceId: 1 }, { sparse: true });

@@ -19,7 +19,7 @@ import AppointmentDetailPage from '../pages/appointments/AppointmentDetailPage';
 import TreatmentsPage from '../pages/treatments/TreatmentsPage';
 import BillingListPage from '../pages/billing/BillingListPage';
 import InvoiceDetailPage from '../pages/billing/InvoiceDetailPage';
-import InvoiceCreatePage from '../pages/billing/InvoiceCreatePage';
+import InvoiceEditorPage from '../pages/billing/InvoiceEditorPage';
 import StaffListPage from '../pages/staff/StaffListPage';
 import StaffDetailPage from '../pages/staff/StaffDetailPage';
 import ReportsPage from '../pages/reports/ReportsPage';
@@ -54,9 +54,14 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
 
                     <Route path="/treatments" element={<TreatmentsPage />} />
 
-                    <Route path="/billing" element={<BillingListPage />} />
-                    <Route path="/billing/new" element={<InvoiceCreatePage />} />
-                    <Route path="/billing/:id" element={<InvoiceDetailPage />} />
+                    <Route element={<RequirePermission permission="viewBilling" />}>
+                        <Route path="/billing" element={<BillingListPage />} />
+                        <Route path="/billing/:id" element={<InvoiceDetailPage />} />
+                    </Route>
+                    <Route element={<RequirePermission permission="manageBilling" />}>
+                        <Route path="/billing/new" element={<InvoiceEditorPage />} />
+                        <Route path="/billing/:id/edit" element={<InvoiceEditorPage />} />
+                    </Route>
 
                     <Route path="/staff" element={<StaffListPage />} />
                     <Route path="/staff/:id" element={<StaffDetailPage />} />

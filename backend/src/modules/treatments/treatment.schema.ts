@@ -1,6 +1,7 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { ToothStatus } from 'src/modules/dental-records/dental-record.schema';
+import { Currency } from 'src/common/utils';
 
 export enum TreatmentCategory {
     GENERAL = 'general',
@@ -13,12 +14,6 @@ export enum TreatmentCategory {
     PEDIATRIC = 'pediatric',
     DIAGNOSTIC = 'diagnostic',
     PREVENTIVE = 'preventive',
-}
-
-export enum Currency {
-    AMD = 'AMD',
-    USD = 'USD',
-    RUB = 'RUB',
 }
 
 @Schema({ _id: false })

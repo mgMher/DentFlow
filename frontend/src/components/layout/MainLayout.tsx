@@ -16,15 +16,18 @@ const MainLayout: React.FC<MainLayoutProps> = ({ themeMode, onToggleTheme }) => 
 
     return (
         <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-            <Sidebar
-                collapsed={sidebarCollapsed}
-                onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
-            />
-            <Header
-                sidebarWidth={sidebarWidth}
-                themeMode={themeMode}
-                onToggleTheme={onToggleTheme}
-            />
+            {/* App chrome is left out of printouts (invoices). */}
+            <Box sx={{ displayPrint: 'none' }}>
+                <Sidebar
+                    collapsed={sidebarCollapsed}
+                    onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+                />
+                <Header
+                    sidebarWidth={sidebarWidth}
+                    themeMode={themeMode}
+                    onToggleTheme={onToggleTheme}
+                />
+            </Box>
             <Box
                 component="main"
                 sx={{
@@ -38,6 +41,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ themeMode, onToggleTheme }) => 
                     backgroundColor: (theme) => theme.palette.background.default,
                     minHeight: `calc(100vh - ${HEADER_HEIGHT}px)`,
                     transition: 'margin-left 0.2s ease',
+                    '@media print': { mt: 0, p: 0, backgroundColor: '#fff' },
                 }}
             >
                 <Outlet />

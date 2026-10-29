@@ -28,6 +28,8 @@ export interface PaginatedPatients {
     totalPages: number;
 }
 
+import { patientSearchClauses } from './patient-search';
+
 @Injectable()
 export class PatientsService implements OnModuleInit {
     private readonly logger = new Logger(PatientsService.name);
@@ -155,7 +157,7 @@ export class PatientsService implements OnModuleInit {
         const filter: FilterQuery<PatientDocument> = { clinicId };
 
         if (query.search?.trim()) {
-            filter.$and = this.searchClauses(query.search);
+            filter.$and = patientSearchClauses(query.search);
         }
 
         if (query.gender) {
@@ -427,31 +429,6 @@ export class PatientsService implements OnModuleInit {
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * "Armen Hakobyan" → every word must match some field. A single regex over
-     * the whole string matched nothing, because no one field holds both names.
-     */
-    private searchClauses(search: string): FilterQuery<PatientDocument>[] {
-        return search
-            .trim()
-            .split(/\s+/)
-            .slice(0, 5)
-            .map((word) => {
-                const regex = new RegExp(escapeRegex(word), 'i');
-                const or: FilterQuery<PatientDocument>[] = [
-                    { firstName: regex },
-                    { lastName: regex },
-                    { patronymic: regex },
-                    { email: regex },
-                    { phone: regex },
-                ];
-                // Let "093123456" or "93123456" match the stored +374XXXXXXXX form.
-                const digits = word.replace(/\D/g, '');
-                if (digits.length >= 3) or.push({ phone: new RegExp(digits.replace(/^(?:374|0)/, '')) });
-                return { $or: or };
-            });
-    }
 
     private assertValidDateOfBirth(dateOfBirth: string): void {
         const date = new Date(dateOfBirth);

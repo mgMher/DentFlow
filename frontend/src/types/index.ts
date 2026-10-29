@@ -364,16 +364,21 @@ export interface TreatmentEntry {
     voidReason?: string;
 }
 
-// Billing types
-export type InvoiceStatus = 'draft' | 'pending' | 'partial' | 'paid' | 'overdue' | 'cancelled';
+// Billing types — amounts arrive in major units (dram, dollars)
+/** Stored statuses. "Overdue" is computed: see `Invoice.isOverdue`. */
+export type InvoiceStatus = 'draft' | 'issued' | 'partial' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'card' | 'bank_transfer';
+export type PaymentVoidType = 'refund' | 'mistake';
 
 export interface InvoiceItem {
     /** Populated by the API on read — a plain id on write. */
     treatmentId?: string | Treatment;
+    /** The chart entry this line bills. */
+    treatmentEntryId?: string;
     description: string;
     quantity: number;
     unitPrice: number;
+    /** Percent, 0–100. */
     discount: number;
     total: number;
 }
@@ -391,11 +396,20 @@ export interface Invoice {
     taxAmount: number;
     totalAmount: number;
     paidAmount: number;
+    balance: number;
     currency: Currency;
     status: InvoiceStatus;
+    /** Issued or partly paid and past the due date. */
+    isOverdue: boolean;
     dueDate?: string;
     notes?: string;
     createdAt: string;
+    createdBy?: PersonRef;
+    issuedAt?: string;
+    issuedBy?: PersonRef;
+    cancelledAt?: string;
+    cancelledBy?: PersonRef;
+    cancelReason?: string;
 }
 
 export interface Payment {
@@ -409,6 +423,16 @@ export interface Payment {
     date: string;
     reference?: string;
     notes?: string;
+    receivedBy?: PersonRef;
+    voidedAt?: string;
+    voidedBy?: PersonRef;
+    voidType?: PaymentVoidType;
+    voidReason?: string;
+}
+
+export interface PatientBillingSummary {
+    byCurrency: { currency: Currency; billed: number; paid: number; balance: number; invoices: number; overdue: number }[];
+    unbilledTreatments: number;
 }
 
 // Schedule types

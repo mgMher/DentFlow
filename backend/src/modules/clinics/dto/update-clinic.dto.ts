@@ -17,7 +17,8 @@ import {
 import { Transform, Type } from 'class-transformer';
 import { IsTimeZone, TIME_OF_DAY, Trim } from 'src/common/decorators';
 import { ARMENIAN_PHONE_E164, ARMENIAN_PHONE_MESSAGE, normalizeArmenianPhone } from 'src/common/utils';
-import { SupportedCurrency, SupportedLanguage } from '../clinic.schema';
+import { SupportedLanguage } from '../clinic.schema';
+import { Currency } from 'src/common/utils';
 
 /** `''` means "clear this field", so it skips the format check. */
 const unlessEmpty = ValidateIf((_, value) => value !== '');
@@ -133,10 +134,10 @@ export class UpdateClinicDto {
     @IsEnum(SupportedLanguage)
     language?: SupportedLanguage;
 
-    @ApiPropertyOptional({ enum: SupportedCurrency, example: SupportedCurrency.AMD })
+    @ApiPropertyOptional({ enum: Currency, example: Currency.AMD })
     @IsOptional()
-    @IsEnum(SupportedCurrency)
-    currency?: SupportedCurrency;
+    @IsEnum(Currency)
+    currency?: Currency;
 
     // `subscription` is deliberately absent: a clinic must not be able to
     // grant itself a plan. It belongs to a platform-admin path.
@@ -156,10 +157,10 @@ export class UpdateSettingsDto {
     @IsEnum(SupportedLanguage)
     language?: SupportedLanguage;
 
-    @ApiPropertyOptional({ enum: SupportedCurrency, example: SupportedCurrency.AMD })
+    @ApiPropertyOptional({ enum: Currency, example: Currency.AMD })
     @IsOptional()
-    @IsEnum(SupportedCurrency)
-    currency?: SupportedCurrency;
+    @IsEnum(Currency)
+    currency?: Currency;
 
     @ApiPropertyOptional({ example: 'Asia/Yerevan' })
     @IsOptional()

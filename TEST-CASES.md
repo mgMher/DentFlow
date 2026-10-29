@@ -446,6 +446,35 @@ Log in as the clinic admin and as a dentist; some rows need a receptionist or as
 | F4-24 | Catalogue roles | Dentist opens Treatments | List only, "Only the clinic admin can change the catalogue" | — |
 | F4-25 | Empty catalogue | Clinic with no items (admin) | "Add the standard catalogue" button creates 20 items | — |
 
+## 18. Phase 5 — billing
+
+Log in as the clinic admin, a receptionist, a dentist and an assistant.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F5-01 | Create from treatments | Patient → Billing → Create invoice → "From treatments", tick two | Lines with the recorded cost, "From the dental chart"; patient pre-filled | — |
+| F5-02 | No double billing | Create a second invoice and look at "From treatments" | Already billed treatments are not offered; API refuses them (409) | — |
+| F5-03 | Discount % | 20 000 with 10% | Line 18 000; detail page shows "10%" (not "10 ֏") | — |
+| F5-04 | Currency | Open the form | Currency is the clinic's, read-only | — |
+| F5-05 | Draft → issue | Save as draft; open it; Edit; Issue | Draft editable; after Issue no Edit; payments allowed only after Issue | — |
+| F5-06 | Exact balance | Pay the whole remaining amount | Accepted; status Paid, balance 0 | — |
+| F5-07 | Overpay | Pay more than the balance | Inline "The remaining balance is …" | — |
+| F5-08 | Two cashiers | Two browsers pay the last 5 000 at the same time | One succeeds, the other gets the balance error | — |
+| F5-09 | Half a dram | Price or payment 100.5 in an AMD clinic | Refused ("Too many decimals") | — |
+| F5-10 | Cancel with payments | Cancel a partly paid invoice | Not offered; API says refund first | — |
+| F5-11 | Refund | Admin → payment → Refund / void, reason | Payment struck through with who / when / why; balance back up; status Partly paid / Issued | — |
+| F5-12 | Cancel | Admin cancels an issued unpaid invoice with a reason; receptionist cancels a draft | Cancelled with reason shown; its treatments become billable again | — |
+| F5-13 | Receptionist limits | Receptionist on an issued invoice | No Cancel (hint shown), no Refund | — |
+| F5-14 | Dentist / assistant | Dentist opens Billing; assistant looks for Billing | Dentist: view only, no Create; assistant: no menu item, `/billing` redirects | — |
+| F5-15 | Overdue | Issued invoice with yesterday's due date | Red "Overdue" chip, Overdue tab lists it, due date red | — |
+| F5-16 | Search | Type a patient's first + last name, then an invoice number | Matches; no 400 on typing | — |
+| F5-17 | Numbers | Create several invoices | `INV-2026-00001`, `…00002`, …, never duplicated | — |
+| F5-18 | Patient balance | Patient → Billing | Billed / paid / balance ignore drafts and cancelled; "Treatments not billed yet: N" | — |
+| F5-19 | Print | Invoice → Print | Only the invoice with the clinic's name/address/phone; no sidebar, header or buttons | — |
+| F5-20 | Old data | Existing database, first start after deploy | Log "Converted N invoices/payments to integer amounts"; old USD 12.50 still shows 12.50; `pending` invoices show Issued / Partly paid | — |
+| F5-21 | Billed treatment | Void a treatment that is on an invoice | "This treatment is on an invoice. Cancel the invoice first." | — |
+| F5-22 | Languages | Billing screens in hy / ru / en | All labels and errors translated | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

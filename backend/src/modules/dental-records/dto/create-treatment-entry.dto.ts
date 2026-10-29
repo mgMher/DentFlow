@@ -15,7 +15,8 @@ import {
     Min,
     MinLength,
 } from 'class-validator';
-import { Currency, TreatmentEntryStatus } from '../treatment-entry.schema';
+import { TreatmentEntryStatus } from '../treatment-entry.schema';
+import { Currency } from 'src/common/utils';
 import { ToothStatus, ToothSurface } from '../dental-record.schema';
 import { Trim } from 'src/common/decorators';
 
