@@ -24,8 +24,8 @@ the first 20 records. There are **zero automated tests**, and TypeScript `strict
 | Treatments catalog | ✅ Cleaned | — |
 | Dental chart | ✅ Cleaned | FDI, per-surface, planned/done; no periodontal chart yet (F12) |
 | Billing | ✅ Cleaned | Fiscal receipts (F10) and deposits (F4) not built |
-| Reports | **Broken** | Every revenue request returns 400; charts always empty |
-| Dashboard | Mostly broken | 2 cards always 0; receptionists get "Insufficient permissions" on login |
+| Reports | ✅ Cleaned | Export / commission (F11) not built |
+| Dashboard | ✅ Cleaned | Activity is rebuilt from records until the audit log (F7) |
 | Notifications | **Never created** | Nothing in the app ever creates a notification; bell hardcoded to 0 |
 
 ---
@@ -191,19 +191,25 @@ built from treatment entries. Reports come after billing because they read billi
 - [x] **P2** Patient billing tab (`PatientBillingTab`): billed / paid / balance / overdue per currency without drafts or cancelled, unbilled treatments count, "Create invoice", paginated list
 - [x] **NEW** Edit drafts (`/billing/:id/edit`), Issue button, status tabs incl. Draft / Issued / Overdue / Cancelled
 - [x] Verified on local MongoDB: 53 checks (`test/smoke/05-billing.mjs`) + suites 01–04, legacy-data migration (USD decimals → cents, `pending` → `partial`), browser (invoice from treatments, totals, issue, payment, list)
-- [ ] **For Phase 6:** invoice/payment amounts are now stored in minor units — reports must divide by the currency's factor (no change for AMD) and skip voided payments. `/billing/revenue` is admin-only now; the Reports page still sends `period` (400)
+- [x] **For Phase 6:** reports divide minor units back and skip voided payments (done in Phase 6)
 - [ ] Not built: e-HDM fiscal receipt (F10), deposits / one payment across invoices (F4), PDF export (print-to-PDF works)
 
-### Phase 6 — Reports & Dashboard
+### Phase 6 — Reports & Dashboard — ✅ done 2026-10-29 (not committed yet)
 
-- [ ] **P1** Reports page: sends `period` (400), reads fields no endpoint returns → rewire to existing endpoints
-- [ ] **P1** Dashboard: field names don't match backend (2 cards always 0, activity always empty)
-- [ ] **P1** Dashboard endpoint forbidden for receptionist/assistant (their landing page)
-- [ ] **P0** Revenue: group by currency, never sum AMD + USD + RUB
-- [ ] **P1** Date ranges in clinic timezone; end date inclusive; `$dateToString` with timezone
-- [ ] **P1** One revenue definition (collected payments vs billed) used by every report
-- [ ] **P2** Query DTOs for reports (missing dates → Invalid Date)
-- [ ] **P3** Unused filter in `getPatientStats`; delete or wire unused endpoints
+- [x] **P1** Reports page rewired: range presets (this month, last month, 30 days, this year, custom), day / week / month grouping, every number from an endpoint that returns it; responses for another range are never shown
+- [x] **P1** Dashboard reads the fields the backend returns: today (non-cancelled), active patients + new this month, open / overdue invoices, month revenue; upcoming appointments populated
+- [x] **P1** Recent activity built from the records (new patients, bookings, treatments done, invoices issued, payments) with who and when, newest first, clickable — until the audit log (F7)
+- [x] **P1** `GET /reports/dashboard` open to every role; each part only for roles that see it elsewhere (revenue: admins; invoices: billing viewers); dentists get their own appointments
+- [x] **P0** Revenue in the clinic currency only (D3), minor units divided back (D2); legacy payments in another currency listed apart, never added
+- [x] **P1** Date ranges are clinic days in the clinic timezone, end date included; `$dateTrunc` / `$dateToString` with timezone; periods zero-filled (`report-periods.ts`, unit-tested)
+- [x] **P1** One revenue definition: **collected** = payments received in the period, not voided. Per dentist and per treatment split those payments over the invoice lines they paid (dentist from the treatment entry, else the invoice appointment), so the parts add up to the total. Invoiced and outstanding shown beside it, labelled as such
+- [x] **P1 / D5** Reports: admins all; dentists their own appointments, row and treatments without money; revenue admin only. `/billing/revenue` removed (one definition, in `/reports/revenue`)
+- [x] **P2** `ReportQueryDto`: `YYYY-MM-DD` dates (defaults: 1st of this month → today), `groupBy`; start after end → 400 `invalidDateRange`; > 400 periods or 10 years → 400 `reportRangeTooLong`
+- [x] **P3** `getPatientStats` filter used (new patients in the range); unused `/billing/invoices/overdue` removed (the list's `status=overdue` replaces it)
+- [x] Staff → Performance tab reads the new report (this year; collected for admins); shown to a dentist on their own profile only
+- [x] Verified on local MongoDB: 57 checks (`test/smoke/06-reports-dashboard.mjs`) + suites 01–05, browser (admin dashboard and reports, grouping and presets, dentist views)
+- [ ] Not built: CSV / Excel export and dentist commission (F11), daily cash report (F5), comparison with the previous period
+- [ ] Mobile: the sidebar is a permanent drawer and covers the page on phones (all pages, pre-existing)
 
 ### Phase 7 — Notifications
 

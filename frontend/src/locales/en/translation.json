@@ -93,8 +93,6 @@
     "title": "Dashboard",
     "todayAppointments": "Today's Appointments",
     "monthRevenue": "This Month's Revenue",
-    "totalPatients": "Total Patients",
-    "pendingInvoices": "Pending Invoices",
     "quickActions": "Quick Actions",
     "newAppointment": "New Appointment",
     "newPatient": "New Patient",
@@ -104,7 +102,20 @@
     "upcomingAppointments": "Upcoming Appointments",
     "noUpcomingAppointments": "No upcoming appointments",
     "welcome": "Welcome",
-    "viewAll": "View All"
+    "viewAll": "View All",
+    "activePatients": "Active Patients",
+    "openInvoices": "Open Invoices",
+    "myTodayAppointments": "My Appointments Today",
+    "myUpcomingAppointments": "My Upcoming Appointments",
+    "newThisMonth": "+{{count}} new this month",
+    "overdueCount": "Overdue: {{count}}",
+    "activity": {
+      "patient": "New patient {{patient}}",
+      "appointment": "Appointment booked: {{patient}}, {{when}}",
+      "treatment": "{{treatment}} done for {{patient}}",
+      "invoice": "Invoice {{number}} issued to {{patient}}, {{amount}}",
+      "payment": "Payment {{amount}} from {{patient}}"
+    }
   },
   "patients": {
     "title": "Patients",
@@ -504,7 +515,7 @@
     "emailIsLogin": "This email is the sign-in address",
     "readOnlyProfile": "Only a clinic administrator can edit staff records",
     "readOnlyAvailability": "You can only edit your own availability",
-    "performanceHint": "Appointments and paid invoices recorded against this dentist, across the clinic’s whole history.",
+    "performanceHint": "This year so far: appointments, treatments done and, for admins, money collected for this dentist's work.",
     "totalAppointments": "Appointments",
     "specializations": {
       "general_dentistry": "General Dentistry",
@@ -524,8 +535,6 @@
   },
   "reports": {
     "title": "Reports",
-    "patientStats": "Patient Statistics",
-    "revenueReport": "Revenue Report",
     "appointmentStats": "Appointment Statistics",
     "dentistPerformance": "Dentist Performance",
     "treatmentStats": "Treatment Statistics",
@@ -533,10 +542,44 @@
     "daily": "Daily",
     "weekly": "Weekly",
     "monthly": "Monthly",
-    "totalRevenue": "Total Revenue",
-    "averageRevenue": "Average Revenue",
     "completionRate": "Completion Rate",
-    "cancellationRate": "Cancellation Rate"
+    "range": "Period",
+    "from": "From",
+    "to": "To",
+    "presets": {
+      "thisMonth": "This month",
+      "lastMonth": "Last month",
+      "last30": "Last 30 days",
+      "thisYear": "This year",
+      "custom": "Custom"
+    },
+    "rangeInvalid": "The start date is after the end date",
+    "collected": "Collected",
+    "invoiced": "Invoiced",
+    "outstandingNow": "Outstanding now",
+    "overdueAmount": "Overdue: {{amount}}",
+    "newPatients": "New Patients",
+    "activePatients": "Active patients: {{count}}",
+    "paymentsCount": "Payments: {{count}}",
+    "invoicesCount": "Invoices: {{count}}",
+    "appointments": "Appointments",
+    "myAppointments": "My Appointments",
+    "treatmentsDone": "Treatments Done",
+    "ownOnlyHint": "You see your own appointments and treatments.",
+    "collectedOverTime": "Collected",
+    "chart": "Chart",
+    "table": "Table",
+    "revenueChart": "Collected per period",
+    "otherCurrencies": "Older payments in another currency are not included: {{list}}",
+    "payments": "Payments",
+    "myAppointmentStats": "My Appointments",
+    "stillBooked": "Still booked: {{count}}",
+    "ratesHint": "Rates are out of appointments that are completed, cancelled or no-show.",
+    "formerStaff": "former",
+    "unassigned": "Lines without a dentist",
+    "timesDone": "Times done",
+    "otherLines": "Other",
+    "collectedHint": "Collected = payments received in the period, refunds excluded. A payment is split over the lines of its invoice."
   },
   "settings": {
     "title": "Settings",
@@ -728,7 +771,6 @@
     "cancelInvoice": "Could not cancel the invoice",
     "addPayment": "Could not record the payment",
     "loadPayments": "Could not load payments",
-    "loadRevenue": "Could not load revenue",
     "loadDashboard": "Could not load the dashboard",
     "loadRevenueReport": "Could not load the revenue report",
     "loadAppointmentStats": "Could not load appointment statistics",
@@ -815,6 +857,8 @@
     "treatmentEntryBilled": "This treatment is on an invoice. Cancel the invoice first.",
     "updateInvoice": "Could not save the invoice.",
     "issueInvoice": "Could not issue the invoice.",
-    "voidPayment": "Could not refund the payment."
+    "voidPayment": "Could not refund the payment.",
+    "invalidDateRange": "The start date is after the end date",
+    "reportRangeTooLong": "The period is too long for this view. Pick weeks or months."
   }
 }

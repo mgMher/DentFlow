@@ -22,8 +22,6 @@ const GET_PATIENT_INVOICES = 'GET_PATIENT_INVOICES';
 const GET_PATIENT_INVOICES_SUCCESS = 'GET_PATIENT_INVOICES_SUCCESS';
 const GET_PATIENT_BILLING_SUMMARY = 'GET_PATIENT_BILLING_SUMMARY';
 const GET_PATIENT_BILLING_SUMMARY_SUCCESS = 'GET_PATIENT_BILLING_SUMMARY_SUCCESS';
-const GET_REVENUE = 'GET_REVENUE';
-const GET_REVENUE_SUCCESS = 'GET_REVENUE_SUCCESS';
 
 export type InvoiceStatusFilter = Invoice['status'] | 'overdue';
 
@@ -83,7 +81,6 @@ export const billingActions = {
         payload,
     }),
     getPatientSummary: (payload: string) => ({ type: GET_PATIENT_BILLING_SUMMARY, payload }),
-    getRevenue: (payload?: any) => ({ type: GET_REVENUE, payload }),
     clearCreated: () => ({ type: CREATE_INVOICE + '_CLEAR' }),
 };
 
@@ -101,7 +98,6 @@ const service = {
     voidPayment: (id: string, paymentId: string, type: PaymentVoidType, reason: string) =>
         api.patch(`/billing/invoices/${id}/payments/${paymentId}/void`, { type, reason }),
     getPatientSummary: (patientId: string) => api.get(`/billing/patients/${patientId}/summary`),
-    getRevenue: (params?: any) => api.get('/billing/revenue', { params }),
 };
 
 const unwrap = (res: any) => res.data?.data ?? res.data;
@@ -227,13 +223,6 @@ function* getPatientSummarySaga(action: any) {
     }));
 }
 
-function* getRevenueSaga(action: any) {
-    yield call(read, action, 'errors.loadRevenue', () => service.getRevenue(action.payload), (revenue) => ({
-        type: GET_REVENUE_SUCCESS,
-        payload: revenue,
-    }));
-}
-
 export function* watchBilling() {
     yield takeLatest(GET_INVOICES, getInvoicesSaga);
     yield takeLatest(GET_INVOICE, getInvoiceSaga);
@@ -246,7 +235,6 @@ export function* watchBilling() {
     yield takeLatest(VOID_PAYMENT, voidPaymentSaga);
     yield takeLatest(GET_PATIENT_INVOICES, getPatientInvoicesSaga);
     yield takeLatest(GET_PATIENT_BILLING_SUMMARY, getPatientSummarySaga);
-    yield takeLatest(GET_REVENUE, getRevenueSaga);
 }
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
@@ -266,7 +254,6 @@ interface BillingState {
     };
     /** Id of the invoice just created, for the create page to navigate to. */
     createdId: string | null;
-    revenue: any;
 }
 
 const initialState: BillingState = {
@@ -275,7 +262,6 @@ const initialState: BillingState = {
     payments: { invoiceId: null, list: [] },
     byPatient: { query: null, items: [], total: 0, summary: null },
     createdId: null,
-    revenue: null,
 };
 
 export const billingReducer = (state = initialState, action: any): BillingState => {
@@ -310,8 +296,6 @@ export const billingReducer = (state = initialState, action: any): BillingState 
             return { ...state, createdId: action.payload };
         case CREATE_INVOICE + '_CLEAR':
             return { ...state, createdId: null };
-        case GET_REVENUE_SUCCESS:
-            return { ...state, revenue: action.payload };
         default:
             return state;
     }

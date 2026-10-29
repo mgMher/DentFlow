@@ -475,6 +475,30 @@ Log in as the clinic admin, a receptionist, a dentist and an assistant.
 | F5-21 | Billed treatment | Void a treatment that is on an invoice | "This treatment is on an invoice. Cancel the invoice first." | — |
 | F5-22 | Languages | Billing screens in hy / ru / en | All labels and errors translated | — |
 
+## 19. Phase 6 — reports & dashboard
+
+Log in as the clinic admin, a receptionist, a dentist and an assistant. Have at least one paid, one partly paid and one refunded payment this month.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F6-01 | Dashboard per role | Log in as each role | Opens for everyone (no "Insufficient permissions"). Admin: today, revenue, patients, open invoices. Receptionist/dentist: no revenue card. Assistant: no revenue, no invoices | — |
+| F6-02 | Dashboard numbers | Compare with Appointments / Billing | Today's count excludes cancelled; active patients = Patients page "Active"; open invoices + overdue match the Billing tabs | — |
+| F6-03 | Month revenue | Admin dashboard vs Reports "This month" | Same amount; refunded payments not counted | — |
+| F6-04 | Recent activity | Register a patient, book, take a payment | Newest first with who did it; click opens the patient / appointment / invoice; assistant sees no payments or invoices | — |
+| F6-05 | Dentist dashboard | Log in as a dentist | "My appointments today", own upcoming only, no Create invoice button | — |
+| F6-06 | Reports — revenue | Reports → This month | Collected / Invoiced / Outstanding / New patients filled; chart has a bar per day (zero days included) | — |
+| F6-07 | Grouping | Daily → Weekly → Monthly; presets This year / Last month | Periods start on Mondays / the 1st; totals unchanged; only the revenue request reloads when grouping changes | — |
+| F6-08 | Clinic day | Payment at 00:30 Yerevan time | Counted on that day, not the day before; end date included | — |
+| F6-09 | Bad range | Start after end | Red fields, "The start date is after the end date", nothing loaded | — |
+| F6-10 | Table view | Collected → Table | Same numbers as the chart; hover / focus a bar shows date, amount, payments | — |
+| F6-11 | Dentist performance | Admin view | Every active dentist; collected per dentist + "Lines without a dentist" add up to Collected | — |
+| F6-12 | Treatments | Admin view | Done count from the chart; collected per treatment; manual lines grouped by name | — |
+| F6-13 | Dentist reports | Log in as a dentist → Reports | Own appointments, own row, own treatments; no money anywhere; no 403 in the network tab | — |
+| F6-14 | Receptionist / assistant | Look for Reports | No menu item; `/reports` redirects | — |
+| F6-15 | USD clinic | Clinic in USD, payments 0.10 + 0.20 | Collected 0.30 (not 30) | — |
+| F6-16 | Staff → Performance | Admin opens a dentist; dentist opens own profile | This year's appointments, completion, treatments, collected (admin only); a dentist doesn't see the tab on colleagues | — |
+| F6-17 | Languages | Dashboard and Reports in hy / ru / en | All labels, activity lines and month names translated | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
@@ -486,3 +510,4 @@ Log in as the clinic admin, a receptionist, a dentist and an assistant.
 | Photos | Stored as base64 on the patient document (192px, ~8KB). Fine at this scale; would need a file store if photos get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
 | JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |
+| Mobile layout | The sidebar is a permanent drawer: on a phone it stays open beside the page. Needs a temporary drawer + menu button |

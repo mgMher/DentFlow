@@ -51,6 +51,7 @@ import { formatCurrency, getFullName, getInitials } from '../../utils/formatters
 import { formatArmenianPhone } from '../../utils/validators';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
 import { staffRefId } from '../../utils/staff';
+import { toLocalDateString } from '../../utils/dates';
 import { DENTIST_SPECIALIZATIONS, STAFF_ROLES } from '../../types';
 import {
     AvailabilityRow,
@@ -160,16 +161,20 @@ const StaffDetailPage: React.FC = () => {
         setAvailability(availabilityToRows(staff.schedule?.defaultAvailability));
     }, [staff, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // `/reports` is open to admins and dentists only, so anyone else would just
-    // get a 403 behind the tab.
-    const canSeeReports = can('viewReports');
-    const showPerformance = staff?.role === 'dentist' && canSeeReports;
+    // `/reports` is open to admins and dentists; a dentist only gets their own
+    // row, so the tab shows on their own profile only.
+    const canSeeRevenue = can('viewRevenue');
+    const showPerformance = staff?.role === 'dentist' && can('viewReports') && (canSeeRevenue || isSelf);
+    const performanceQuery = useMemo(() => {
+        const today = toLocalDateString();
+        return { startDate: `${today.slice(0, 4)}-01-01`, endDate: today };
+    }, []);
 
     useEffect(() => {
         if (activeTab === 2 && showPerformance) {
-            dispatch(reportsActions.getDentistPerf());
+            dispatch(reportsActions.getDentistPerf(performanceQuery));
         }
-    }, [activeTab, showPerformance, dispatch]);
+    }, [activeTab, showPerformance, performanceQuery, dispatch]);
 
     // The refreshed record is the visible feedback; drop the flag so it does not
     // pile up across changes.
@@ -198,27 +203,25 @@ const StaffDetailPage: React.FC = () => {
 
     /**
      * Performance rows are keyed by the auth id, which is what appointments and
-     * invoices reference — not the profile id in the URL.
+     * treatment entries reference — not the profile id in the URL. The report
+     * state is shared with the Reports page, so only this year's response counts.
      */
     const stats = useMemo(() => {
         const refId = staffRefId(staff);
-        if (!refId || !performance) return null;
-
-        const appointments = performance.appointmentsPerDentist?.find(
-            (row: any) => row._id === refId,
-        );
-        const revenue = performance.revenuePerDentist?.find((row: any) => row._id === refId);
-
-        const total = appointments?.totalAppointments ?? 0;
+        if (!refId || !performance || performance.startDate !== performanceQuery.startDate) return null;
+        const row = performance.rows.find((r) => r.dentistId === refId);
+        const closed = (row?.completed ?? 0) + (row?.cancelled ?? 0) + (row?.noShow ?? 0);
         return {
-            total,
-            completed: appointments?.completed ?? 0,
-            cancelled: appointments?.cancelled ?? 0,
-            completionRate: total ? Math.round(((appointments?.completed ?? 0) / total) * 100) : 0,
-            revenue: revenue?.totalRevenue ?? 0,
-            invoiceCount: revenue?.invoiceCount ?? 0,
+            total: row?.appointments ?? 0,
+            completed: row?.completed ?? 0,
+            cancelled: row?.cancelled ?? 0,
+            noShow: row?.noShow ?? 0,
+            treatmentsDone: row?.treatmentsDone ?? 0,
+            completionRate: closed ? Math.round(((row?.completed ?? 0) / closed) * 100) : 0,
+            collected: row?.collected,
+            currency: performance.currency,
         };
-    }, [performance, staff]);
+    }, [performance, performanceQuery, staff]);
 
     const onSaveProfile = (data: StaffFormData) => {
         if (!id) return;
@@ -765,12 +768,21 @@ const StaffDetailPage: React.FC = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12} md={3}>
-                                    <StatCard
-                                        title={t('reports.totalRevenue')}
-                                        value={formatCurrency(stats?.revenue ?? 0)}
-                                        icon={<RevenueIcon />}
-                                        color="#0B5E6E"
-                                    />
+                                    {canSeeRevenue ? (
+                                        <StatCard
+                                            title={t('reports.collected')}
+                                            value={formatCurrency(stats?.collected ?? 0, stats?.currency)}
+                                            icon={<RevenueIcon />}
+                                            color="#0B5E6E"
+                                        />
+                                    ) : (
+                                        <StatCard
+                                            title={t('reports.treatmentsDone')}
+                                            value={stats?.treatmentsDone ?? 0}
+                                            icon={<RevenueIcon />}
+                                            color="#0B5E6E"
+                                        />
+                                    )}
                                 </Grid>
                             </Grid>
                             <Paper sx={{ p: 3 }}>
@@ -786,11 +798,15 @@ const StaffDetailPage: React.FC = () => {
                                     </Grid>
                                     <Grid item xs={6} md={3}>
                                         <Typography variant="body2" color="text.secondary">
-                                            {t('billing.invoices')}
+                                            {t('appointments.noShow')}
                                         </Typography>
-                                        <Typography variant="h6">
-                                            {stats?.invoiceCount ?? 0}
+                                        <Typography variant="h6">{stats?.noShow ?? 0}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6} md={3}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {t('reports.treatmentsDone')}
                                         </Typography>
+                                        <Typography variant="h6">{stats?.treatmentsDone ?? 0}</Typography>
                                     </Grid>
                                 </Grid>
                             </Paper>

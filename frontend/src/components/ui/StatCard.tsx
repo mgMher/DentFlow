@@ -7,9 +7,11 @@ interface StatCardProps {
     icon: React.ReactNode;
     color?: string;
     trend?: { value: number; label: string };
+    /** A short line under the value, e.g. "3 overdue". */
+    caption?: { text: string; color?: string };
 }
 
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, trend }) => {
+const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, trend, caption }) => {
     const theme = useTheme();
     const bgColor = color || theme.palette.primary.main;
 
@@ -24,6 +26,11 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, icon, color, trend })
                         <Typography variant="h4" fontWeight={700}>
                             {value}
                         </Typography>
+                        {caption && (
+                            <Typography variant="caption" sx={{ color: caption.color ?? 'text.secondary', fontWeight: 600 }}>
+                                {caption.text}
+                            </Typography>
+                        )}
                         {trend && (
                             <Typography
                                 variant="caption"

@@ -93,8 +93,6 @@
     "title": "Главная",
     "todayAppointments": "Записи на сегодня",
     "monthRevenue": "Доход за месяц",
-    "totalPatients": "Всего пациентов",
-    "pendingInvoices": "Неоплаченные счета",
     "quickActions": "Быстрые действия",
     "newAppointment": "Новая запись",
     "newPatient": "Новый пациент",
@@ -104,7 +102,20 @@
     "upcomingAppointments": "Предстоящие записи",
     "noUpcomingAppointments": "Нет предстоящих записей",
     "welcome": "Добро пожаловать",
-    "viewAll": "Показать все"
+    "viewAll": "Показать все",
+    "activePatients": "Активные пациенты",
+    "openInvoices": "Открытые счета",
+    "myTodayAppointments": "Мои приёмы сегодня",
+    "myUpcomingAppointments": "Мои ближайшие приёмы",
+    "newThisMonth": "+{{count}} новых в этом месяце",
+    "overdueCount": "Просрочено: {{count}}",
+    "activity": {
+      "patient": "Новый пациент {{patient}}",
+      "appointment": "Запись: {{patient}}, {{when}}",
+      "treatment": "{{treatment}} — {{patient}}",
+      "invoice": "Счёт {{number}} выставлен: {{patient}}, {{amount}}",
+      "payment": "Оплата {{amount}} от {{patient}}"
+    }
   },
   "patients": {
     "title": "Пациенты",
@@ -514,7 +525,7 @@
     "emailIsLogin": "Этот email используется для входа",
     "readOnlyProfile": "Редактировать сотрудников может только администратор клиники",
     "readOnlyAvailability": "Вы можете менять только свою доступность",
-    "performanceHint": "Приёмы и оплаченные счета этого стоматолога за всю историю клиники.",
+    "performanceHint": "С начала года: приёмы, выполненные лечения и (для администраторов) деньги, полученные за работу этого стоматолога.",
     "totalAppointments": "Приёмы",
     "specializations": {
       "general_dentistry": "Общая стоматология",
@@ -536,8 +547,6 @@
   },
   "reports": {
     "title": "Отчёты",
-    "patientStats": "Статистика пациентов",
-    "revenueReport": "Отчёт о доходах",
     "appointmentStats": "Статистика записей",
     "dentistPerformance": "Эффективность стоматологов",
     "treatmentStats": "Статистика лечения",
@@ -545,10 +554,44 @@
     "daily": "Ежедневно",
     "weekly": "Еженедельно",
     "monthly": "Ежемесячно",
-    "totalRevenue": "Общий доход",
-    "averageRevenue": "Средний доход",
     "completionRate": "Процент завершения",
-    "cancellationRate": "Процент отмен"
+    "range": "Период",
+    "from": "С",
+    "to": "По",
+    "presets": {
+      "thisMonth": "Этот месяц",
+      "lastMonth": "Прошлый месяц",
+      "last30": "Последние 30 дней",
+      "thisYear": "Этот год",
+      "custom": "Свой период"
+    },
+    "rangeInvalid": "Дата начала позже даты окончания",
+    "collected": "Получено",
+    "invoiced": "Выставлено",
+    "outstandingNow": "К оплате сейчас",
+    "overdueAmount": "Просрочено: {{amount}}",
+    "newPatients": "Новые пациенты",
+    "activePatients": "Активных пациентов: {{count}}",
+    "paymentsCount": "Платежей: {{count}}",
+    "invoicesCount": "Счетов: {{count}}",
+    "appointments": "Приёмы",
+    "myAppointments": "Мои приёмы",
+    "treatmentsDone": "Выполнено лечений",
+    "ownOnlyHint": "Показаны только ваши приёмы и лечения.",
+    "collectedOverTime": "Получено",
+    "chart": "График",
+    "table": "Таблица",
+    "revenueChart": "Получено по периодам",
+    "otherCurrencies": "Старые платежи в другой валюте не учтены: {{list}}",
+    "payments": "Платежи",
+    "myAppointmentStats": "Мои приёмы",
+    "stillBooked": "Ещё запланировано: {{count}}",
+    "ratesHint": "Доли считаются от приёмов, которые завершены, отменены или пропущены.",
+    "formerStaff": "бывший",
+    "unassigned": "Строки без врача",
+    "timesDone": "Выполнено",
+    "otherLines": "Прочее",
+    "collectedHint": "Получено = платежи за период без возвратов. Платёж делится между строками своего счёта."
   },
   "settings": {
     "title": "Настройки",
@@ -742,7 +785,6 @@
     "cancelInvoice": "Не удалось отменить счёт",
     "addPayment": "Не удалось провести оплату",
     "loadPayments": "Не удалось загрузить оплаты",
-    "loadRevenue": "Не удалось загрузить выручку",
     "loadDashboard": "Не удалось загрузить панель",
     "loadRevenueReport": "Не удалось загрузить отчёт о выручке",
     "loadAppointmentStats": "Не удалось загрузить статистику приёмов",
@@ -829,6 +871,8 @@
     "treatmentEntryBilled": "Это лечение есть в счёте. Сначала отмените счёт.",
     "updateInvoice": "Не удалось сохранить счёт.",
     "issueInvoice": "Не удалось выставить счёт.",
-    "voidPayment": "Не удалось оформить возврат."
+    "voidPayment": "Не удалось оформить возврат.",
+    "invalidDateRange": "Дата начала позже даты окончания",
+    "reportRangeTooLong": "Слишком длинный период для этого вида. Выберите недели или месяцы."
   }
 }

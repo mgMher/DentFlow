@@ -5,6 +5,8 @@ import { Appointment, AppointmentSchema } from '../appointments/appointment.sche
 import { Invoice, InvoiceSchema } from '../billing/invoice.schema';
 import { Payment, PaymentSchema } from '../billing/payment.schema';
 import { Treatment, TreatmentSchema } from '../treatments/treatment.schema';
+import { TreatmentEntry, TreatmentEntrySchema } from '../dental-records/treatment-entry.schema';
+import { User, UserSchema } from '../auth/auth.schema';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
 
@@ -16,6 +18,8 @@ import { ReportsController } from './reports.controller';
             { name: Invoice.name, schema: InvoiceSchema },
             { name: Payment.name, schema: PaymentSchema },
             { name: Treatment.name, schema: TreatmentSchema },
+            { name: TreatmentEntry.name, schema: TreatmentEntrySchema },
+            { name: User.name, schema: UserSchema },
         ]),
     ],
     controllers: [ReportsController],

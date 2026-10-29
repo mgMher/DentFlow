@@ -23,8 +23,9 @@ node test/smoke/03-appointments-schedule.mjs   # one suite
 | `03-appointments-schedule.mjs` | clashes (dentist/room/patient), hours, blocked time, availability, status rules, cancel, reschedule, calendar, recurring series, concurrency, blocked-time roles |
 | `04-dental-treatments.mjs` | FDI chart, per-surface findings, chart roles, chart-type archive/restore, planned → done updates the chart, catalogue defaults, multi-tooth and no-tooth entries, void, history filters, concurrent edits, catalogue paging/codes/clearing/reactivate, tenancy |
 | `05-billing.mjs` | totals and integer money, clinic currency, draft → issued → paid, payment race and exact balance, refunds, cancel rules, invoice numbers under concurrency, roles, search/overdue, billing treatment entries (no double billing), patient summary, tenancy, USD cents |
+| `06-reports-dashboard.mjs` | dashboard for every role, one revenue definition (collected, refunds out), clinic-timezone days and inclusive end date, zero-filled day/week/month periods, range validation, appointment rates, dentist performance and treatment revenue that add up, dentists see their own without money, USD cents |
 
 Notes:
-- Suites 01 and 02 log in as the seeded demo clinic (`admin@ararat-dental.am`); 03, 04 and 05 register their own clinics.
+- Suites 01 and 02 log in as the seeded demo clinic (`admin@ararat-dental.am`); 03 to 06 register their own clinics (06 registers two).
 - Registration is rate-limited to 5 per IP per hour (in memory). Restart the API between full runs.
 - A suite exits non-zero when any check fails, so it can run in CI later.

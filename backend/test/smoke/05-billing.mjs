@@ -100,10 +100,10 @@ r = await inv({ items: [{ description: 'X', unitPrice: 1 }] }, D);
 check('dentist cannot create invoices', r.status === 403, r.body);
 r = await call('GET', '/billing/invoices', { token: A });
 check('assistant has no billing access', r.status === 403, r.body);
-r = await call('GET', '/billing/revenue', { token: R });
+r = await call('GET', '/reports/revenue', { token: R });
 check('revenue: admin only', r.status === 403, r.body);
-r = await call('GET', '/billing/revenue', { token: T });
-check('revenue counts net payments (13500 paid, 3500 refunded)', r.status === 200 && r.data.totalRevenue === 10000 && r.data.currency === 'AMD', r.data);
+r = await call('GET', '/reports/revenue', { token: T });
+check('revenue counts net payments (13500 paid, 3500 refunded)', r.status === 200 && r.data.collected === 10000 && r.data.currency === 'AMD', r.data);
 
 // ── List: search, overdue, pages ──────────────────────────────────────────
 r = await call('GET', `/billing/invoices?search=Payer${u}%20Anna`, { token: R });

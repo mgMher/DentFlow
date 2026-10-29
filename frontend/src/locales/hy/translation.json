@@ -93,8 +93,6 @@
     "title": "Վահանակ",
     "todayAppointments": "Այսօրվա այցելությունները",
     "monthRevenue": "Այս ամսվա եկամուտը",
-    "totalPatients": "Ընդհանուր հիվանդներ",
-    "pendingInvoices": "Չվճարված հաշիվներ",
     "quickActions": "Արագ գործողություններ",
     "newAppointment": "Նոր այցելություն",
     "newPatient": "Նոր հիվանդ",
@@ -104,7 +102,20 @@
     "upcomingAppointments": "Առաջիկա այցելությունները",
     "noUpcomingAppointments": "Առաջիկա այցելություններ չկան",
     "welcome": "Բարի գալուստ",
-    "viewAll": "Տեսնել բոլորը"
+    "viewAll": "Տեսնել բոլորը",
+    "activePatients": "Ակտիվ պացիենտներ",
+    "openInvoices": "Բաց հաշիվներ",
+    "myTodayAppointments": "Իմ այսօրվա այցելությունները",
+    "myUpcomingAppointments": "Իմ մոտակա այցելությունները",
+    "newThisMonth": "+{{count}} նոր այս ամիս",
+    "overdueCount": "Ժամկետանց՝ {{count}}",
+    "activity": {
+      "patient": "Նոր պացիենտ՝ {{patient}}",
+      "appointment": "Գրանցում՝ {{patient}}, {{when}}",
+      "treatment": "{{treatment}} — {{patient}}",
+      "invoice": "Դուրս գրված հաշիվ {{number}}՝ {{patient}}, {{amount}}",
+      "payment": "Վճարում {{amount}}՝ {{patient}}"
+    }
   },
   "patients": {
     "title": "Հիվանդներ",
@@ -504,7 +515,7 @@
     "emailIsLogin": "Այս էլ. հասցեով է մուտք գործվում",
     "readOnlyProfile": "Աշխատակիցներին կարող է խմբագրել միայն կլինիկայի ադմինիստրատորը",
     "readOnlyAvailability": "Դուք կարող եք խմբագրել միայն ձեր հասանելիությունը",
-    "performanceHint": "Այս ատամնաբույժի ընդունելությունները և վճարված հաշիվները՝ կլինիկայի ողջ պատմության ընթացքում։",
+    "performanceHint": "Տարեսկզբից՝ այցելություններ, կատարված բուժումներ և (ադմինիստրատորների համար) այս ատամնաբույժի աշխատանքի դիմաց ստացված գումար։",
     "totalAppointments": "Ընդունելություններ",
     "specializations": {
       "general_dentistry": "Ընդհանուր ստոմատոլոգիա",
@@ -524,8 +535,6 @@
   },
   "reports": {
     "title": "Հաշվետվություններ",
-    "patientStats": "Հիվանդների վիճակագրություն",
-    "revenueReport": "Եկամուտի հաշվետվություն",
     "appointmentStats": "Այցելությունների վիճակագրություն",
     "dentistPerformance": "Ատամնաբույժի արդյունավետություն",
     "treatmentStats": "Բուժման վիճակագրություն",
@@ -533,10 +542,44 @@
     "daily": "Օրական",
     "weekly": "Շաբաթական",
     "monthly": "Ամսական",
-    "totalRevenue": "Ընդհանուր եկամուտ",
-    "averageRevenue": "Միին եկամուտ",
     "completionRate": "Կատարման տոկոսը",
-    "cancellationRate": "Չեղարկման տոկոսը"
+    "range": "Ժամանակահատված",
+    "from": "Սկիզբ",
+    "to": "Ավարտ",
+    "presets": {
+      "thisMonth": "Այս ամիս",
+      "lastMonth": "Նախորդ ամիս",
+      "last30": "Վերջին 30 օրը",
+      "thisYear": "Այս տարի",
+      "custom": "Այլ"
+    },
+    "rangeInvalid": "Սկզբի ամսաթիվը ավարտից հետո է",
+    "collected": "Ստացված",
+    "invoiced": "Դուրս գրված",
+    "outstandingNow": "Վճարման ենթակա",
+    "overdueAmount": "Ժամկետանց՝ {{amount}}",
+    "newPatients": "Նոր պացիենտներ",
+    "activePatients": "Ակտիվ պացիենտներ՝ {{count}}",
+    "paymentsCount": "Վճարումներ՝ {{count}}",
+    "invoicesCount": "Հաշիվներ՝ {{count}}",
+    "appointments": "Այցելություններ",
+    "myAppointments": "Իմ այցելությունները",
+    "treatmentsDone": "Կատարված բուժումներ",
+    "ownOnlyHint": "Ցուցադրված են միայն ձեր այցելություններն ու բուժումները։",
+    "collectedOverTime": "Ստացված",
+    "chart": "Գրաֆիկ",
+    "table": "Աղյուսակ",
+    "revenueChart": "Ստացված գումար ըստ ժամանակահատվածի",
+    "otherCurrencies": "Այլ արժույթով հին վճարումները ներառված չեն՝ {{list}}",
+    "payments": "Վճարումներ",
+    "myAppointmentStats": "Իմ այցելությունները",
+    "stillBooked": "Դեռ գրանցված՝ {{count}}",
+    "ratesHint": "Տոկոսները հաշվարկվում են ավարտված, չեղարկված կամ չներկայացած այցելություններից։",
+    "formerStaff": "նախկին",
+    "unassigned": "Տողեր առանց բժշկի",
+    "timesDone": "Կատարվել է",
+    "otherLines": "Այլ",
+    "collectedHint": "Ստացված = ժամանակահատվածում ստացված վճարումներ՝ առանց վերադարձների։ Վճարումը բաշխվում է իր հաշվի տողերի վրա։"
   },
   "settings": {
     "title": "Կարգավորումներ",
@@ -728,7 +771,6 @@
     "cancelInvoice": "Չհաջողվեց չեղարկել հաշիվը",
     "addPayment": "Չհաջողվեց գրանցել վճարումը",
     "loadPayments": "Չհաջողվեց բեռնել վճարումները",
-    "loadRevenue": "Չհաջողվեց բեռնել եկամուտը",
     "loadDashboard": "Չհաջողվեց բեռնել վահանակը",
     "loadRevenueReport": "Չհաջողվեց բեռնել եկամտի հաշվետվությունը",
     "loadAppointmentStats": "Չհաջողվեց բեռնել այցերի վիճակագրությունը",
@@ -815,6 +857,8 @@
     "treatmentEntryBilled": "Այս բուժումը հաշվում է։ Նախ չեղարկեք հաշիվը։",
     "updateInvoice": "Չհաջողվեց պահպանել հաշիվը։",
     "issueInvoice": "Չհաջողվեց տրամադրել հաշիվը։",
-    "voidPayment": "Չհաջողվեց վերադարձնել վճարումը։"
+    "voidPayment": "Չհաջողվեց վերադարձնել վճարումը։",
+    "invalidDateRange": "Սկզբի ամսաթիվը ավարտից հետո է",
+    "reportRangeTooLong": "Ժամանակահատվածը շատ երկար է այս տեսքի համար։ Ընտրեք շաբաթներ կամ ամիսներ։"
   }
 }

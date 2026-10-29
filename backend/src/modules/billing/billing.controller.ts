@@ -9,7 +9,6 @@ import {
     UpdateInvoiceDto,
     CreatePaymentDto,
     QueryInvoiceDto,
-    QueryRevenueDto,
     VoidPaymentDto,
     CancelInvoiceDto,
 } from './dto';
@@ -18,7 +17,7 @@ import {
 const BILLING_VIEWERS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST];
 /** Create, edit, issue, take payments, cancel drafts. */
 const BILLING_EDITORS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST];
-/** Refunds and revenue (cancelling an issued invoice is checked in the service). */
+/** Refunds (cancelling an issued invoice is checked in the service). Revenue lives in /reports/revenue. */
 const BILLING_ADMINS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN];
 
 type AuthUser = { userId: string; clinicId: string; role: Role };
@@ -48,12 +47,6 @@ export class BillingController {
     @ApiResponse({ status: 200, description: 'Paginated invoice list' })
     async findAllInvoices(@CurrentUser('clinicId') clinicId: string, @Query() query: QueryInvoiceDto) {
         return this.billingService.findAllInvoices(new Types.ObjectId(clinicId), query);
-    }
-
-    @Get('invoices/overdue')
-    @ApiOperation({ summary: 'Issued or partly paid invoices past their due date' })
-    async getOverdueInvoices(@CurrentUser('clinicId') clinicId: string) {
-        return this.billingService.getOverdueInvoices(new Types.ObjectId(clinicId));
     }
 
     @Get('invoices/:id')
@@ -157,13 +150,6 @@ export class BillingController {
             new Types.ObjectId(user.userId),
             dto,
         );
-    }
-
-    @Get('revenue')
-    @Roles(...BILLING_ADMINS)
-    @ApiOperation({ summary: 'Payments received in a date range, in the clinic currency' })
-    async getRevenueStats(@CurrentUser('clinicId') clinicId: string, @Query() query: QueryRevenueDto) {
-        return this.billingService.getRevenueStats(new Types.ObjectId(clinicId), query.startDate, query.endDate);
     }
 
     @Get('patients/:patientId/summary')

@@ -1,14 +1,21 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import api from '../../api/axios';
 import { httpActions } from '../http';
-import { apiErrorMessage } from '../../utils/apiError';
+import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
+import {
+    AppointmentReport,
+    DashboardSummary,
+    DentistPerformanceReport,
+    PatientReport,
+    ReportGroupBy,
+    RevenueReport,
+    TreatmentReport,
+} from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
 
 const GET_DASHBOARD = 'GET_DASHBOARD';
 const GET_DASHBOARD_SUCCESS = 'GET_DASHBOARD_SUCCESS';
-const GET_PATIENT_STATS = 'GET_REPORT_PATIENT_STATS';
-const GET_PATIENT_STATS_SUCCESS = 'GET_REPORT_PATIENT_STATS_SUCCESS';
 const GET_REVENUE_REPORT = 'GET_REVENUE_REPORT';
 const GET_REVENUE_REPORT_SUCCESS = 'GET_REVENUE_REPORT_SUCCESS';
 const GET_APPT_STATS = 'GET_APPT_STATS';
@@ -17,150 +24,122 @@ const GET_DENTIST_PERF = 'GET_DENTIST_PERF';
 const GET_DENTIST_PERF_SUCCESS = 'GET_DENTIST_PERF_SUCCESS';
 const GET_TREATMENT_STATS = 'GET_TREATMENT_STATS';
 const GET_TREATMENT_STATS_SUCCESS = 'GET_TREATMENT_STATS_SUCCESS';
+const GET_PATIENT_STATS = 'GET_REPORT_PATIENT_STATS';
+const GET_PATIENT_STATS_SUCCESS = 'GET_REPORT_PATIENT_STATS_SUCCESS';
+
+/** Clinic calendar days, both included. `groupBy` only matters for revenue. */
+export interface ReportQuery {
+    startDate: string;
+    endDate: string;
+    groupBy?: ReportGroupBy;
+}
 
 // ── Actions ───────────────────────────────────────────────────────────────────
 
 export const reportsActions = {
     getDashboard: () => ({ type: GET_DASHBOARD }),
-    getDashboardSuccess: (payload: any) => ({ type: GET_DASHBOARD_SUCCESS, payload }),
-    getPatientStats: (payload?: any) => ({ type: GET_PATIENT_STATS, payload }),
-    getPatientStatsSuccess: (payload: any) => ({ type: GET_PATIENT_STATS_SUCCESS, payload }),
-    getRevenueReport: (payload?: any) => ({ type: GET_REVENUE_REPORT, payload }),
-    getRevenueReportSuccess: (payload: any) => ({ type: GET_REVENUE_REPORT_SUCCESS, payload }),
-    getApptStats: (payload?: any) => ({ type: GET_APPT_STATS, payload }),
-    getApptStatsSuccess: (payload: any) => ({ type: GET_APPT_STATS_SUCCESS, payload }),
-    getDentistPerf: (payload?: any) => ({ type: GET_DENTIST_PERF, payload }),
-    getDentistPerfSuccess: (payload: any) => ({ type: GET_DENTIST_PERF_SUCCESS, payload }),
-    getTreatmentStats: (payload?: any) => ({ type: GET_TREATMENT_STATS, payload }),
-    getTreatmentStatsSuccess: (payload: any) => ({ type: GET_TREATMENT_STATS_SUCCESS, payload }),
+    getRevenueReport: (payload: ReportQuery) => ({ type: GET_REVENUE_REPORT, payload }),
+    getApptStats: (payload: ReportQuery) => ({ type: GET_APPT_STATS, payload }),
+    getDentistPerf: (payload: ReportQuery) => ({ type: GET_DENTIST_PERF, payload }),
+    getTreatmentStats: (payload: ReportQuery) => ({ type: GET_TREATMENT_STATS, payload }),
+    getPatientStats: (payload: ReportQuery) => ({ type: GET_PATIENT_STATS, payload }),
 };
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
 const service = {
     getDashboard: () => api.get('/reports/dashboard'),
-    getPatientStats: (params?: any) => api.get('/reports/patients', { params }),
-    getRevenue: (params?: any) => api.get('/reports/revenue', { params }),
-    getAppointmentStats: (params?: any) => api.get('/reports/appointments', { params }),
-    getDentistPerformance: (params?: any) => api.get('/reports/dentist-performance', { params }),
-    getTreatmentStats: (params?: any) => api.get('/reports/treatments', { params }),
+    getRevenue: (params: ReportQuery) => api.get('/reports/revenue', { params }),
+    getAppointmentStats: (params: ReportQuery) => api.get('/reports/appointments', { params }),
+    getDentistPerformance: (params: ReportQuery) => api.get('/reports/dentist-performance', { params }),
+    getTreatmentStats: (params: ReportQuery) => api.get('/reports/treatments', { params }),
+    getPatientStats: (params: ReportQuery) => api.get('/reports/patients', { params }),
 };
 
 // ── Sagas ─────────────────────────────────────────────────────────────────────
 
-function* getDashboardSaga(action: any) {
+const unwrap = (res: any) => res.data?.data ?? res.data;
+
+function* read(action: any, successType: string, fallbackKey: string, request: () => Promise<any>) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getDashboard);
-        yield put({ type: GET_DASHBOARD_SUCCESS, payload: res.data?.data || res.data });
+        const res: any = yield call(request);
+        yield put({ type: successType, payload: unwrap(res) });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadDashboard')));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, fallbackKey), apiErrorCode(err)));
     }
 }
 
-function* getPatientStatsSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getPatientStats, action.payload);
-        yield put({ type: GET_PATIENT_STATS_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadPatientStats')));
-    }
+function* getDashboardSaga(action: any) {
+    yield call(read, action, GET_DASHBOARD_SUCCESS, 'errors.loadDashboard', service.getDashboard);
 }
 
 function* getRevenueReportSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getRevenue, action.payload);
-        yield put({ type: GET_REVENUE_REPORT_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadRevenueReport')));
-    }
+    yield call(read, action, GET_REVENUE_REPORT_SUCCESS, 'errors.loadRevenueReport', () =>
+        service.getRevenue(action.payload),
+    );
 }
 
 function* getApptStatsSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getAppointmentStats, action.payload);
-        yield put({ type: GET_APPT_STATS_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadAppointmentStats')));
-    }
+    yield call(read, action, GET_APPT_STATS_SUCCESS, 'errors.loadAppointmentStats', () =>
+        service.getAppointmentStats(action.payload),
+    );
 }
 
 function* getDentistPerfSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getDentistPerformance, action.payload);
-        yield put({ type: GET_DENTIST_PERF_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadDentistPerformance')));
-    }
+    yield call(read, action, GET_DENTIST_PERF_SUCCESS, 'errors.loadDentistPerformance', () =>
+        service.getDentistPerformance(action.payload),
+    );
 }
 
 function* getTreatmentStatsSaga(action: any) {
-    yield put(httpActions.removeError(action.type));
-    yield put(httpActions.appendLoading(action.type));
-    try {
-        const res: any = yield call(service.getTreatmentStats, action.payload);
-        yield put({ type: GET_TREATMENT_STATS_SUCCESS, payload: res.data?.data || res.data });
-        yield put(httpActions.removeLoading(action.type));
-    } catch (err: any) {
-        yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadTreatmentStats')));
-    }
+    yield call(read, action, GET_TREATMENT_STATS_SUCCESS, 'errors.loadTreatmentStats', () =>
+        service.getTreatmentStats(action.payload),
+    );
+}
+
+function* getPatientStatsSaga(action: any) {
+    yield call(read, action, GET_PATIENT_STATS_SUCCESS, 'errors.loadPatientStats', () =>
+        service.getPatientStats(action.payload),
+    );
 }
 
 export function* watchReports() {
     yield takeLatest(GET_DASHBOARD, getDashboardSaga);
-    yield takeLatest(GET_PATIENT_STATS, getPatientStatsSaga);
     yield takeLatest(GET_REVENUE_REPORT, getRevenueReportSaga);
     yield takeLatest(GET_APPT_STATS, getApptStatsSaga);
     yield takeLatest(GET_DENTIST_PERF, getDentistPerfSaga);
     yield takeLatest(GET_TREATMENT_STATS, getTreatmentStatsSaga);
+    yield takeLatest(GET_PATIENT_STATS, getPatientStatsSaga);
 }
 
 // ── Reducer ───────────────────────────────────────────────────────────────────
 
 interface ReportsState {
-    dashboard: any;
-    patientStats: any;
-    revenue: any;
-    appointmentStats: any;
-    dentistPerformance: any;
-    treatmentStats: any;
+    dashboard: DashboardSummary | null;
+    revenue: RevenueReport | null;
+    appointmentStats: AppointmentReport | null;
+    dentistPerformance: DentistPerformanceReport | null;
+    treatmentStats: TreatmentReport | null;
+    patientStats: PatientReport | null;
 }
 
 const initialState: ReportsState = {
     dashboard: null,
-    patientStats: null,
     revenue: null,
     appointmentStats: null,
     dentistPerformance: null,
     treatmentStats: null,
+    patientStats: null,
 };
 
 export const reportsReducer = (state = initialState, action: any): ReportsState => {
     switch (action.type) {
         case GET_DASHBOARD_SUCCESS:
             return { ...state, dashboard: action.payload };
-        case GET_PATIENT_STATS_SUCCESS:
-            return { ...state, patientStats: action.payload };
         case GET_REVENUE_REPORT_SUCCESS:
             return { ...state, revenue: action.payload };
         case GET_APPT_STATS_SUCCESS:
@@ -169,6 +148,8 @@ export const reportsReducer = (state = initialState, action: any): ReportsState 
             return { ...state, dentistPerformance: action.payload };
         case GET_TREATMENT_STATS_SUCCESS:
             return { ...state, treatmentStats: action.payload };
+        case GET_PATIENT_STATS_SUCCESS:
+            return { ...state, patientStats: action.payload };
         default:
             return state;
     }

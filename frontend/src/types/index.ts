@@ -479,22 +479,109 @@ export interface Notification {
 }
 
 // Report types
+type PersonName = { firstName: string; lastName: string };
+
+/** GET /reports/dashboard — parts the role may not see are absent. */
 export interface DashboardSummary {
-    todayAppointments: number;
-    monthRevenue: number;
-    totalActivePatients: number;
-    pendingInvoices: number;
+    timezone: string;
+    /** Dentists see their own appointments. */
+    ownAppointments: boolean;
+    today: { appointments: number; completed: number; noShow: number };
+    activePatients: number;
+    newPatientsThisMonth: number;
+    /** Billing viewers only. */
+    invoices?: { currency: Currency; open: number; overdue: number; outstanding: number };
+    /** Admins only: collected this month. */
+    monthRevenue?: { currency: Currency; amount: number };
     upcomingAppointments: Appointment[];
     recentActivity: ActivityItem[];
 }
 
 export interface ActivityItem {
-    _id: string;
-    type: 'appointment' | 'patient' | 'invoice' | 'treatment';
-    description: string;
-    timestamp: string;
-    userId: string;
-    userName: string;
+    type: 'patient' | 'appointment' | 'treatment' | 'invoice' | 'payment';
+    /** What to open: patient, appointment or invoice id (patient id for a treatment). */
+    id: string;
+    at: string;
+    patient?: (PersonName & { _id: string; patronymic?: string }) | null;
+    by?: PersonName | null;
+    startTime?: string;
+    treatmentName?: string;
+    invoiceNumber?: string;
+    amount?: number;
+    currency?: Currency;
+}
+
+export type ReportGroupBy = 'day' | 'week' | 'month';
+
+export interface ReportRange {
+    startDate: string;
+    endDate: string;
+    timezone: string;
+}
+
+/** GET /reports/revenue (admins). "Collected" = payments received, not voided. */
+export interface RevenueReport extends ReportRange {
+    groupBy: ReportGroupBy;
+    currency: Currency;
+    collected: number;
+    paymentCount: number;
+    invoiced: number;
+    invoiceCount: number;
+    outstanding: { balance: number; invoices: number; overdue: number; overdueInvoices: number };
+    byPeriod: { period: string; total: number; count: number }[];
+    byMethod: { method: PaymentMethod; total: number; count: number }[];
+    /** Legacy payments in another currency, never added to the totals. */
+    otherCurrencies: { currency: Currency; total: number; count: number }[];
+}
+
+export interface AppointmentReport extends ReportRange {
+    ownOnly: boolean;
+    total: number;
+    byStatus: Record<AppointmentStatus, number>;
+    completed: number;
+    cancelled: number;
+    noShow: number;
+    completionRate: number;
+    cancellationRate: number;
+    noShowRate: number;
+}
+
+export interface DentistPerformanceReport extends ReportRange {
+    ownOnly: boolean;
+    /** With money (admins). */
+    currency?: Currency;
+    unassignedCollected?: number;
+    rows: (PersonName & {
+        dentistId: string;
+        isActive: boolean;
+        appointments: number;
+        completed: number;
+        cancelled: number;
+        noShow: number;
+        treatmentsDone: number;
+        collected?: number;
+    })[];
+}
+
+export interface TreatmentReport extends ReportRange {
+    ownOnly: boolean;
+    currency?: Currency;
+    rows: {
+        treatmentId?: string;
+        name: string;
+        nameHy?: string;
+        nameRu?: string;
+        code?: string;
+        done: number;
+        collected?: number;
+    }[];
+}
+
+export interface PatientReport extends ReportRange {
+    total: number;
+    active: number;
+    newInRange: number;
+    newByGender: Record<string, number>;
 }
 
 // Pagination

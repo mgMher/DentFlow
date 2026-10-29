@@ -19,8 +19,10 @@ export const PERMISSIONS = {
     editTreatments: ['clinic_admin'],
     /** Chart, tooth and treatment-entry writes — dental-records.controller CHART_EDITORS */
     editDentalChart: ['super_admin', 'clinic_admin', 'dentist'],
-    /** /reports/* */
+    /** /reports/* — reports.controller REPORT_VIEWERS (dentists: their own, no money) */
     viewReports: ['super_admin', 'clinic_admin', 'dentist'],
+    /** Money in reports and on the dashboard — reports.service REVENUE_ROLES */
+    viewRevenue: ['super_admin', 'clinic_admin'],
     /** POST /patients, PATCH /patients/:id — patients.controller PATIENT_EDITORS */
     editPatients: ['super_admin', 'clinic_admin', 'dentist', 'receptionist'],
     /** Medical history and PATCH /patients/:id/status — patients.controller CLINICAL_EDITORS */
@@ -29,7 +31,7 @@ export const PERMISSIONS = {
     viewBilling: ['super_admin', 'clinic_admin', 'receptionist', 'dentist'],
     /** Create / edit / issue invoices, take payments, cancel drafts — BILLING_EDITORS */
     manageBilling: ['super_admin', 'clinic_admin', 'receptionist'],
-    /** Refunds, cancelling issued invoices, revenue — BILLING_ADMINS */
+    /** Refunds, cancelling issued invoices — BILLING_ADMINS */
     billingAdmin: ['super_admin', 'clinic_admin'],
     /** POST/PATCH /appointments */
     manageAppointments: ['clinic_admin', 'dentist', 'receptionist'],
