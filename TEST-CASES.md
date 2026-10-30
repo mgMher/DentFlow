@@ -553,6 +553,17 @@ Two browsers: a receptionist in one, the dentist (or admin) in the other.
 | F8-07 | Unknown patient | Open `/patients/<deleted or other clinic id>` and its tabs | "Patient not found" everywhere — upcoming count, billing summary, unbilled treatments and history used to show empty data | PASS (e2e) |
 | F8-08 | Backend log on an existing database | Start the API once | `2026-10-patient-email-not-unique-again` runs once; no index error | — |
 
+## 22. Layout on phones
+
+Log in as the clinic admin. Use the browser's device toolbar at 375×812 (iPhone-sized), then at ≥ 900px wide.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| M-01 | Phone layout | 375px wide, open every menu page plus a patient, staff member and appointment | No sidebar beside the page; content fills the width; no sideways scrolling (wide tables scroll inside their own box) | — |
+| M-02 | Menu | Tap ☰ in the header; tap outside the drawer; open it again and tap a menu item | Drawer slides in over a dimmed page; tapping outside or the ‹ button closes it; a menu item opens that page and closes the drawer | — |
+| M-03 | Desktop unchanged | ≥ 900px wide; click ‹ / › at the top of the sidebar | No ☰ button; sidebar sits beside the page and collapses to icons and back as before | — |
+| M-04 | Print from a phone | 375px wide, print an invoice | Only the invoice prints — no header, no drawer | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
@@ -564,6 +575,6 @@ Two browsers: a receptionist in one, the dentist (or admin) in the other.
 | Photos | Stored as base64 on the patient document (192px, ~8KB). Fine at this scale; would need a file store if photos get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
 | JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |
-| Mobile layout | The sidebar is a permanent drawer: on a phone it stays open beside the page. Needs a temporary drawer + menu button |
+| Mobile layout | Below 900px the sidebar is an overlay drawer opened from the header (M-01–M-04). Pages themselves aren't redesigned for phones: wide tables scroll sideways inside their own box |
 | Type safety | `strict` is on, but 177 explicit `any` remain in the frontend (mostly saga `action: any`) and 18 in the backend |
 | Backend lint | The backend has no ESLint config; `npm run lint` there fails to start |
