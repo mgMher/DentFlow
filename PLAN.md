@@ -11,7 +11,10 @@ Work top to bottom. Tick a box when the fix is done **and** its row in `TEST-CAS
 
 Honest summary: **the UI looks finished, but most modules below Patients/Staff are only half wired.**
 Many pages call endpoints with the wrong fields, read fields the backend never returns, or load only
-the first 20 records. There are **zero automated tests**, and TypeScript `strict` is off on both sides.
+the first 20 records. There were **zero automated tests**, and TypeScript `strict` was off on both sides.
+
+*Update 2026-10-30, after Phases 0–8:* every module is cleaned; 121 backend e2e tests (jest), 7 API smoke
+suites (341 checks) and 22 unit tests pass; `strict` is on in backend and frontend.
 
 | Module | State | Worst problem |
 |---|---|---|
@@ -227,11 +230,24 @@ built from treatment entries. Reports come after billing because they read billi
 - [x] Verified on local MongoDB: 39 checks (`test/smoke/07-notifications.mjs`) + suites 01–06, browser (bell, page, open, delete read)
 - [ ] Not built: patient reminders by SMS / Telegram (F3), overdue-invoice and tomorrow's-diary digests (need a scheduled job), per-user notification settings, live push (polling only)
 
-### Phase 8 — Safety net
+### Phase 8 — Safety net — ✅ done 2026-10-30 (not committed yet)
 
-- [ ] Backend e2e tests for: tenant isolation, auth/refresh, payment race, conflict detection, status transitions
-- [ ] Turn on TypeScript `strict` (backend first, then frontend) — fix what it finds
-- [ ] Run the full `TEST-CASES.md` checklist in hy / ru / en
+- [x] Backend e2e tests (`npm run test:e2e`, `test/e2e/`): the real app (`src/app.setup.ts`, shared with `main.ts`) on a random port against a throwaway local database per file, dropped afterwards; refuses any non-local Mongo. 121 tests:
+  - auth/refresh (14): forged/expired/wrong-secret tokens, stale role, rotation and reuse detection, parallel refresh, logout / logout-all, change password, deactivation, demotion, lockout, register rate limit
+  - tenant isolation (69): clinic B reads, changes or references none of clinic A's records by id in the URL or the body, and nothing of A's appears in B's lists and reports
+  - payments (13): parallel payments never overpay, parallel voids, pay vs void, pay vs cancel, edit vs issue, invoice status lifecycle, roles, invoice numbers
+  - appointments (21): dentist / room / patient clashes, blocked time, hours, six-way booking race, move races, series, the full status lifecycle and its races
+  - patients (4): shared family email, archive + cancel upcoming, status race, 404 for unknown patients
+- [x] **P1** Bugs the tests found, fixed:
+  - Three tabs refreshing with one token at once forked the session: the third looked like a stolen token and the session was revoked (everyone signed out). Inside the 30 s grace window the previous token now gets the token its rotation issued (kept AES-GCM-encrypted on the session for that window), so all tabs converge on one token
+  - Moving an appointment, or restoring a cancelled one, only checked the slot *before* writing: two moves (or a move and a new booking) into one slot both succeeded. The write is now re-checked afterwards and rolled back on a clash, like new bookings already were
+  - An appointment edit didn't re-check status or time when writing: it could move an appointment cancelled meanwhile, or undo a reschedule made between read and write → `409 appointmentChanged`
+  - The patient email unique index was still declared in the schema, so autoIndex rebuilt it on every fresh database after the Phase 2 migration had run: siblings sharing a parent's email got `409 duplicateValue` on new installs. Declaration removed; a second one-off migration drops it where it was rebuilt
+  - Four per-patient reads (`/patients/:id/upcoming-appointments`, billing summary, unbilled treatments, treatment history) answered 200 with empty data for an unknown or other-clinic patient; now `404 patientNotFound` like the rest (no data was exposed)
+- [x] TypeScript `strict` on in both projects (backend keeps `strictPropertyInitialization` off: DTOs and schemas are filled by decorators). Backend: 7 fixes; frontend: 34 saga `yield`s typed as `AxiosResponse`
+- [x] Checklist run in hy / ru / en (see TEST-CASES §21): translation audit (keys in code and all enum-driven keys exist in all three languages, no placeholder mismatches, every backend error code translated, no hard-coded English in JSX), and a browser walk of all 18 routes and their 27 tabs in each language — no raw keys, no `undefined` / `NaN` / `Invalid Date`, no console errors
+- [x] Smoke suite fixes: 01 expects the new rotation behaviour; 02 no longer fails when "in 9 days" falls on a weekend
+- [ ] Not done: the 323 manual rows were not each clicked through by hand — API behaviour is covered by e2e + smoke, the UI-only rows (dialog details, toasts, layout) still need a person; 177 explicit `any` remain in the frontend (mostly saga `action: any`); the backend has no ESLint config
 
 ---
 

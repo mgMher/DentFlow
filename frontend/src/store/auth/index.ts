@@ -1,4 +1,5 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api, { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, clearSession } from '../../api/axios';
 import { apiErrorMessage } from '../../utils/apiError';
 import { clinicActions } from '../clinic';
@@ -52,7 +53,7 @@ function* loginSaga(action: ReturnType<typeof authActions.login>) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.login, action.payload);
+        const res: AxiosResponse = yield call(service.login, action.payload);
         const data = res.data?.data || res.data;
         saveSession(data);
         yield put({ type: LOGIN_SUCCESS, payload: data.user });
@@ -69,7 +70,7 @@ function* registerSaga(action: ReturnType<typeof authActions.register>) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.register, action.payload);
+        const res: AxiosResponse = yield call(service.register, action.payload);
         const data = res.data?.data || res.data;
         saveSession(data);
         yield put({ type: LOGIN_SUCCESS, payload: data.user });
@@ -125,7 +126,7 @@ function* getProfileSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getProfile);
+        const res: AxiosResponse = yield call(service.getProfile);
         yield put({ type: GET_PROFILE_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {

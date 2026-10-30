@@ -1,4 +1,5 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorMessage } from '../../utils/apiError';
@@ -37,7 +38,7 @@ function* getClinicSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getClinic);
+        const res: AxiosResponse = yield call(service.getClinic);
         yield put({ type: GET_CLINIC_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -50,7 +51,7 @@ function* updateClinicSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.updateClinic, action.payload);
+        const res: AxiosResponse = yield call(service.updateClinic, action.payload);
         yield put({ type: GET_CLINIC_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
@@ -64,7 +65,7 @@ function* updateWorkingHoursSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.updateWorkingHours, action.payload);
+        const res: AxiosResponse = yield call(service.updateWorkingHours, action.payload);
         yield put({ type: GET_CLINIC_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
@@ -78,7 +79,7 @@ function* updateSettingsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.updateSettings, action.payload);
+        const res: AxiosResponse = yield call(service.updateSettings, action.payload);
         yield put({ type: GET_CLINIC_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));

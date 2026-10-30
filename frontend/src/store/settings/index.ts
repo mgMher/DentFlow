@@ -1,4 +1,5 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorMessage } from '../../utils/apiError';
@@ -36,7 +37,7 @@ function* getTemplatesSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getTemplates);
+        const res: AxiosResponse = yield call(service.getTemplates);
         yield put({ type: GET_TEMPLATES_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {

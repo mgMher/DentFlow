@@ -1,4 +1,5 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
@@ -58,7 +59,7 @@ function* getTreatmentsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getAll, action.payload);
+        const res: AxiosResponse = yield call(service.getAll, action.payload);
         const data = res.data?.data ?? res.data;
         yield put({
             type: GET_TREATMENTS_SUCCESS,
@@ -75,7 +76,7 @@ function* getActiveTreatmentsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getAll, { isActive: true, limit: 100 });
+        const res: AxiosResponse = yield call(service.getAll, { isActive: true, limit: 100 });
         const data = res.data?.data ?? res.data;
         yield put({ type: GET_ACTIVE_TREATMENTS_SUCCESS, payload: data?.data ?? [] });
         yield put(httpActions.removeLoading(action.type));

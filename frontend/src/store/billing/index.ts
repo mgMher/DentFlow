@@ -1,4 +1,5 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
@@ -108,7 +109,7 @@ function* read(action: any, fallbackKey: string, request: () => Promise<any>, su
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(request);
+        const res: AxiosResponse = yield call(request);
         yield put(success(unwrap(res)));
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -135,7 +136,7 @@ function* write(action: any, fallbackKey: string, request: () => Promise<any>) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(request);
+        const res: AxiosResponse = yield call(request);
         const data = unwrap(res);
         const invoice: Invoice = data?.invoice ?? data;
         yield put({ type: GET_INVOICE_SUCCESS, payload: invoice });

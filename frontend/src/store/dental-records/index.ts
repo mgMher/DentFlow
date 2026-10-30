@@ -1,4 +1,5 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorCode, apiErrorMessage } from '../../utils/apiError';
@@ -119,7 +120,7 @@ function* write(action: any, fallbackKey: string, request: () => Promise<any>) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(request);
+        const res: AxiosResponse = yield call(request);
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
         return res;
@@ -138,7 +139,7 @@ function* read(action: any, fallbackKey: string, request: () => Promise<any>, su
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(request);
+        const res: AxiosResponse = yield call(request);
         yield put(success(unwrap(res)));
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -157,7 +158,7 @@ function* getChartSaga(action: any) {
 
 function* setChartTypeSaga(action: any) {
     const { patientId, chartType } = action.payload;
-    const res: any = yield call(write, action, 'errors.changeChartType', () => service.setChartType(patientId, chartType));
+    const res: AxiosResponse | null = yield call(write, action, 'errors.changeChartType', () => service.setChartType(patientId, chartType));
     if (res) {
         yield put({ type: GET_CHART_SUCCESS, payload: unwrap(res) });
         yield put({ type: GET_TOOTH_HISTORY_SUCCESS, payload: null });
@@ -166,7 +167,7 @@ function* setChartTypeSaga(action: any) {
 
 function* updateToothSaga(action: any) {
     const { patientId, data } = action.payload;
-    const res: any = yield call(write, action, 'errors.updateTooth', () => service.updateTooth(patientId, data));
+    const res: AxiosResponse | null = yield call(write, action, 'errors.updateTooth', () => service.updateTooth(patientId, data));
     if (res) {
         yield put({ type: GET_CHART_SUCCESS, payload: unwrap(res) });
         yield put({ type: GET_TOOTH_HISTORY, payload: { patientId, toothNumber: data.toothNumber } });
@@ -195,7 +196,7 @@ function* entryWriteSaga(action: any) {
     const fallback = { [ADD_ENTRY]: 'errors.addEntry', [COMPLETE_ENTRY]: 'errors.completeEntry', [VOID_ENTRY]: 'errors.voidEntry' }[
         action.type as string
     ] as string;
-    const res: any = yield call(write, action, fallback, request);
+    const res: AxiosResponse | null = yield call(write, action, fallback, request);
     if (res) yield call(refreshAfterChange, patientId);
 }
 

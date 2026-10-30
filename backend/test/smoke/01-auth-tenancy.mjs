@@ -113,10 +113,13 @@ r = await call('POST', '/auth/refresh', { body: { refreshToken: t0 } });
 check('refresh rotates', r.status === 200 && r.data.refreshToken !== t0, r.body);
 const t1 = r.data.refreshToken;
 r = await call('POST', '/auth/refresh', { body: { refreshToken: t0 } });
-check('old token within grace (two tabs) accepted', r.status === 200, r.body);
+check('old token within grace (two tabs) gets the same new token', r.status === 200 && r.data.refreshToken === t1, r.body);
+r = await call('POST', '/auth/refresh', { body: { refreshToken: t1 } });
+check('the new token rotates on', r.status === 200 && r.data.refreshToken !== t1, r.body);
+const t2 = r.data.refreshToken;
 r = await call('POST', '/auth/refresh', { body: { refreshToken: t0 } });
 check('token two rotations old -> revoked', r.status === 401 && r.body.code === 'sessionRevoked', r.body);
-r = await call('POST', '/auth/refresh', { body: { refreshToken: t1 } });
+r = await call('POST', '/auth/refresh', { body: { refreshToken: t2 } });
 check('session is dead after reuse detection', r.status === 401, r.body);
 
 // --- logout this device only

@@ -27,6 +27,7 @@ node test/smoke/03-appointments-schedule.mjs   # one suite
 | `07-notifications.mjs` | who is told about bookings, series, reschedules, confirmations, cancellations (one, series, patient archived, dentist deactivated), payments and refunds; never the actor, never inactive staff; own notifications only (read, delete, other clinic), isRead filter, paging, read all, delete read |
 
 Notes:
-- Suites 01 and 02 log in as the seeded demo clinic (`admin@ararat-dental.am`); 03 to 07 register their own clinics (06 and 07 register two).
+- Suites 01 and 02 log in as the seeded demo clinic (`admin@ararat-dental.am`) and change its data: run `npm run seed` again before each run of them. 03 to 07 register their own clinics (06 and 07 register two).
+- The jest e2e tests in `test/e2e/` need no running API or seed; see that README.
 - Registration is rate-limited to 5 per IP per hour (in memory). Restart the API between full runs.
 - A suite exits non-zero when any check fails, so it can run in CI later.

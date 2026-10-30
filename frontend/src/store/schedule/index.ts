@@ -1,4 +1,5 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { apiErrorMessage } from '../../utils/apiError';
@@ -61,7 +62,7 @@ function* getRoomsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getRooms);
+        const res: AxiosResponse = yield call(service.getRooms);
         yield put({ type: GET_ROOMS_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -116,7 +117,7 @@ function* getBlockedSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getBlocked, action.payload);
+        const res: AxiosResponse = yield call(service.getBlocked, action.payload);
         yield put({ type: GET_BLOCKED_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -129,7 +130,7 @@ function* createBlockedSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.createBlocked, action.payload);
+        const res: AxiosResponse = yield call(service.createBlocked, action.payload);
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
         // Blocking over booked visits is allowed (sick day), but say so — the
@@ -161,7 +162,7 @@ function* getAvailabilitySaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(
+        const res: AxiosResponse = yield call(
             service.getAvailability,
             action.payload.dentistId,
             action.payload.date,

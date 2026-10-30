@@ -28,6 +28,15 @@ export class Session {
     @Prop()
     rotatedAt?: Date;
 
+    /**
+     * The token issued by the last rotation, encrypted with a key derived from
+     * the refresh secret. Requests that present the previous token inside the
+     * grace window get this same token back, so tabs refreshing at once all
+     * end up holding one token instead of forking the session.
+     */
+    @Prop()
+    graceToken?: string;
+
     @Prop({ trim: true, maxlength: 300 })
     userAgent?: string;
 

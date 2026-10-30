@@ -80,6 +80,9 @@ const STATUS_FROM_AMOUNTS: PipelineStage.Set = {
     },
 };
 
+/** `filter(Boolean)` that also narrows the type. */
+const isSet = <T>(value: T | undefined | null | ''): value is T => !!value;
+
 const isDuplicateKey = (err: unknown) => (err as { code?: number })?.code === 11000;
 
 const asId = (id: string | Types.ObjectId) => (typeof id === 'string' ? new Types.ObjectId(id) : id);
@@ -369,7 +372,7 @@ export class BillingService implements OnModuleInit {
         await Promise.all([
             this.clinicRefs.assertPatient(clinicId, patientId, { forBooking: true }),
             dto.appointmentId && this.clinicRefs.assertAppointment(clinicId, dto.appointmentId, patientId),
-            this.clinicRefs.assertTreatments(clinicId, dto.items.map((i) => i.treatmentId).filter(Boolean)),
+            this.clinicRefs.assertTreatments(clinicId, dto.items.map((i) => i.treatmentId).filter(isSet)),
         ]);
 
         const currency = await this.billingCurrency(clinicId, dto.currency);
@@ -491,7 +494,7 @@ export class BillingService implements OnModuleInit {
         if (dto.items || dto.taxAmount !== undefined) {
             const items = dto.items;
             if (items) {
-                await this.clinicRefs.assertTreatments(clinicId, items.map((i) => i.treatmentId).filter(Boolean));
+                await this.clinicRefs.assertTreatments(clinicId, items.map((i) => i.treatmentId).filter(isSet));
             }
             const currentItems: InvoiceItemDto[] = invoice.items.map((i) => ({
                 treatmentId: i.treatmentId?.toString(),
@@ -759,6 +762,7 @@ export class BillingService implements OnModuleInit {
      * not debt (the patient tab used to count cancelled invoices).
      */
     async getPatientSummary(clinicId: Types.ObjectId, patientId: Types.ObjectId) {
+        await this.clinicRefs.assertPatient(clinicId, patientId);
         const todayStart = await this.todayStart(clinicId);
         const rows = await this.invoiceModel.aggregate<{
             _id: Currency;
@@ -816,6 +820,7 @@ export class BillingService implements OnModuleInit {
 
     /** Done chart entries not yet on a live invoice — the "bill these treatments" list. */
     async getUnbilledTreatments(clinicId: Types.ObjectId, patientId: Types.ObjectId) {
+        await this.clinicRefs.assertPatient(clinicId, patientId);
         return this.entryModel
             .find({ clinicId, patientId, status: TreatmentEntryStatus.DONE, voidedAt: null, invoiceId: null })
             .sort({ date: -1, _id: -1 })

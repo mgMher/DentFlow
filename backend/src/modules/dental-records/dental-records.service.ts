@@ -266,7 +266,7 @@ export class DentalRecordsService implements OnModuleInit {
         const chart = await this.mutateChart(clinicId, patientId, (chart) => {
             if (chart.chartType === chartType) return;
 
-            const archived = chart.toObject().archivedCharts ?? [];
+            const archived = chart.toObject<DentalRecord>().archivedCharts ?? [];
             const restoreIndex = archived.map((a) => a.chartType).lastIndexOf(chartType);
             const restored = restoreIndex >= 0 ? archived[restoreIndex].teeth : null;
 
@@ -420,7 +420,7 @@ export class DentalRecordsService implements OnModuleInit {
         }
 
         const chart = await this.getOrCreateChart(clinicId, patientId);
-        const tooth = chart.toObject().teeth.find((t) => t.toothNumber === toothNumber);
+        const tooth = chart.toObject<DentalRecord>().teeth.find((t) => t.toothNumber === toothNumber);
 
         const [statusHistory, treatments] = await Promise.all([
             this.dentalRecordModel.populate(
@@ -599,6 +599,7 @@ export class DentalRecordsService implements OnModuleInit {
      * date range. Voided entries are left out unless asked for. Newest first.
      */
     async getTreatmentHistory(clinicId: Types.ObjectId, patientId: Types.ObjectId, query: QueryRecordsDto) {
+        await this.clinicRefs.assertPatient(clinicId, patientId);
         const filter: FilterQuery<TreatmentEntryDocument> = { clinicId, patientId };
 
         if (!query.includeVoided) filter.voidedAt = null;
@@ -666,7 +667,7 @@ export class DentalRecordsService implements OnModuleInit {
 
     /** The chart without the archived teeth, which only the server needs; their types are listed instead. */
     private toResponse(chart: DentalRecordDocument) {
-        const { archivedCharts, ...rest } = chart.toObject();
+        const { archivedCharts, ...rest } = chart.toObject<DentalRecord>();
         return { ...rest, archivedChartTypes: (archivedCharts ?? []).map((a) => a.chartType) };
     }
 

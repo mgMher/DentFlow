@@ -1,6 +1,6 @@
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { createHash, randomUUID } from 'crypto';
+import { createCipheriv, createDecipheriv, createHash, createSecretKey, randomBytes, randomUUID } from 'crypto';
 import { Model, Types } from 'mongoose';
 import * as jwt from 'jsonwebtoken';
 import { jwtConfig } from 'src/config';
@@ -34,6 +34,30 @@ const REUSE_GRACE_MS = 30_000;
 const MAX_SESSIONS_PER_USER = 10;
 
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
+
+// Plain Uint8Arrays: this @types/node's Buffer doesn't satisfy TypeScript 5.9's crypto signatures.
+const bytes = (b64url: string) => new Uint8Array(Buffer.from(b64url, 'base64url'));
+const graceKey = () =>
+    createSecretKey(new Uint8Array(createHash('sha256').update(`${jwtConfig.refreshSecret}:grace-token`).digest()));
+
+/** AES-256-GCM, as `iv.tag.ciphertext` in base64url. Anyone holding the key could mint tokens anyway. */
+const sealToken = (token: string): string => {
+    const iv = randomBytes(12).toString('base64url');
+    const cipher = createCipheriv('aes-256-gcm', graceKey(), bytes(iv));
+    const data = cipher.update(token, 'utf8', 'base64url') + cipher.final('base64url');
+    return [iv, cipher.getAuthTag().toString('base64url'), data].join('.');
+};
+
+const openToken = (sealed: string): string | null => {
+    try {
+        const [iv, tag, data] = sealed.split('.');
+        const decipher = createDecipheriv('aes-256-gcm', graceKey(), bytes(iv));
+        decipher.setAuthTag(bytes(tag));
+        return decipher.update(data, 'base64url', 'utf8') + decipher.final('utf8');
+    } catch {
+        return null;
+    }
+};
 
 const expiryOf = (token: string): Date => new Date(((jwt.decode(token) as jwt.JwtPayload).exp ?? 0) * 1000);
 
@@ -75,6 +99,11 @@ export class SessionsService {
      * Verify a refresh token and rotate it. Presenting a token that was
      * already rotated away (outside the grace window) means it was copied, so
      * the whole session is revoked.
+     *
+     * Inside the grace window the previous token gets the token its rotation
+     * issued, not a new one: tabs share one stored token, and rotating again
+     * for each of them made the chain fork, so the third tab to refresh at
+     * once looked like a thief and the session was revoked.
      *
      * `loadUser` re-reads the account so role and active status are current.
      */
@@ -118,6 +147,11 @@ export class SessionsService {
             throw sessionExpired();
         }
 
+        const issued = isRecentPrevious && session.graceToken ? openToken(session.graceToken) : null;
+        if (issued) {
+            return { accessToken: this.signAccess(user, session._id), refreshToken: issued, userId: payload.userId };
+        }
+
         const tokens = this.sign(user, session._id);
         // Conditional on the hash we read, so two concurrent rotations can't both win.
         const updated = await this.sessionModel.updateOne(
@@ -126,6 +160,7 @@ export class SessionsService {
                 $set: {
                     previousTokenHash: session.tokenHash,
                     tokenHash: hashToken(tokens.refreshToken),
+                    graceToken: sealToken(tokens.refreshToken),
                     rotatedAt: now,
                     lastUsedAt: now,
                     expiresAt: expiryOf(tokens.refreshToken),
@@ -167,23 +202,33 @@ export class SessionsService {
         );
     }
 
-    private sign(user: TokenSubject, sessionId: Id): TokenPair {
-        const userId = String(user._id);
-        const clinicId = user.clinicId.toString();
-        const sid = sessionId.toString();
-
-        const accessToken = jwt.sign({ userId, clinicId, email: user.email, role: user.role, sid }, jwtConfig.accessSecret, {
+    private signAccess(user: TokenSubject, sessionId: Id): string {
+        const payload = {
+            userId: String(user._id),
+            clinicId: user.clinicId.toString(),
+            email: user.email,
+            role: user.role,
+            sid: sessionId.toString(),
+        };
+        return jwt.sign(payload, jwtConfig.accessSecret, {
             expiresIn: jwtConfig.accessExpiration as jwt.SignOptions['expiresIn'],
         });
+    }
+
+    private sign(user: TokenSubject, sessionId: Id): TokenPair {
         // `jwtid` makes every refresh token unique. Without it two tokens signed
         // in the same second were byte-identical, so rotation changed nothing and
         // a stolen token could not be told apart from the current one.
-        const refreshToken = jwt.sign({ userId, clinicId, sid }, jwtConfig.refreshSecret, {
-            expiresIn: jwtConfig.refreshExpiration as jwt.SignOptions['expiresIn'],
-            jwtid: randomUUID(),
-        });
+        const refreshToken = jwt.sign(
+            { userId: String(user._id), clinicId: user.clinicId.toString(), sid: sessionId.toString() },
+            jwtConfig.refreshSecret,
+            {
+                expiresIn: jwtConfig.refreshExpiration as jwt.SignOptions['expiresIn'],
+                jwtid: randomUUID(),
+            },
+        );
 
-        return { accessToken, refreshToken };
+        return { accessToken: this.signAccess(user, sessionId), refreshToken };
     }
 
     private async pruneOldSessions(userId: Id): Promise<void> {

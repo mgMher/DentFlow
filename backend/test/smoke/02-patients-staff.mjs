@@ -56,6 +56,8 @@ check('new dentist created', r.status === 201, r.body);
 const newDentist = r.data;
 check('new dentist gets clinic opening hours', (newDentist?.schedule?.defaultAvailability || []).length >= 5, newDentist?.schedule);
 const day = new Date(Date.now() + 86400000 * 9); day.setUTCHours(7, 0, 0, 0);
+// A weekday: the demo clinic is closed at weekends, and this books without the hours override.
+while ([0, 6].includes(day.getUTCDay())) day.setUTCDate(day.getUTCDate() + 1);
 for (let k = 0; k < 2; k++) {
   const s = new Date(day.getTime() + k * 3600000), e = new Date(s.getTime() + 1800000);
   r = await call('POST', '/appointments', { token: A.accessToken, body: { patientId: p1._id, dentistId: newDentist.authId, startTime: s, endTime: e, title: 'x' } });

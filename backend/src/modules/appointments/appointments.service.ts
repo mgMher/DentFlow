@@ -379,7 +379,32 @@ export class AppointmentsService implements OnModuleInit {
         if (dto.notes !== undefined) set.notes = dto.notes;
         if (dto.color !== undefined) set.color = dto.color;
 
-        await this.appointmentModel.updateOne({ _id: existing._id, clinicId: oid(clinicId) }, { $set: set });
+        const before = await this.appointmentModel.findById(existing._id).select(Object.keys(set).join(' ')).lean();
+        // Conditional on what we validated against: an edit used to land on an
+        // appointment cancelled meanwhile, or silently undo someone's reschedule.
+        const written = await this.appointmentModel.updateOne(
+            {
+                _id: existing._id,
+                clinicId: oid(clinicId),
+                status: { $in: EDITABLE_STATUSES },
+                startTime: existing.startTime,
+                endTime: existing.endTime,
+                dentistId: oid(refId(existing.dentistId)),
+            },
+            { $set: set },
+        );
+        if (!written.matchedCount) {
+            throw new ConflictException(errorBody('appointmentChanged', 'The appointment was changed by someone else; reload'));
+        }
+        if (moved) {
+            await this.assertKeptSlot(
+                clinicId,
+                existing._id,
+                { startTime, endTime, dentistId: oid(dentistId) },
+                set,
+                (before ?? {}) as Record<string, unknown>,
+            );
+        }
         const updated = await this.findById(clinicId, existing._id);
 
         // A new time or a new dentist is news for the dentists involved; a room or note change is not.
@@ -456,6 +481,22 @@ export class AppointmentsService implements OnModuleInit {
         );
         if (!updated.modifiedCount) {
             throw new ConflictException(errorBody('appointmentChanged', 'The appointment was changed by someone else; reload'));
+        }
+
+        if (status === AppointmentStatus.SCHEDULED && !SLOT_HOLDING_STATUSES.includes(from)) {
+            await this.assertKeptSlot(
+                clinicId,
+                appointment._id,
+                { status },
+                { status, cancelReason: null, cancelNote: null, cancelledAt: null, cancelledBy: null },
+                {
+                    status: from,
+                    cancelReason: appointment.cancelReason,
+                    cancelNote: appointment.cancelNote,
+                    cancelledAt: appointment.cancelledAt,
+                    cancelledBy: appointment.cancelledBy ? oid(refId(appointment.cancelledBy)) : undefined,
+                },
+            );
         }
 
         if (status === AppointmentStatus.COMPLETED) {
@@ -635,6 +676,50 @@ export class AppointmentsService implements OnModuleInit {
             await this.appointmentModel.deleteOne({ _id: created._id });
             throw new ConflictException(clash);
         }
+    }
+
+    /**
+     * A move or a restore checks the slot before writing, and so can race
+     * another booking of it. Look again after writing: if anything overlaps,
+     * put the old values back and refuse. Two racing requests may both be
+     * refused, but never both kept.
+     *
+     * `applied` identifies our write (the rollback only undoes it if it is
+     * still there); `fields` are the keys written; `before` their old values.
+     */
+    private async assertKeptSlot(
+        clinicId: string,
+        id: Types.ObjectId,
+        applied: Record<string, unknown>,
+        fields: Record<string, unknown>,
+        before: Record<string, unknown>,
+    ): Promise<void> {
+        const doc = await this.appointmentModel
+            .findById(id)
+            .select('dentistId patientId treatmentRoomId startTime endTime')
+            .lean();
+        if (!doc) return;
+        const clash = await this.findClash(clinicId, {
+            dentistId: refId(doc.dentistId),
+            patientId: refId(doc.patientId),
+            treatmentRoomId: doc.treatmentRoomId ? refId(doc.treatmentRoomId) : undefined,
+            startTime: doc.startTime,
+            endTime: doc.endTime,
+            excludeId: id,
+        });
+        if (!clash) return;
+
+        const $set: Record<string, unknown> = {};
+        const $unset: Record<string, ''> = {};
+        for (const key of Object.keys(fields)) {
+            if (before[key] === undefined || before[key] === null) $unset[key] = '';
+            else $set[key] = before[key];
+        }
+        await this.appointmentModel.updateOne(
+            { _id: id, ...applied },
+            { ...(Object.keys($set).length ? { $set } : {}), ...(Object.keys($unset).length ? { $unset } : {}) },
+        );
+        throw new ConflictException(clash);
     }
 
     private newAppointment(clinicId: string, dto: CreateAppointmentDto, startTime: Date, endTime: Date) {

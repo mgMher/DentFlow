@@ -1,4 +1,5 @@
 import { call, put, select, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
 import { Patient, PatientStats, PatientStatus } from '../../types';
@@ -92,7 +93,7 @@ function* getPatientsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getAll, action.payload);
+        const res: AxiosResponse = yield call(service.getAll, action.payload);
         const payload = res.data?.data || res.data;
         const list = payload?.data || payload || [];
         yield put({
@@ -117,7 +118,7 @@ function* getPatientSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getById, action.payload);
+        const res: AxiosResponse = yield call(service.getById, action.payload);
         yield put({ type: GET_PATIENT_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
@@ -130,7 +131,7 @@ function* createPatientSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.create, action.payload);
+        const res: AxiosResponse = yield call(service.create, action.payload);
         yield put({ type: GET_PATIENT_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
@@ -145,7 +146,7 @@ function* updatePatientSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.update, action.payload.id, action.payload.data);
+        const res: AxiosResponse = yield call(service.update, action.payload.id, action.payload.data);
         yield put({ type: GET_PATIENT_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
@@ -159,7 +160,7 @@ function* updatePatientStatusSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(
+        const res: AxiosResponse = yield call(
             service.updateStatus,
             action.payload.id,
             action.payload.status,
@@ -184,7 +185,7 @@ function* getPatientStatsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getStats);
+        const res: AxiosResponse = yield call(service.getStats);
         yield put({ type: GET_PATIENT_STATS_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {

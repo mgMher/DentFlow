@@ -522,6 +522,37 @@ Two browsers: a receptionist in one, the dentist (or admin) in the other.
 | F7-15 | Offline | Stop the API for two minutes | No error toast every minute; the bell recovers when the API is back | — |
 | F7-16 | Languages | Switch hy / ru / en | Existing notifications re-worded in the new language | — |
 
+## 21. Phase 8 — safety net
+
+### Automated runs (2026-10-30)
+
+| Check | How | Result |
+|---|---|---|
+| Backend e2e, 121 tests in 5 files (auth/refresh, tenant isolation, payments, appointments, patients) | `cd backend && npm run test:e2e` (needs a local MongoDB; see `test/e2e/README.md`) | PASS |
+| API smoke suites 01–07, 341 checks | `test/smoke/README.md` (fresh seed before 01–02, API restart between batches) | PASS |
+| Unit tests, 22 | `npm test` | PASS |
+| TypeScript `strict`, backend and frontend | `npx tsc --noEmit` in each | PASS |
+| Frontend lint | `npx eslint src --ext .ts,.tsx` | PASS |
+| Translation audit | every `t('…')` key and every enum-driven key (statuses, reasons, roles, categories, days…) exists in en / hy / ru; no missing or empty keys (except the deliberately blank `dental.short.healthy`); placeholders match; every backend error `code` has `errors.<code>`; no hard-coded English in JSX | PASS |
+| Browser walk, hy / ru / en | all 18 routes (lists, detail pages, forms, editor) and their 27 tabs as clinic admin, scanned for raw keys, `undefined` / `NaN` / `Invalid Date`, untranslated text and console errors; Armenian layout checked on invoice and reports | PASS |
+
+> The earlier sections' rows were **not** each clicked through by hand. Their API behaviour is covered
+> by the e2e and smoke suites above; rows that are about the UI itself (dialog wording, toasts, focus,
+> layout) still need a person. Their Status column is left as it was.
+
+### Bugs found by the new tests (now fixed)
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F8-01 | Several tabs refresh at once | Open the app in 3 tabs, wait for the access token to expire (or shorten `JWT_ACCESS_EXPIRATION`), then click in all tabs quickly | All tabs stay signed in (it used to revoke the session and sign everyone out) | PASS (e2e) |
+| F8-02 | Two moves into one slot | Two receptionists drag/edit two appointments of the same dentist into the same free time at the same moment | At most one succeeds; the other gets "already has an appointment" and stays where it was | PASS (e2e) |
+| F8-03 | Move vs new booking | One moves an appointment into a slot while another books that slot | Never both | PASS (e2e) |
+| F8-04 | Restore vs new booking | Restore a cancelled appointment while someone books its old slot | Never both; a refused restore stays cancelled with its reason | PASS (e2e) |
+| F8-05 | Edit vs cancel | Open the edit dialog, someone else cancels the appointment, save | "Someone else just changed this appointment" — the cancelled appointment is not moved | PASS (e2e) |
+| F8-06 | Family email on a new install | On a fresh database, add two children with the same parent email | Both saved (the unique index came back on fresh databases) | PASS (e2e + smoke 02) |
+| F8-07 | Unknown patient | Open `/patients/<deleted or other clinic id>` and its tabs | "Patient not found" everywhere — upcoming count, billing summary, unbilled treatments and history used to show empty data | PASS (e2e) |
+| F8-08 | Backend log on an existing database | Start the API once | `2026-10-patient-email-not-unique-again` runs once; no index error | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
@@ -534,3 +565,5 @@ Two browsers: a receptionist in one, the dentist (or admin) in the other.
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
 | JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |
 | Mobile layout | The sidebar is a permanent drawer: on a phone it stays open beside the page. Needs a temporary drawer + menu button |
+| Type safety | `strict` is on, but 177 explicit `any` remain in the frontend (mostly saga `action: any`) and 18 in the backend |
+| Backend lint | The backend has no ESLint config; `npm run lint` there fails to start |

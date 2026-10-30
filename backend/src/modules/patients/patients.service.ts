@@ -47,6 +47,9 @@ export class PatientsService implements OnModuleInit {
         await runOnce(this.connection, '2026-09-patient-status-backfill', this.logger, () => this.backfillStatus());
         await runOnce(this.connection, '2026-10-patient-phone-normalize', this.logger, () => this.normalizeStoredPhones());
         await runOnce(this.connection, '2026-10-patient-email-not-unique', this.logger, () => this.dropUniqueEmailIndex());
+        // The schema kept declaring the index, so autoIndex built it again on
+        // any database the first run found without it (every fresh install).
+        await runOnce(this.connection, '2026-10-patient-email-not-unique-again', this.logger, () => this.dropUniqueEmailIndex());
     }
 
     /**
@@ -328,6 +331,7 @@ export class PatientsService implements OnModuleInit {
 
     /** How many booked appointments are still ahead for this patient (for the status dialog). */
     async countUpcomingAppointments(clinicId: Types.ObjectId, patientId: Types.ObjectId): Promise<{ count: number }> {
+        await this.clinicRefs.assertPatient(clinicId, patientId);
         return { count: await this.upcoming.count(clinicId, { patientId }) };
     }
 
