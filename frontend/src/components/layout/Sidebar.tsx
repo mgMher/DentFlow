@@ -47,9 +47,13 @@ const navItems: NavItem[] = [
 interface SidebarProps {
     collapsed: boolean;
     onToggle: () => void;
+    /** Phones: an overlay drawer opened from the header menu button instead of a fixed column. */
+    mobile?: boolean;
+    mobileOpen?: boolean;
+    onMobileClose?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobile = false, mobileOpen = false, onMobileClose }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
@@ -60,10 +64,14 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
 
     return (
         <Drawer
-            variant="permanent"
+            variant={mobile ? 'temporary' : 'permanent'}
+            open={mobile ? mobileOpen : undefined}
+            onClose={onMobileClose}
+            ModalProps={{ keepMounted: true }}
             sx={{
-                width,
-                flexShrink: 0,
+                // A temporary drawer's root is the full-screen modal: sizing it would shrink the backdrop.
+                // It also renders in a portal, outside MainLayout's print wrapper, so hide it from print here.
+                ...(mobile ? { displayPrint: 'none' } : { width, flexShrink: 0 }),
                 '& .MuiDrawer-paper': {
                     width,
                     boxSizing: 'border-box',
@@ -90,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                         </Typography>
                     </Box>
                 )}
-                <IconButton onClick={onToggle} size="small">
+                <IconButton onClick={mobile ? onMobileClose : onToggle} size="small">
                     {collapsed ? <ExpandIcon /> : <CollapseIcon />}
                 </IconButton>
             </Box>
@@ -104,7 +112,10 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                     const button = (
                         <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
                             <ListItemButton
-                                onClick={() => navigate(item.path)}
+                                onClick={() => {
+                                    navigate(item.path);
+                                    if (mobile) onMobileClose?.();
+                                }}
                                 sx={{
                                     borderRadius: 2,
                                     minHeight: 44,

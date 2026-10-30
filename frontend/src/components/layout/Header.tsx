@@ -13,6 +13,7 @@ import {
     Settings as SettingsIcon,
     Password as PasswordIcon,
     PhonelinkErase as LogoutAllIcon,
+    Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
@@ -25,11 +26,13 @@ import { HEADER_HEIGHT, LANGUAGES } from '../../utils/constants';
 
 interface HeaderProps {
     sidebarWidth: number;
+    /** Set on phones, where the sidebar is hidden until this button opens it. */
+    onMenuClick?: () => void;
     themeMode: 'light' | 'dark';
     onToggleTheme: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme }) => {
+const Header: React.FC<HeaderProps> = ({ sidebarWidth, onMenuClick, themeMode, onToggleTheme }) => {
     const { t, i18n } = useTranslation();
     const theme = useTheme();
     const navigate = useNavigate();
@@ -81,6 +84,11 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
             }}
         >
             <Toolbar sx={{ justifyContent: 'flex-end', gap: 1 }}>
+                {onMenuClick && (
+                    <IconButton onClick={onMenuClick} edge="start" aria-label={t('nav.menu')} sx={{ mr: 'auto' }}>
+                        <MenuIcon />
+                    </IconButton>
+                )}
                 <Select
                     value={i18n.language}
                     onChange={handleLanguageChange}

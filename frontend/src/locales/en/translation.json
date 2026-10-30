@@ -58,7 +58,8 @@
     "reports": "Reports",
     "settings": "Settings",
     "schedule": "Schedule",
-    "notifications": "Notifications"
+    "notifications": "Notifications",
+    "menu": "Menu"
   },
   "auth": {
     "login": "Sign In",

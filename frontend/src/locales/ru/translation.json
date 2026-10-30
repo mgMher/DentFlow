@@ -58,7 +58,8 @@
     "reports": "Отчёты",
     "settings": "Настройки",
     "schedule": "Расписание",
-    "notifications": "Уведомления"
+    "notifications": "Уведомления",
+    "menu": "Меню"
   },
   "auth": {
     "login": "Войти",

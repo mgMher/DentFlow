@@ -318,11 +318,11 @@ const StaffDetailPage: React.FC = () => {
                     >
                         {getInitials(staff.firstName, staff.lastName)}
                     </Avatar>
-                    <Box>
+                    <Box sx={{ minWidth: 0 }}>
                         <Typography variant="h5" fontWeight={700}>
                             {getFullName(staff.firstName, staff.lastName, staff.patronymic)}
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
                             <StatusChip
                                 status={staff.role === 'dentist' ? 'confirmed' : 'scheduled'}
                                 translationPrefix="staff"
@@ -333,7 +333,7 @@ const StaffDetailPage: React.FC = () => {
                                 translationPrefix="common"
                             />
                         </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
                             {staff.email}
                             {staff.phone ? ` | ${formatArmenianPhone(staff.phone)}` : ''}
                         </Typography>
