@@ -699,9 +699,59 @@
     "blockOverlapsAppointments_other": "Заблокировано. На это время записано {{count}} приёмов — перенесите или отмените их."
   },
   "notifications": {
-    "markAllRead": "Отметить все как прочитанные",
-    "unread": "непрочитанных",
-    "noNotifications": "Нет уведомлений"
+    "markAllRead": "Отметить все прочитанными",
+    "noNotifications": "Нет уведомлений",
+    "all": "Все",
+    "unreadTab": "Непрочитанные",
+    "noUnread": "Нет непрочитанных уведомлений",
+    "deleteRead": "Удалить прочитанные",
+    "deleteTitle": "Удалить уведомление?",
+    "deleteMessage": "Оно исчезнет из вашего списка.",
+    "deleteReadTitle": "Удалить прочитанные уведомления?",
+    "deleteReadMessage": "Все прочитанные уведомления исчезнут из вашего списка.",
+    "bellLabel": "Уведомления, непрочитанных: {{count}}",
+    "types": {
+      "appointmentCreated": {
+        "title": "Новая запись",
+        "message": "{{patient}} записан(а) на {{when}}"
+      },
+      "appointmentSeries": {
+        "title": "Новая серия записей",
+        "message": "{{patient}}: визитов — {{count}}, с {{when}}"
+      },
+      "appointmentRescheduled": {
+        "title": "Запись перенесена",
+        "message": "{{patient}}: {{previous}} → {{when}}"
+      },
+      "appointmentReassigned": {
+        "title": "Запись передана",
+        "message": "{{patient}}, {{when}}: сменился врач"
+      },
+      "appointmentConfirmed": {
+        "title": "Запись подтверждена",
+        "message": "{{patient}} подтвердил(а) {{when}}"
+      },
+      "appointmentCancelled": {
+        "title": "Запись отменена",
+        "message": "{{patient}}, {{when}} — {{reason}}"
+      },
+      "appointmentsCancelled": {
+        "title": "Записи отменены",
+        "message": "{{patient}}: визитов — {{count}}, с {{when}} — {{reason}}"
+      },
+      "dentistAppointmentsCancelled": {
+        "title": "Нужно обзвонить пациентов",
+        "message": "{{dentist}} больше не работает: отменено визитов — {{count}}"
+      },
+      "paymentReceived": {
+        "title": "Получена оплата",
+        "message": "{{amount}} от {{patient}}, счёт {{number}}"
+      },
+      "paymentRefunded": {
+        "title": "Оплата возвращена",
+        "message": "{{amount}} от {{patient}}, счёт {{number}} — {{reason}}"
+      }
+    }
   },
   "currency": {
     "AMD": "Армянский драм",
@@ -873,6 +923,7 @@
     "issueInvoice": "Не удалось выставить счёт.",
     "voidPayment": "Не удалось оформить возврат.",
     "invalidDateRange": "Дата начала позже даты окончания",
-    "reportRangeTooLong": "Слишком длинный период для этого вида. Выберите недели или месяцы."
+    "reportRangeTooLong": "Слишком длинный период для этого вида. Выберите недели или месяцы.",
+    "notificationNotFound": "Этого уведомления больше нет"
   }
 }

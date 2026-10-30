@@ -318,7 +318,7 @@ export class PatientsService implements OnModuleInit {
 
         let cancelledAppointments: number | undefined;
         if (cancelUpcomingAppointments && status !== PatientStatus.ACTIVE) {
-            cancelledAppointments = await this.upcoming.cancel(clinicId, { patientId }, `Patient ${status}`);
+            cancelledAppointments = await this.upcoming.cancel(clinicId, { patientId }, `Patient ${status}`, userId);
         }
 
         return Object.assign(patient.toObject(), { cancelledAppointments }) as PatientDocument & {

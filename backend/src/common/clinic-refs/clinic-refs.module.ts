@@ -8,6 +8,7 @@ import { Appointment, AppointmentSchema } from 'src/modules/appointments/appoint
 import { ClinicRefsService } from './clinic-refs.service';
 import { UpcomingAppointmentsService } from './upcoming-appointments.service';
 import { Clinic, ClinicSchema } from 'src/modules/clinics/clinic.schema';
+import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 
 /** Global so any feature module can verify body references without importing five others. */
 @Global()
@@ -21,6 +22,7 @@ import { Clinic, ClinicSchema } from 'src/modules/clinics/clinic.schema';
             { name: Appointment.name, schema: AppointmentSchema },
             { name: Clinic.name, schema: ClinicSchema },
         ]),
+        NotificationsModule,
     ],
     providers: [ClinicRefsService, UpcomingAppointmentsService],
     exports: [ClinicRefsService, UpcomingAppointmentsService],

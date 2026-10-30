@@ -20,6 +20,9 @@ const SILENT = new Set([
     'ADD_PAYMENT',
     'CANCEL_INVOICE',
     'VOID_PAYMENT',
+    // The bell polls every minute: a dropped connection must not toast each time.
+    'GET_UNREAD_COUNT',
+    'GET_NOTIFICATIONS',
 ]);
 
 /**
@@ -68,6 +71,7 @@ const SUCCESS_TOAST_KEYS: Record<string, string> = {
     UPDATE_TEMPLATE: 'toast.updateSuccess',
     DELETE_TEMPLATE: 'toast.deleteSuccess',
     DELETE_NOTIFICATION: 'toast.deleteSuccess',
+    DELETE_READ_NOTIFICATIONS: 'toast.deleteSuccess',
 };
 
 /**

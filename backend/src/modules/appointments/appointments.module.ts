@@ -6,6 +6,7 @@ import { AppointmentsService } from './appointments.service';
 import { PatientsModule } from '../patients/patients.module';
 import { ScheduleModule } from '../schedule/schedule.module';
 import { UserProfile, UserProfileSchema } from '../users/user.schema';
+import { NotificationsModule } from '../notifications/notifications.module';
 
 @Module({
     imports: [
@@ -16,6 +17,7 @@ import { UserProfile, UserProfileSchema } from '../users/user.schema';
         ]),
         PatientsModule,
         ScheduleModule,
+        NotificationsModule,
     ],
     controllers: [AppointmentsController],
     providers: [AppointmentsService],

@@ -26,7 +26,7 @@ the first 20 records. There are **zero automated tests**, and TypeScript `strict
 | Billing | ✅ Cleaned | Fiscal receipts (F10) and deposits (F4) not built |
 | Reports | ✅ Cleaned | Export / commission (F11) not built |
 | Dashboard | ✅ Cleaned | Activity is rebuilt from records until the audit log (F7) |
-| Notifications | **Never created** | Nothing in the app ever creates a notification; bell hardcoded to 0 |
+| Notifications | ✅ Cleaned | In-app only; SMS / Telegram reminders are F3 |
 
 ---
 
@@ -211,13 +211,21 @@ built from treatment entries. Reports come after billing because they read billi
 - [ ] Not built: CSV / Excel export and dentist commission (F11), daily cash report (F5), comparison with the previous period
 - [ ] Mobile: the sidebar is a permanent drawer and covers the page on phones (all pages, pre-existing)
 
-### Phase 7 — Notifications
+### Phase 7 — Notifications — ✅ done 2026-10-29 (not committed yet)
 
-- [ ] **P1** Actually create notifications (new appointment, cancellation, payment received, …)
-- [ ] **P1** Mark-read / delete must check `recipientId` (any user can delete others' notifications)
-- [ ] **P2** `isRead=false` filter returns read items (`@Type(() => Boolean)` bug)
-- [ ] **P2** Header bell: real unread count + polling
-- [ ] **P2** Mark-read updates the list; pagination; confirm delete; link to related item
+- [x] **P1** Notifications are created — always to staff, never to the person who acted, never to inactive or other-clinic users, and a failure never breaks the action (`NotificationsService.notify`):
+  - booked (one per series, with its count), moved (old → new time), dentist changed (both dentists), confirmed, cancelled (with reason) → the dentist
+  - patient archived / deceased with visits cancelled → each affected dentist, once, with the count
+  - dentist deactivated with visits cancelled → admins and receptionists ("patients to call")
+  - payment received → admins; payment refunded / voided → the cashier who took it
+- [x] **P1** Typed notifications store `type` + `data` (patient, time, amount, count, reason…) and who did it; the app words them in the reader's language. Old free-text ones still show as stored
+- [x] **P1** Read, mark-read, delete only touch the caller's own notifications (`recipientId`); anyone else's → 404 `notificationNotFound`
+- [x] **P2** `isRead=false` returns unread only (query strings were cast with `Boolean("false") === true`); `isRead=maybe` → 400
+- [x] **P2** Header bell: real unread count, refreshed every minute while the tab is visible and when the user comes back; polling errors are silent
+- [x] **P2** Page: All / Unread tabs, pages of 20, click marks read and opens the appointment / invoice / patient, delete with confirmation, "Delete read", "Mark all read"; mark-read updates the row in place
+- [x] Notifications expire after 180 days (TTL index); `CreateNotificationDto` removed (nothing posts notifications)
+- [x] Verified on local MongoDB: 39 checks (`test/smoke/07-notifications.mjs`) + suites 01–06, browser (bell, page, open, delete read)
+- [ ] Not built: patient reminders by SMS / Telegram (F3), overdue-invoice and tomorrow's-diary digests (need a scheduled job), per-user notification settings, live push (polling only)
 
 ### Phase 8 — Safety net
 

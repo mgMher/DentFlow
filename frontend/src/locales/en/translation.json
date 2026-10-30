@@ -685,9 +685,59 @@
     "blockOverlapsAppointments_other": "Blocked. {{count}} booked appointments fall in this time — move or cancel them."
   },
   "notifications": {
-    "markAllRead": "Mark All Read",
-    "unread": "unread",
-    "noNotifications": "No notifications"
+    "markAllRead": "Mark all read",
+    "noNotifications": "No notifications",
+    "all": "All",
+    "unreadTab": "Unread",
+    "noUnread": "No unread notifications",
+    "deleteRead": "Delete read",
+    "deleteTitle": "Delete notification?",
+    "deleteMessage": "It will be removed from your list.",
+    "deleteReadTitle": "Delete read notifications?",
+    "deleteReadMessage": "Every notification you have read will be removed from your list.",
+    "bellLabel": "Notifications, {{count}} unread",
+    "types": {
+      "appointmentCreated": {
+        "title": "New appointment",
+        "message": "{{patient}} booked for {{when}}"
+      },
+      "appointmentSeries": {
+        "title": "New appointment series",
+        "message": "{{patient}}: {{count}} visits from {{when}}"
+      },
+      "appointmentRescheduled": {
+        "title": "Appointment moved",
+        "message": "{{patient}}: {{previous}} → {{when}}"
+      },
+      "appointmentReassigned": {
+        "title": "Appointment reassigned",
+        "message": "{{patient}}, {{when}}: the dentist was changed"
+      },
+      "appointmentConfirmed": {
+        "title": "Appointment confirmed",
+        "message": "{{patient}} confirmed {{when}}"
+      },
+      "appointmentCancelled": {
+        "title": "Appointment cancelled",
+        "message": "{{patient}}, {{when}} — {{reason}}"
+      },
+      "appointmentsCancelled": {
+        "title": "Appointments cancelled",
+        "message": "{{patient}}: {{count}} visits from {{when}} — {{reason}}"
+      },
+      "dentistAppointmentsCancelled": {
+        "title": "Patients to call",
+        "message": "{{dentist}} no longer works here: {{count}} booked visits were cancelled"
+      },
+      "paymentReceived": {
+        "title": "Payment received",
+        "message": "{{amount}} from {{patient}}, invoice {{number}}"
+      },
+      "paymentRefunded": {
+        "title": "Payment refunded",
+        "message": "{{amount}} from {{patient}}, invoice {{number}} — {{reason}}"
+      }
+    }
   },
   "currency": {
     "AMD": "Armenian Dram",
@@ -859,6 +909,7 @@
     "issueInvoice": "Could not issue the invoice.",
     "voidPayment": "Could not refund the payment.",
     "invalidDateRange": "The start date is after the end date",
-    "reportRangeTooLong": "The period is too long for this view. Pick weeks or months."
+    "reportRangeTooLong": "The period is too long for this view. Pick weeks or months.",
+    "notificationNotFound": "This notification no longer exists"
   }
 }

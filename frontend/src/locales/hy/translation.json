@@ -686,8 +686,58 @@
   },
   "notifications": {
     "markAllRead": "Նշել բոլորը կարդացված",
-    "unread": "չկարդացված",
-    "noNotifications": "Ծանուցումներ չկան"
+    "noNotifications": "Ծանուցումներ չկան",
+    "all": "Բոլորը",
+    "unreadTab": "Չկարդացված",
+    "noUnread": "Չկարդացված ծանուցումներ չկան",
+    "deleteRead": "Ջնջել կարդացվածները",
+    "deleteTitle": "Ջնջե՞լ ծանուցումը",
+    "deleteMessage": "Այն կհեռացվի ձեր ցուցակից։",
+    "deleteReadTitle": "Ջնջե՞լ կարդացված ծանուցումները",
+    "deleteReadMessage": "Բոլոր կարդացված ծանուցումները կհեռացվեն ձեր ցուցակից։",
+    "bellLabel": "Ծանուցումներ, չկարդացված՝ {{count}}",
+    "types": {
+      "appointmentCreated": {
+        "title": "Նոր գրանցում",
+        "message": "{{patient}}՝ {{when}}"
+      },
+      "appointmentSeries": {
+        "title": "Նոր գրանցումների շարք",
+        "message": "{{patient}}՝ {{count}} այց, սկսած {{when}}"
+      },
+      "appointmentRescheduled": {
+        "title": "Այցը տեղափոխվել է",
+        "message": "{{patient}}՝ {{previous}} → {{when}}"
+      },
+      "appointmentReassigned": {
+        "title": "Այցը փոխանցվել է",
+        "message": "{{patient}}, {{when}}՝ բժիշկը փոխվել է"
+      },
+      "appointmentConfirmed": {
+        "title": "Այցը հաստատվել է",
+        "message": "{{patient}}-ը հաստատել է {{when}}"
+      },
+      "appointmentCancelled": {
+        "title": "Այցը չեղարկվել է",
+        "message": "{{patient}}, {{when}} — {{reason}}"
+      },
+      "appointmentsCancelled": {
+        "title": "Այցերը չեղարկվել են",
+        "message": "{{patient}}՝ {{count}} այց, սկսած {{when}} — {{reason}}"
+      },
+      "dentistAppointmentsCancelled": {
+        "title": "Պետք է զանգահարել պացիենտներին",
+        "message": "{{dentist}}-ն այլևս չի աշխատում՝ չեղարկվել է {{count}} այց"
+      },
+      "paymentReceived": {
+        "title": "Վճարում ստացվեց",
+        "message": "{{amount}}՝ {{patient}}, հաշիվ {{number}}"
+      },
+      "paymentRefunded": {
+        "title": "Վճարումը վերադարձվեց",
+        "message": "{{amount}}՝ {{patient}}, հաշիվ {{number}} — {{reason}}"
+      }
+    }
   },
   "currency": {
     "AMD": "Հայկական դրամ",
@@ -859,6 +909,7 @@
     "issueInvoice": "Չհաջողվեց տրամադրել հաշիվը։",
     "voidPayment": "Չհաջողվեց վերադարձնել վճարումը։",
     "invalidDateRange": "Սկզբի ամսաթիվը ավարտից հետո է",
-    "reportRangeTooLong": "Ժամանակահատվածը շատ երկար է այս տեսքի համար։ Ընտրեք շաբաթներ կամ ամիսներ։"
+    "reportRangeTooLong": "Ժամանակահատվածը շատ երկար է այս տեսքի համար։ Ընտրեք շաբաթներ կամ ամիսներ։",
+    "notificationNotFound": "Այս ծանուցումն այլևս գոյություն չունի"
   }
 }

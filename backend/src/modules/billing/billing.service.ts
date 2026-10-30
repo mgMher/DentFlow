@@ -19,6 +19,8 @@ import {
     TreatmentEntryStatus,
 } from 'src/modules/dental-records/treatment-entry.schema';
 import { ClinicRefsService } from 'src/common/clinic-refs';
+import { NotificationsService, personName } from 'src/modules/notifications/notifications.service';
+import { NotificationRelatedType, NotificationType } from 'src/modules/notifications/notification.schema';
 import { runOnce } from 'src/common/migrations/run-once';
 import { Role } from 'src/common/decorators';
 import {
@@ -97,7 +99,34 @@ export class BillingService implements OnModuleInit {
         private readonly entryModel: Model<TreatmentEntryDocument>,
         @InjectConnection() private readonly connection: Connection,
         private readonly clinicRefs: ClinicRefsService,
+        private readonly notifications: NotificationsService,
     ) {}
+
+    /** Money moved on an invoice: tell the people who look after it (never the one who did it). */
+    private notifyPayment(
+        clinicId: Types.ObjectId,
+        type: NotificationType,
+        recipients: (Types.ObjectId | string | undefined)[],
+        actorId: Types.ObjectId,
+        invoice: Record<string, any>,
+        payment: Record<string, any>,
+    ) {
+        return this.notifications.notify({
+            clinicId,
+            recipients,
+            actorId,
+            type,
+            relatedId: invoice._id,
+            relatedType: NotificationRelatedType.INVOICE,
+            data: {
+                patientName: personName(invoice.patientId),
+                invoiceNumber: invoice.invoiceNumber,
+                amount: payment.amount,
+                currency: payment.currency,
+                ...(payment.voidReason ? { reason: payment.voidReason, voidType: payment.voidType } : {}),
+            },
+        });
+    }
 
     /** One-off data fixes; each runs once per database (see `runOnce`). */
     async onModuleInit(): Promise<void> {
@@ -659,10 +688,16 @@ export class BillingService implements OnModuleInit {
         }
 
         await payment.populate(PAYMENT_POPULATE);
-        return {
-            payment: this.serializePayment(payment),
-            invoice: await this.findInvoiceById(clinicId, invoiceId),
-        };
+        const result = { payment: this.serializePayment(payment), invoice: await this.findInvoiceById(clinicId, invoiceId) };
+        await this.notifyPayment(
+            clinicId,
+            NotificationType.PAYMENT_RECEIVED,
+            await this.notifications.staffWithRoles(clinicId, [Role.CLINIC_ADMIN]),
+            userId,
+            result.invoice,
+            result.payment,
+        );
+        return result;
     }
 
     /**
@@ -699,11 +734,12 @@ export class BillingService implements OnModuleInit {
             throw await this.invoiceStateError(clinicId, invoiceId);
         }
 
+        const receivedBy = payment.receivedBy?.toString();
         await payment.populate(PAYMENT_POPULATE);
-        return {
-            payment: this.serializePayment(payment),
-            invoice: await this.findInvoiceById(clinicId, invoiceId),
-        };
+        const result = { payment: this.serializePayment(payment), invoice: await this.findInvoiceById(clinicId, invoiceId) };
+        // The cashier who took it should know it was given back.
+        await this.notifyPayment(clinicId, NotificationType.PAYMENT_REFUNDED, [receivedBy], userId, result.invoice, result.payment);
+        return result;
     }
 
     async getPaymentsByInvoice(clinicId: Types.ObjectId, invoiceId: Types.ObjectId) {

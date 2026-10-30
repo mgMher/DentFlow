@@ -499,6 +499,29 @@ Log in as the clinic admin, a receptionist, a dentist and an assistant. Have at 
 | F6-16 | Staff → Performance | Admin opens a dentist; dentist opens own profile | This year's appointments, completion, treatments, collected (admin only); a dentist doesn't see the tab on colleagues | — |
 | F6-17 | Languages | Dashboard and Reports in hy / ru / en | All labels, activity lines and month names translated | — |
 
+## 20. Phase 7 — notifications
+
+Two browsers: a receptionist in one, the dentist (or admin) in the other.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F7-01 | Booking | Receptionist books for the dentist | Within a minute (or on switching back to the tab) the dentist's bell shows 1; "New appointment: patient, time"; the receptionist's bell does not move | — |
+| F7-02 | Own action | Dentist books for himself | No notification | — |
+| F7-03 | Series | Book a weekly series | One notification with the number of visits | — |
+| F7-04 | Move | Change the time; then change only the note | Time change: "old → new"; note change: nothing | — |
+| F7-05 | Other dentist | Move the appointment to another dentist | Both dentists notified | — |
+| F7-06 | Confirm / cancel | Confirm, then cancel with a reason | Dentist gets both; the cancel shows the reason in the reader's language | — |
+| F7-07 | Patient archived | Archive a patient with future visits, cancel them | Each dentist gets one notification with the count; click opens the patient | — |
+| F7-08 | Dentist leaves | Deactivate a dentist with future visits, cancel them | Admins and receptionists: "Patients to call", with the count | — |
+| F7-09 | Payments | Receptionist takes a payment; admin refunds it | Admin told of the payment; receptionist told of the refund with the reason; click opens the invoice | — |
+| F7-10 | Privacy | Try `PATCH /notifications/<someone else's id>/read` | 404; their notification unchanged | — |
+| F7-11 | Unread tab | Open Unread | Only unread items (the old filter returned read ones too) | — |
+| F7-12 | Read | Click an unread item | Marked read in place, bell drops by one, the linked page opens | — |
+| F7-13 | Delete | Delete one; "Delete read" | Each asks first; list and bell update | — |
+| F7-14 | Paging | More than 20 notifications | Pages of 20; deleting the last item of the last page steps back a page | — |
+| F7-15 | Offline | Stop the API for two minutes | No error toast every minute; the bell recovers when the API is back | — |
+| F7-16 | Languages | Switch hy / ru / en | Existing notifications re-worded in the new language | — |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

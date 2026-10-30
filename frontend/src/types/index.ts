@@ -465,16 +465,46 @@ export interface BlockedTime {
 }
 
 // Notification types
+export type NotificationType =
+    | 'appointment_created'
+    | 'appointment_rescheduled'
+    | 'appointment_reminder'
+    | 'appointment_cancelled'
+    | 'appointment_confirmed'
+    | 'dentist_appointments_cancelled'
+    | 'new_patient'
+    | 'payment_received'
+    | 'payment_refunded'
+    | 'system'
+    | 'custom';
+
 export interface Notification {
     _id: string;
     clinicId: string;
     recipientId: string;
-    type: string;
-    title: string;
-    message: string;
+    type: NotificationType;
+    /** Free text for system / custom and older notifications. */
+    title?: string;
+    message?: string;
+    /** Values for the wording of typed notifications. */
+    data?: {
+        patientName?: string;
+        dentistName?: string;
+        startTime?: string;
+        previousStartTime?: string;
+        dentistChanged?: boolean;
+        count?: number;
+        reason?: string;
+        voidType?: string;
+        invoiceNumber?: string;
+        amount?: number;
+        currency?: Currency;
+    };
+    /** Who did it (populated). */
+    actorId?: { _id: string; firstName: string; lastName: string } | null;
     isRead: boolean;
     relatedId?: string;
-    relatedType?: string;
+    relatedType?: 'appointment' | 'invoice' | 'patient' | 'staff' | string;
     createdAt: string;
 }
 

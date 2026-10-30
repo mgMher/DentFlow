@@ -34,6 +34,8 @@ import {
 import { PatientsService } from '../patients/patients.service';
 import { UserProfile, UserProfileDocument } from '../users/user.schema';
 import { ScheduleService, SLOT_HOLDING_STATUSES } from '../schedule/schedule.service';
+import { NotificationsService, personName } from '../notifications/notifications.service';
+import { NotificationRelatedType, NotificationType } from '../notifications/notification.schema';
 
 type Id = string | Types.ObjectId;
 const oid = (id: Id) => new Types.ObjectId(id.toString());
@@ -87,8 +89,36 @@ export class AppointmentsService implements OnModuleInit {
         private readonly patientsService: PatientsService,
         private readonly clinicRefs: ClinicRefsService,
         private readonly scheduleService: ScheduleService,
+        private readonly notifications: NotificationsService,
         @InjectConnection() private readonly connection: Connection,
     ) {}
+
+    /**
+     * Tell the dentist (or dentists) about a change someone else made to
+     * their diary. The actor is never notified of their own action.
+     */
+    private notifyDentists(
+        clinicId: string,
+        type: NotificationType,
+        appointment: AppointmentDocument,
+        actorId: string | undefined,
+        extra: Record<string, unknown> = {},
+        dentistIds: string[] = [refId(appointment.dentistId)],
+    ) {
+        return this.notifications.notify({
+            clinicId,
+            recipients: dentistIds,
+            actorId,
+            type,
+            relatedId: appointment._id,
+            relatedType: NotificationRelatedType.APPOINTMENT,
+            data: {
+                patientName: personName(appointment.patientId),
+                startTime: appointment.startTime,
+                ...extra,
+            },
+        });
+    }
 
     /**
      * `Appointment.dentistId` references the auth `User` collection, but the UI
@@ -144,7 +174,7 @@ export class AppointmentsService implements OnModuleInit {
 
     // ─── Create ───────────────────────────────────────────────────────
 
-    async create(clinicId: string, dto: CreateAppointmentDto): Promise<AppointmentDocument> {
+    async create(clinicId: string, dto: CreateAppointmentDto, actorId?: string): Promise<AppointmentDocument> {
         const { startTime, endTime } = this.parseRange(dto.startTime, dto.endTime);
         await this.assertRefs(clinicId, dto);
         await this.assertBookable(clinicId, {
@@ -158,7 +188,9 @@ export class AppointmentsService implements OnModuleInit {
 
         const created = await this.appointmentModel.create(this.newAppointment(clinicId, dto, startTime, endTime));
         await this.assertWonRace(clinicId, created);
-        return this.findById(clinicId, created._id);
+        const appointment = await this.findById(clinicId, created._id);
+        await this.notifyDentists(clinicId, NotificationType.APPOINTMENT_CREATED, appointment, actorId);
+        return appointment;
     }
 
     /**
@@ -169,6 +201,7 @@ export class AppointmentsService implements OnModuleInit {
     async createRecurring(
         clinicId: string,
         dto: CreateRecurringAppointmentDto,
+        actorId?: string,
     ): Promise<{ seriesId: Types.ObjectId; created: AppointmentDocument[]; skipped: { startTime: string; code: string }[] }> {
         const { startTime, endTime } = this.parseRange(dto.startTime, dto.endTime);
         await this.assertRefs(clinicId, dto);
@@ -218,6 +251,15 @@ export class AppointmentsService implements OnModuleInit {
                 errorBody('seriesAllConflicting', 'None of the dates in this series could be booked'),
             );
         }
+
+        // One notification for the whole series, pointing at its first visit.
+        await this.notifyDentists(
+            clinicId,
+            NotificationType.APPOINTMENT_CREATED,
+            await this.findById(clinicId, created[0]._id),
+            actorId,
+            { count: created.length },
+        );
 
         return { seriesId, created, skipped };
     }
@@ -284,7 +326,12 @@ export class AppointmentsService implements OnModuleInit {
     // ─── Update ───────────────────────────────────────────────────────
 
     /** Reschedule or edit details. Only appointments that have not happened yet can change. */
-    async update(clinicId: string, appointmentId: Id, dto: UpdateAppointmentDto): Promise<AppointmentDocument> {
+    async update(
+        clinicId: string,
+        appointmentId: Id,
+        dto: UpdateAppointmentDto,
+        actorId?: string,
+    ): Promise<AppointmentDocument> {
         const existing = await this.findById(clinicId, appointmentId);
 
         if (!EDITABLE_STATUSES.includes(existing.status)) {
@@ -333,7 +380,21 @@ export class AppointmentsService implements OnModuleInit {
         if (dto.color !== undefined) set.color = dto.color;
 
         await this.appointmentModel.updateOne({ _id: existing._id, clinicId: oid(clinicId) }, { $set: set });
-        return this.findById(clinicId, existing._id);
+        const updated = await this.findById(clinicId, existing._id);
+
+        // A new time or a new dentist is news for the dentists involved; a room or note change is not.
+        const previousDentist = refId(existing.dentistId);
+        if (startTime.getTime() !== existing.startTime.getTime() || dentistId !== previousDentist) {
+            await this.notifyDentists(
+                clinicId,
+                NotificationType.APPOINTMENT_RESCHEDULED,
+                updated,
+                actorId,
+                { previousStartTime: existing.startTime, dentistChanged: dentistId !== previousDentist },
+                [dentistId, previousDentist],
+            );
+        }
+        return updated;
     }
 
     /**
@@ -342,7 +403,12 @@ export class AppointmentsService implements OnModuleInit {
      * no-show to completed. Bringing a cancelled or no-show appointment back
      * re-checks the slot, because it may have been given to someone else.
      */
-    async updateStatus(clinicId: string, appointmentId: Id, status: AppointmentStatus): Promise<AppointmentDocument> {
+    async updateStatus(
+        clinicId: string,
+        appointmentId: Id,
+        status: AppointmentStatus,
+        actorId?: string,
+    ): Promise<AppointmentDocument> {
         const appointment = await this.findById(clinicId, appointmentId);
         const from = appointment.status;
 
@@ -396,7 +462,11 @@ export class AppointmentsService implements OnModuleInit {
             await this.patientsService.touchLastVisit(oid(clinicId), oid(refId(appointment.patientId)), appointment.startTime);
         }
 
-        return this.findById(clinicId, appointment._id);
+        const result = await this.findById(clinicId, appointment._id);
+        if (status === AppointmentStatus.CONFIRMED) {
+            await this.notifyDentists(clinicId, NotificationType.APPOINTMENT_CONFIRMED, result, actorId);
+        }
+        return result;
     }
 
     /**
@@ -438,6 +508,12 @@ export class AppointmentsService implements OnModuleInit {
         });
 
         const updated = await this.findById(clinicId, appointment._id);
+        if (result.modifiedCount) {
+            await this.notifyDentists(clinicId, NotificationType.APPOINTMENT_CANCELLED, updated, userId, {
+                count: result.modifiedCount,
+                reason: dto.reason,
+            });
+        }
         return Object.assign(updated.toObject(), { cancelledCount: result.modifiedCount }) as AppointmentDocument & {
             cancelledCount?: number;
         };

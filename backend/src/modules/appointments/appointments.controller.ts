@@ -34,14 +34,14 @@ export class AppointmentsController {
     @ApiOperation({ summary: 'Book an appointment' })
     @ApiResponse({ status: 409, description: 'Dentist, room or patient already booked; blocked time; outside hours' })
     create(@CurrentUser() user: AuthUser, @Body() dto: CreateAppointmentDto) {
-        return this.appointmentsService.create(user.clinicId, dto);
+        return this.appointmentsService.create(user.clinicId, dto, user.userId);
     }
 
     @Post('recurring')
     @Roles(...BOOKERS)
     @ApiOperation({ summary: 'Book a recurring series (returns created and skipped dates)' })
     createRecurring(@CurrentUser() user: AuthUser, @Body() dto: CreateRecurringAppointmentDto) {
-        return this.appointmentsService.createRecurring(user.clinicId, dto);
+        return this.appointmentsService.createRecurring(user.clinicId, dto, user.userId);
     }
 
     @Get()
@@ -76,7 +76,7 @@ export class AppointmentsController {
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateAppointmentDto,
     ) {
-        return this.appointmentsService.update(user.clinicId, id, dto);
+        return this.appointmentsService.update(user.clinicId, id, dto, user.userId);
     }
 
     @Patch(':id/status')
@@ -87,7 +87,7 @@ export class AppointmentsController {
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateAppointmentStatusDto,
     ) {
-        return this.appointmentsService.updateStatus(user.clinicId, id, dto.status);
+        return this.appointmentsService.updateStatus(user.clinicId, id, dto.status, user.userId);
     }
 
     @Patch(':id/cancel')

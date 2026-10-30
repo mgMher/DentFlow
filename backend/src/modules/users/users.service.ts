@@ -366,7 +366,7 @@ export class UsersService {
         // Appointments reference the dentist's auth id.
         const cancelledAppointments =
             !isActive && cancelUpcomingAppointments && profile.authId
-                ? await this.upcoming.cancel(clinicId, { dentistId: profile.authId }, 'Dentist deactivated')
+                ? await this.upcoming.cancel(clinicId, { dentistId: profile.authId }, 'Dentist deactivated', actingAuthId)
                 : undefined;
 
         return { ...(updated as UserProfileDocument), cancelledAppointments } as UserProfileDocument & {
