@@ -4,6 +4,7 @@ import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 import { UserProfile, UserProfileSchema } from './user.schema';
 import { User, UserSchema } from '../auth/auth.schema';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
     imports: [
@@ -11,6 +12,7 @@ import { User, UserSchema } from '../auth/auth.schema';
             { name: UserProfile.name, schema: UserProfileSchema },
             { name: User.name, schema: UserSchema },
         ]),
+        AuthModule,
     ],
     controllers: [UsersController],
     providers: [UsersService],

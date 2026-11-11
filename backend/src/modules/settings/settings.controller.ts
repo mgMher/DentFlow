@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Roles, Role } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
+import { Types } from 'mongoose';
 import { SettingsService } from './settings.service';
 import { CreateTemplateDto, UpdateTemplateDto } from './dto';
 
@@ -40,7 +42,7 @@ export class SettingsController {
     @ApiOperation({ summary: 'Update a notification template' })
     updateTemplate(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateTemplateDto,
     ) {
         return this.settingsService.updateTemplate(user.clinicId, id, dto);
@@ -50,7 +52,7 @@ export class SettingsController {
     @ApiOperation({ summary: 'Delete a notification template' })
     deleteTemplate(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
         return this.settingsService.deleteTemplate(user.clinicId, id);
     }

@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Document } from 'mongoose';
+import { Currency } from 'src/common/utils';
 
 export type ClinicDocument = Clinic & Document;
 
@@ -14,12 +15,6 @@ export enum SupportedLanguage {
     HY = 'hy',
     RU = 'ru',
     EN = 'en',
-}
-
-export enum SupportedCurrency {
-    AMD = 'AMD',
-    USD = 'USD',
-    RUB = 'RUB',
 }
 
 @Schema({ _id: false })
@@ -106,10 +101,10 @@ export class Clinic {
     language: SupportedLanguage;
 
     @Prop({
-        enum: SupportedCurrency,
-        default: SupportedCurrency.AMD,
+        enum: Currency,
+        default: Currency.AMD,
     })
-    currency: SupportedCurrency;
+    currency: Currency;
 
     @Prop({ type: SubscriptionSchema })
     subscription: Subscription;

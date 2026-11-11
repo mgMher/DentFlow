@@ -16,6 +16,9 @@ import { TreatmentsService } from './treatments.service';
 import { TreatmentCategory } from './treatment.schema';
 import { CreateTreatmentDto, UpdateTreatmentDto, QueryTreatmentDto } from './dto';
 
+/** Role matrix (D5): prices and the catalogue belong to the clinic admin; everyone else views. */
+const CATALOG_EDITORS = [Role.CLINIC_ADMIN];
+
 @ApiTags('Treatments')
 @ApiBearerAuth()
 @Controller('treatments')
@@ -33,10 +36,11 @@ export class TreatmentsController {
     }
 
     @Post()
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST)
-    @ApiOperation({ summary: 'Create a new treatment (admin or dentist only)' })
+    @Roles(...CATALOG_EDITORS)
+    @ApiOperation({ summary: 'Create a new treatment (admin only)' })
     @ApiResponse({ status: 201, description: 'Treatment created' })
     @ApiResponse({ status: 403, description: 'Insufficient permissions' })
+    @ApiResponse({ status: 409, description: 'Code already used (treatmentCodeTaken)' })
     async create(
         @CurrentUser('clinicId') clinicId: string,
         @Body() dto: CreateTreatmentDto,
@@ -64,8 +68,8 @@ export class TreatmentsController {
     }
 
     @Patch(':id')
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST)
-    @ApiOperation({ summary: 'Update a treatment (admin or dentist only)' })
+    @Roles(...CATALOG_EDITORS)
+    @ApiOperation({ summary: 'Update a treatment (admin only); an empty optional field clears it' })
     @ApiParam({ name: 'id', description: 'Treatment ObjectId' })
     @ApiResponse({ status: 200, description: 'Treatment updated' })
     @ApiResponse({ status: 403, description: 'Insufficient permissions' })
@@ -79,8 +83,8 @@ export class TreatmentsController {
     }
 
     @Delete(':id')
-    @Roles(Role.CLINIC_ADMIN, Role.DENTIST)
-    @ApiOperation({ summary: 'Deactivate a treatment (soft delete, admin or dentist only)' })
+    @Roles(...CATALOG_EDITORS)
+    @ApiOperation({ summary: 'Deactivate a treatment (hidden from pickers, admin only)' })
     @ApiParam({ name: 'id', description: 'Treatment ObjectId' })
     @ApiResponse({ status: 200, description: 'Treatment deactivated' })
     @ApiResponse({ status: 403, description: 'Insufficient permissions' })
@@ -89,11 +93,23 @@ export class TreatmentsController {
         @CurrentUser('clinicId') clinicId: string,
         @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
-        return this.treatmentsService.deactivate(new Types.ObjectId(clinicId), id);
+        return this.treatmentsService.setActive(new Types.ObjectId(clinicId), id, false);
+    }
+
+    @Patch(':id/reactivate')
+    @Roles(...CATALOG_EDITORS)
+    @ApiOperation({ summary: 'Bring a deactivated treatment back (admin only)' })
+    @ApiParam({ name: 'id', description: 'Treatment ObjectId' })
+    @ApiResponse({ status: 200, description: 'Treatment active again' })
+    async reactivate(
+        @CurrentUser('clinicId') clinicId: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    ) {
+        return this.treatmentsService.setActive(new Types.ObjectId(clinicId), id, true);
     }
 
     @Post('seed-defaults')
-    @Roles(Role.CLINIC_ADMIN)
+    @Roles(...CATALOG_EDITORS)
     @ApiOperation({ summary: 'Seed default treatments for the clinic (admin only)' })
     @ApiResponse({ status: 201, description: 'Default treatments seeded' })
     @ApiResponse({ status: 403, description: 'Insufficient permissions' })

@@ -20,11 +20,15 @@ import {
     ChevronRight as ExpandIcon,
 } from '@mui/icons-material';
 import { DRAWER_WIDTH, DRAWER_WIDTH_COLLAPSED } from '../../utils/constants';
+import { usePermission } from '../../hooks';
+import { Permission } from '../../utils/permissions';
 
 interface NavItem {
     path: string;
     labelKey: string;
     icon: React.ReactNode;
+    /** Hidden for roles that would only get a 403 there. Must match the route guard in AppRouter. */
+    permission?: Permission;
 }
 
 const navItems: NavItem[] = [
@@ -32,32 +36,42 @@ const navItems: NavItem[] = [
     { path: '/patients', labelKey: 'nav.patients', icon: <PeopleIcon /> },
     { path: '/appointments', labelKey: 'nav.appointments', icon: <CalendarIcon /> },
     { path: '/treatments', labelKey: 'nav.treatments', icon: <TreatmentIcon /> },
-    { path: '/billing', labelKey: 'nav.billing', icon: <BillingIcon /> },
+    { path: '/billing', labelKey: 'nav.billing', icon: <BillingIcon />, permission: 'viewBilling' },
     { path: '/staff', labelKey: 'nav.staff', icon: <StaffIcon /> },
     { path: '/schedule', labelKey: 'nav.schedule', icon: <ScheduleIcon /> },
-    { path: '/reports', labelKey: 'nav.reports', icon: <ReportsIcon /> },
+    { path: '/reports', labelKey: 'nav.reports', icon: <ReportsIcon />, permission: 'viewReports' },
     { path: '/notifications', labelKey: 'nav.notifications', icon: <NotificationsIcon /> },
-    { path: '/settings', labelKey: 'nav.settings', icon: <SettingsIcon /> },
+    { path: '/settings', labelKey: 'nav.settings', icon: <SettingsIcon />, permission: 'manageClinic' },
 ];
 
 interface SidebarProps {
     collapsed: boolean;
     onToggle: () => void;
+    /** Phones: an overlay drawer opened from the header menu button instead of a fixed column. */
+    mobile?: boolean;
+    mobileOpen?: boolean;
+    onMobileClose?: () => void;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobile = false, mobileOpen = false, onMobileClose }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
+    const can = usePermission();
+    const visibleItems = navItems.filter((item) => !item.permission || can(item.permission));
     const width = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH;
 
     return (
         <Drawer
-            variant="permanent"
+            variant={mobile ? 'temporary' : 'permanent'}
+            open={mobile ? mobileOpen : undefined}
+            onClose={onMobileClose}
+            ModalProps={{ keepMounted: true }}
             sx={{
-                width,
-                flexShrink: 0,
+                // A temporary drawer's root is the full-screen modal: sizing it would shrink the backdrop.
+                // It also renders in a portal, outside MainLayout's print wrapper, so hide it from print here.
+                ...(mobile ? { displayPrint: 'none' } : { width, flexShrink: 0 }),
                 '& .MuiDrawer-paper': {
                     width,
                     boxSizing: 'border-box',
@@ -84,7 +98,7 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
                         </Typography>
                     </Box>
                 )}
-                <IconButton onClick={onToggle} size="small">
+                <IconButton onClick={mobile ? onMobileClose : onToggle} size="small">
                     {collapsed ? <ExpandIcon /> : <CollapseIcon />}
                 </IconButton>
             </Box>
@@ -92,13 +106,16 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle }) => {
             <Divider />
 
             <List sx={{ px: 1, py: 1 }}>
-                {navItems.map((item) => {
+                {visibleItems.map((item) => {
                     const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
 
                     const button = (
                         <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>
                             <ListItemButton
-                                onClick={() => navigate(item.path)}
+                                onClick={() => {
+                                    navigate(item.path);
+                                    if (mobile) onMobileClose?.();
+                                }}
                                 sx={{
                                     borderRadius: 2,
                                     minHeight: 44,

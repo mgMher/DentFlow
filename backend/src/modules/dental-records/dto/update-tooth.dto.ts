@@ -12,13 +12,20 @@ import {
     MaxLength,
     ValidateNested,
 } from 'class-validator';
-import { ToothStatus, ToothSurface } from '../dental-record.schema';
+import { SurfaceStatus, ToothStatus, ToothSurface } from '../dental-record.schema';
+
+export class SurfaceStateDto {
+    @ApiProperty({ enum: ToothSurface, example: ToothSurface.MESIAL })
+    @IsEnum(ToothSurface)
+    surface: ToothSurface;
+
+    @ApiProperty({ enum: SurfaceStatus, example: SurfaceStatus.DECAYED })
+    @IsEnum(SurfaceStatus)
+    status: SurfaceStatus;
+}
 
 export class UpdateToothDto {
-    @ApiProperty({
-        example: 14,
-        description: 'Universal tooth number: 1-32 for adult, 51-70 for pediatric (A-T mapped)',
-    })
+    @ApiProperty({ example: 16, description: 'FDI tooth number (11–48, primary 51–85)' })
     @IsNotEmpty()
     @IsInt()
     toothNumber: number;
@@ -29,14 +36,19 @@ export class UpdateToothDto {
     status?: ToothStatus;
 
     @ApiPropertyOptional({
-        enum: ToothSurface,
-        isArray: true,
-        example: [ToothSurface.MESIAL, ToothSurface.OCCLUSAL],
+        type: [SurfaceStateDto],
+        description: 'Replaces the surface findings. One entry per surface; a surface not listed is sound.',
+        example: [
+            { surface: ToothSurface.MESIAL, status: SurfaceStatus.DECAYED },
+            { surface: ToothSurface.OCCLUSAL, status: SurfaceStatus.FILLED },
+        ],
     })
     @IsOptional()
     @IsArray()
-    @IsEnum(ToothSurface, { each: true })
-    surfaces?: ToothSurface[];
+    @ArrayMaxSize(Object.keys(ToothSurface).length)
+    @ValidateNested({ each: true })
+    @Type(() => SurfaceStateDto)
+    surfaces?: SurfaceStateDto[];
 
     @ApiPropertyOptional({ example: ['caries', 'fracture'] })
     @IsOptional()
@@ -67,4 +79,14 @@ export class SetChartTypeDto {
     @IsNotEmpty()
     @IsIn(['adult', 'pediatric'])
     chartType: 'adult' | 'pediatric';
+}
+
+export class GetChartQueryDto {
+    @ApiPropertyOptional({
+        enum: ['adult', 'pediatric'],
+        description: 'Only used when the chart does not exist yet',
+    })
+    @IsOptional()
+    @IsIn(['adult', 'pediatric'])
+    chartType?: 'adult' | 'pediatric';
 }

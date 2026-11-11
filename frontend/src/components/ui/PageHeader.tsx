@@ -15,8 +15,8 @@ const PageHeader: React.FC<PageHeaderProps> = ({
     title, subtitle, actionLabel, onAction, actionIcon, children,
 }) => {
     return (
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 3 }}>
-            <Box>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'flex-start', gap: 2, mb: 3 }}>
+            <Box sx={{ minWidth: 0 }}>
                 <Typography variant="h4" fontWeight={700}>{title}</Typography>
                 {subtitle && (
                     <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
@@ -24,7 +24,7 @@ const PageHeader: React.FC<PageHeaderProps> = ({
                     </Typography>
                 )}
             </Box>
-            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, alignItems: 'center' }}>
                 {children}
                 {actionLabel && onAction && (
                     <Button variant="contained" startIcon={actionIcon || <AddIcon />} onClick={onAction}>

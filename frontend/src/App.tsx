@@ -8,7 +8,6 @@ import { store } from './store';
 import { AppRouter } from './router';
 import { useThemeMode } from './hooks';
 import { lightTheme, darkTheme } from './utils/theme';
-import HttpToastHandler from './components/HttpToastHandler';
 import './locales/i18n';
 
 const AppContent: React.FC = () => {
@@ -21,7 +20,6 @@ const AppContent: React.FC = () => {
             <BrowserRouter>
                 <AppRouter themeMode={mode} onToggleTheme={toggleTheme} />
             </BrowserRouter>
-            <HttpToastHandler />
             <ToastContainer
                 position="top-center"
                 autoClose={3500}

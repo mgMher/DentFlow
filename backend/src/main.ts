@@ -1,37 +1,17 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
-import { ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import helmet from 'helmet';
-import { GlobalExceptionFilter, TransformInterceptor } from './common';
+import { configureApp } from './app.setup';
+import { assertJwtConfig } from './config';
 
 async function bootstrap() {
     const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
-    app.use(helmet());
+    // `.env` is loaded by now (ConfigModule ran while AppModule was created).
+    assertJwtConfig();
 
-    app.enableCors({
-        origin: process.env.CLIENT_URL || 'http://localhost:3000',
-        credentials: true,
-    });
-
-    app.setGlobalPrefix('api');
-
-    app.useGlobalPipes(
-        new ValidationPipe({
-            transform: true,
-            whitelist: true,
-            forbidNonWhitelisted: true,
-        }),
-    );
-
-    // Both of these existed but were never wired up. The whole client is
-    // written against the `{ statusCode, message, data }` envelope, so without
-    // the interceptor every paginated response unwrapped to the wrong level
-    // and `total` fell back to the current page's length.
-    app.useGlobalInterceptors(new TransformInterceptor());
-    app.useGlobalFilters(new GlobalExceptionFilter());
+    configureApp(app);
 
     if (process.env.MODE !== 'PROD') {
         const config = new DocumentBuilder()

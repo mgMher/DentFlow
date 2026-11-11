@@ -29,6 +29,7 @@ import {
     Save as SaveIcon,
     ToggleOff as DeactivateIcon,
     ToggleOn as ActivateIcon,
+    Password as PasswordIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -38,16 +39,19 @@ import { RootState } from '../../store';
 import { staffActions } from '../../store/staff';
 import { reportsActions } from '../../store/reports';
 import {
-    ConfirmDialog,
     LoadingSpinner,
+    PasswordDialog,
     PageHeader,
     StatCard,
     StatusChip,
 } from '../../components/ui';
-import { useAuth, useHttpState } from '../../hooks';
+import { useAuth, useHttpState, usePermission } from '../../hooks';
+import StaffStatusDialog from './StaffStatusDialog';
 import { formatCurrency, getFullName, getInitials } from '../../utils/formatters';
+import { formatArmenianPhone } from '../../utils/validators';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
 import { staffRefId } from '../../utils/staff';
+import { toLocalDateString } from '../../utils/dates';
 import { DENTIST_SPECIALIZATIONS, STAFF_ROLES } from '../../types';
 import {
     AvailabilityRow,
@@ -78,6 +82,7 @@ const StaffDetailPage: React.FC = () => {
     const dispatch = useDispatch();
     const { id } = useParams<{ id: string }>();
     const { user } = useAuth();
+    const can = usePermission();
 
     const staff = useSelector((state: RootState) => state.staff.current);
     const performance = useSelector((state: RootState) => state.reports.dentistPerformance);
@@ -113,8 +118,18 @@ const StaffDetailPage: React.FC = () => {
         availabilityToRows(undefined),
     );
     const [pendingStatus, setPendingStatus] = useState<boolean | null>(null);
+    const [resetOpen, setResetOpen] = useState(false);
+    const resetPassword = useHttpState('RESET_STAFF_PASSWORD');
 
-    const canManageStaff = user?.role === 'clinic_admin' || user?.role === 'super_admin';
+    useEffect(() => {
+        if (resetPassword.success) {
+            resetPassword.clearSuccess();
+            setResetOpen(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [resetPassword.success]);
+
+    const canManageStaff = can('manageStaff');
     // Members maintain their own working hours even without staff-management rights.
     const isSelf = !!staff && !!user && staffRefId(staff) === user._id;
     const canEditAvailability = canManageStaff || isSelf;
@@ -146,16 +161,20 @@ const StaffDetailPage: React.FC = () => {
         setAvailability(availabilityToRows(staff.schedule?.defaultAvailability));
     }, [staff, id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // `/reports` is open to admins and dentists only, so anyone else would just
-    // get a 403 behind the tab.
-    const canSeeReports = canManageStaff || user?.role === 'dentist';
-    const showPerformance = staff?.role === 'dentist' && canSeeReports;
+    // `/reports` is open to admins and dentists; a dentist only gets their own
+    // row, so the tab shows on their own profile only.
+    const canSeeRevenue = can('viewRevenue');
+    const showPerformance = staff?.role === 'dentist' && can('viewReports') && (canSeeRevenue || isSelf);
+    const performanceQuery = useMemo(() => {
+        const today = toLocalDateString();
+        return { startDate: `${today.slice(0, 4)}-01-01`, endDate: today };
+    }, []);
 
     useEffect(() => {
         if (activeTab === 2 && showPerformance) {
-            dispatch(reportsActions.getDentistPerf());
+            dispatch(reportsActions.getDentistPerf(performanceQuery));
         }
-    }, [activeTab, showPerformance, dispatch]);
+    }, [activeTab, showPerformance, performanceQuery, dispatch]);
 
     // The refreshed record is the visible feedback; drop the flag so it does not
     // pile up across changes.
@@ -184,27 +203,25 @@ const StaffDetailPage: React.FC = () => {
 
     /**
      * Performance rows are keyed by the auth id, which is what appointments and
-     * invoices reference — not the profile id in the URL.
+     * treatment entries reference — not the profile id in the URL. The report
+     * state is shared with the Reports page, so only this year's response counts.
      */
     const stats = useMemo(() => {
         const refId = staffRefId(staff);
-        if (!refId || !performance) return null;
-
-        const appointments = performance.appointmentsPerDentist?.find(
-            (row: any) => row._id === refId,
-        );
-        const revenue = performance.revenuePerDentist?.find((row: any) => row._id === refId);
-
-        const total = appointments?.totalAppointments ?? 0;
+        if (!refId || !performance || performance.startDate !== performanceQuery.startDate) return null;
+        const row = performance.rows.find((r) => r.dentistId === refId);
+        const closed = (row?.completed ?? 0) + (row?.cancelled ?? 0) + (row?.noShow ?? 0);
         return {
-            total,
-            completed: appointments?.completed ?? 0,
-            cancelled: appointments?.cancelled ?? 0,
-            completionRate: total ? Math.round(((appointments?.completed ?? 0) / total) * 100) : 0,
-            revenue: revenue?.totalRevenue ?? 0,
-            invoiceCount: revenue?.invoiceCount ?? 0,
+            total: row?.appointments ?? 0,
+            completed: row?.completed ?? 0,
+            cancelled: row?.cancelled ?? 0,
+            noShow: row?.noShow ?? 0,
+            treatmentsDone: row?.treatmentsDone ?? 0,
+            completionRate: closed ? Math.round(((row?.completed ?? 0) / closed) * 100) : 0,
+            collected: row?.collected,
+            currency: performance.currency,
         };
-    }, [performance, staff]);
+    }, [performance, performanceQuery, staff]);
 
     const onSaveProfile = (data: StaffFormData) => {
         if (!id) return;
@@ -233,11 +250,6 @@ const StaffDetailPage: React.FC = () => {
         );
     };
 
-    const confirmStatusChange = () => {
-        if (!id || pendingStatus === null) return;
-        dispatch(staffActions.updateStaffStatus({ id, isActive: pendingStatus }));
-        setPendingStatus(null);
-    };
 
     if (loading || (!staff && !loadError)) {
         return <LoadingSpinner fullPage />;
@@ -264,6 +276,18 @@ const StaffDetailPage: React.FC = () => {
                 <Button variant="text" startIcon={<BackIcon />} onClick={() => navigate('/staff')}>
                     {t('common.back')}
                 </Button>
+                {canManageStaff && !isSelf && (
+                    <Button
+                        variant="outlined"
+                        startIcon={<PasswordIcon />}
+                        onClick={() => {
+                            resetPassword.clearError();
+                            setResetOpen(true);
+                        }}
+                    >
+                        {t('staff.resetPassword')}
+                    </Button>
+                )}
                 {canManageStaff && (
                     <Button
                         variant="outlined"
@@ -294,11 +318,11 @@ const StaffDetailPage: React.FC = () => {
                     >
                         {getInitials(staff.firstName, staff.lastName)}
                     </Avatar>
-                    <Box>
+                    <Box sx={{ minWidth: 0 }}>
                         <Typography variant="h5" fontWeight={700}>
                             {getFullName(staff.firstName, staff.lastName, staff.patronymic)}
                         </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
                             <StatusChip
                                 status={staff.role === 'dentist' ? 'confirmed' : 'scheduled'}
                                 translationPrefix="staff"
@@ -309,9 +333,9 @@ const StaffDetailPage: React.FC = () => {
                                 translationPrefix="common"
                             />
                         </Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, overflowWrap: 'anywhere' }}>
                             {staff.email}
-                            {staff.phone ? ` | ${staff.phone}` : ''}
+                            {staff.phone ? ` | ${formatArmenianPhone(staff.phone)}` : ''}
                         </Typography>
                     </Box>
                 </Box>
@@ -509,6 +533,13 @@ const StaffDetailPage: React.FC = () => {
                                                         {t(`staff.specializations.${spec}`)}
                                                     </MenuItem>
                                                 ))}
+                                                {/* Older records hold free text; show it instead of a blank select until it is changed. */}
+                                                {field.value &&
+                                                    !(DENTIST_SPECIALIZATIONS as readonly string[]).includes(field.value) && (
+                                                        <MenuItem value={field.value} disabled>
+                                                            {field.value}
+                                                        </MenuItem>
+                                                    )}
                                             </TextField>
                                         )}
                                     />
@@ -737,12 +768,21 @@ const StaffDetailPage: React.FC = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12} md={3}>
-                                    <StatCard
-                                        title={t('reports.totalRevenue')}
-                                        value={formatCurrency(stats?.revenue ?? 0)}
-                                        icon={<RevenueIcon />}
-                                        color="#0B5E6E"
-                                    />
+                                    {canSeeRevenue ? (
+                                        <StatCard
+                                            title={t('reports.collected')}
+                                            value={formatCurrency(stats?.collected ?? 0, stats?.currency)}
+                                            icon={<RevenueIcon />}
+                                            color="#0B5E6E"
+                                        />
+                                    ) : (
+                                        <StatCard
+                                            title={t('reports.treatmentsDone')}
+                                            value={stats?.treatmentsDone ?? 0}
+                                            icon={<RevenueIcon />}
+                                            color="#0B5E6E"
+                                        />
+                                    )}
                                 </Grid>
                             </Grid>
                             <Paper sx={{ p: 3 }}>
@@ -758,11 +798,15 @@ const StaffDetailPage: React.FC = () => {
                                     </Grid>
                                     <Grid item xs={6} md={3}>
                                         <Typography variant="body2" color="text.secondary">
-                                            {t('billing.invoices')}
+                                            {t('appointments.noShow')}
                                         </Typography>
-                                        <Typography variant="h6">
-                                            {stats?.invoiceCount ?? 0}
+                                        <Typography variant="h6">{stats?.noShow ?? 0}</Typography>
+                                    </Grid>
+                                    <Grid item xs={6} md={3}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            {t('reports.treatmentsDone')}
                                         </Typography>
+                                        <Typography variant="h6">{stats?.treatmentsDone ?? 0}</Typography>
                                     </Grid>
                                 </Grid>
                             </Paper>
@@ -771,16 +815,20 @@ const StaffDetailPage: React.FC = () => {
                 </TabPanel>
             )}
 
-            <ConfirmDialog
-                open={pendingStatus !== null}
-                title={t('staff.changeStatus')}
-                message={t('staff.confirmStatusChange', {
-                    name: getFullName(staff.firstName, staff.lastName),
-                    status: pendingStatus ? t('common.active') : t('common.inactive'),
-                })}
-                variant={pendingStatus ? 'default' : 'danger'}
-                onConfirm={confirmStatusChange}
-                onCancel={() => setPendingStatus(null)}
+            <StaffStatusDialog
+                member={pendingStatus !== null ? staff : null}
+                isActive={!!pendingStatus}
+                onClose={() => setPendingStatus(null)}
+            />
+
+            <PasswordDialog
+                open={resetOpen}
+                title={t('staff.resetPassword')}
+                description={t('staff.resetPasswordHint', { name: getFullName(staff.firstName, staff.lastName) })}
+                loading={resetPassword.loading}
+                error={resetPassword.error}
+                onSubmit={({ newPassword }) => dispatch(staffActions.resetStaffPassword({ id: staff._id, newPassword }))}
+                onClose={() => setResetOpen(false)}
             />
         </Box>
     );

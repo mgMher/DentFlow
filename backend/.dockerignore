@@ -1,0 +1,8 @@
+# Secrets must come from the environment at runtime, never baked into an image.
+.env
+.env.*
+!.env.example
+node_modules
+dist
+coverage
+*.log

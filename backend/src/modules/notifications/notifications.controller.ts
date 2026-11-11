@@ -1,16 +1,14 @@
-import {
-    Controller,
-    Delete,
-    Get,
-    Param,
-    Patch,
-    Query,
-} from '@nestjs/common';
+import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Types } from 'mongoose';
 import { CurrentUser } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
 import { NotificationsService } from './notifications.service';
 import { QueryNotificationDto } from './dto';
 
+type AuthUser = { userId: string; clinicId: string };
+
+/** Every route works on the caller's own notifications only. */
 @ApiTags('Notifications')
 @ApiBearerAuth()
 @Controller('notifications')
@@ -18,45 +16,38 @@ export class NotificationsController {
     constructor(private readonly notificationsService: NotificationsService) {}
 
     @Get()
-    @ApiOperation({ summary: 'List notifications for current user' })
-    findAll(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Query() query: QueryNotificationDto,
-    ) {
+    @ApiOperation({ summary: 'My notifications, newest first (isRead filter, pages); includes the unread count' })
+    findAll(@CurrentUser() user: AuthUser, @Query() query: QueryNotificationDto) {
         return this.notificationsService.findAll(user.clinicId, user.userId, query);
     }
 
     @Get('unread-count')
-    @ApiOperation({ summary: 'Get unread notification count for current user' })
-    getUnreadCount(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-    ) {
+    @ApiOperation({ summary: 'How many of my notifications are unread (polled by the header bell)' })
+    getUnreadCount(@CurrentUser() user: AuthUser) {
         return this.notificationsService.getUnreadCount(user.clinicId, user.userId);
     }
 
-    @Patch(':id/read')
-    @ApiOperation({ summary: 'Mark a notification as read' })
-    markAsRead(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
-    ) {
-        return this.notificationsService.markAsRead(user.clinicId, id);
-    }
-
     @Patch('read-all')
-    @ApiOperation({ summary: 'Mark all notifications as read for current user' })
-    markAllAsRead(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-    ) {
+    @ApiOperation({ summary: 'Mark all my notifications as read' })
+    markAllAsRead(@CurrentUser() user: AuthUser) {
         return this.notificationsService.markAllAsRead(user.clinicId, user.userId);
     }
 
+    @Patch(':id/read')
+    @ApiOperation({ summary: 'Mark one of my notifications as read' })
+    markAsRead(@CurrentUser() user: AuthUser, @Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
+        return this.notificationsService.markAsRead(user.clinicId, user.userId, id);
+    }
+
+    @Delete('read')
+    @ApiOperation({ summary: 'Delete all my read notifications' })
+    deleteRead(@CurrentUser() user: AuthUser) {
+        return this.notificationsService.deleteRead(user.clinicId, user.userId);
+    }
+
     @Delete(':id')
-    @ApiOperation({ summary: 'Delete a notification' })
-    delete(
-        @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
-    ) {
-        return this.notificationsService.delete(user.clinicId, id);
+    @ApiOperation({ summary: 'Delete one of my notifications' })
+    delete(@CurrentUser() user: AuthUser, @Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
+        return this.notificationsService.delete(user.clinicId, user.userId, id);
     }
 }

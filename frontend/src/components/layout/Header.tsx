@@ -11,24 +11,69 @@ import {
     LightMode as LightModeIcon,
     Logout as LogoutIcon,
     Settings as SettingsIcon,
+    Password as PasswordIcon,
+    PhonelinkErase as LogoutAllIcon,
+    Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { useHttpState, usePermission } from '../../hooks';
+import { PasswordDialog } from '../ui';
+import { useDispatch, useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { notificationsActions } from '../../store/notifications';
+import { authActions } from '../../store/auth';
 import { getInitials } from '../../utils/formatters';
 import { HEADER_HEIGHT, LANGUAGES } from '../../utils/constants';
 
+/** How often the bell asks for the unread count while the tab is visible. */
+const UNREAD_POLL_MS = 60_000;
+
 interface HeaderProps {
     sidebarWidth: number;
+    /** Set on phones, where the sidebar is hidden until this button opens it. */
+    onMenuClick?: () => void;
     themeMode: 'light' | 'dark';
     onToggleTheme: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme }) => {
+const Header: React.FC<HeaderProps> = ({ sidebarWidth, onMenuClick, themeMode, onToggleTheme }) => {
     const { t, i18n } = useTranslation();
     const theme = useTheme();
     const navigate = useNavigate();
     const { user, logout } = useAuth();
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+    const [passwordOpen, setPasswordOpen] = useState(false);
+    const dispatch = useDispatch();
+    const can = usePermission();
+    const changePassword = useHttpState('CHANGE_PASSWORD');
+    const unreadCount = useSelector((state: RootState) => state.notifications.unreadCount);
+    const userId = user?._id;
+
+    // Real unread count: on load, every minute while the tab is visible, and
+    // as soon as the user comes back to the tab.
+    React.useEffect(() => {
+        if (!userId) return undefined;
+        const refresh = () => {
+            if (document.visibilityState === 'visible') dispatch(notificationsActions.getUnreadCount());
+        };
+        refresh();
+        const timer = window.setInterval(refresh, UNREAD_POLL_MS);
+        document.addEventListener('visibilitychange', refresh);
+        return () => {
+            window.clearInterval(timer);
+            document.removeEventListener('visibilitychange', refresh);
+        };
+    }, [dispatch, userId]);
+
+    // Close only after the server accepted it, so a wrong current password keeps the form.
+    React.useEffect(() => {
+        if (changePassword.success) {
+            changePassword.clearSuccess();
+            setPasswordOpen(false);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [changePassword.success]);
 
     const handleLanguageChange = (e: SelectChangeEvent) => {
         const lang = e.target.value;
@@ -44,10 +89,8 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
 
     const handleLogout = () => {
         handleMenuClose();
+        // The saga revokes the session server-side, then clears storage and redirects.
         logout();
-        localStorage.removeItem('access-token');
-        localStorage.removeItem('refresh-token');
-        window.location.replace('/login');
     };
 
     return (
@@ -64,6 +107,11 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
             }}
         >
             <Toolbar sx={{ justifyContent: 'flex-end', gap: 1 }}>
+                {onMenuClick && (
+                    <IconButton onClick={onMenuClick} edge="start" aria-label={t('nav.menu')} sx={{ mr: 'auto' }}>
+                        <MenuIcon />
+                    </IconButton>
+                )}
                 <Select
                     value={i18n.language}
                     onChange={handleLanguageChange}
@@ -85,8 +133,12 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
                     {themeMode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />}
                 </IconButton>
 
-                <IconButton onClick={() => navigate('/notifications')} color="default">
-                    <Badge badgeContent={0} color="error">
+                <IconButton
+                    onClick={() => navigate('/notifications')}
+                    color="default"
+                    aria-label={t('notifications.bellLabel', { count: unreadCount })}
+                >
+                    <Badge badgeContent={unreadCount} max={99} color="error">
                         <NotificationsIcon />
                     </Badge>
                 </IconButton>
@@ -110,15 +162,44 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, themeMode, onToggleTheme 
                         <Typography variant="caption" color="text.secondary">{user?.email}</Typography>
                     </Box>
                     <Divider />
-                    <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
-                        <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
-                        {t('nav.settings')}
+                    {can('manageClinic') && (
+                        <MenuItem onClick={() => { handleMenuClose(); navigate('/settings'); }}>
+                            <ListItemIcon><SettingsIcon fontSize="small" /></ListItemIcon>
+                            {t('nav.settings')}
+                        </MenuItem>
+                    )}
+                    <MenuItem onClick={() => { handleMenuClose(); changePassword.clearError(); setPasswordOpen(true); }}>
+                        <ListItemIcon><PasswordIcon fontSize="small" /></ListItemIcon>
+                        {t('auth.changePassword')}
                     </MenuItem>
+                    <Divider />
                     <MenuItem onClick={handleLogout}>
                         <ListItemIcon><LogoutIcon fontSize="small" /></ListItemIcon>
                         {t('auth.logout')}
                     </MenuItem>
+                    <MenuItem onClick={() => { handleMenuClose(); dispatch(authActions.logoutAll()); }}>
+                        <ListItemIcon><LogoutAllIcon fontSize="small" /></ListItemIcon>
+                        {t('auth.logoutAll')}
+                    </MenuItem>
                 </Menu>
+
+                <PasswordDialog
+                    open={passwordOpen}
+                    title={t('auth.changePassword')}
+                    description={t('auth.changePasswordHint')}
+                    requireCurrent
+                    loading={changePassword.loading}
+                    error={changePassword.error}
+                    onSubmit={(values) =>
+                        dispatch(
+                            authActions.changePassword({
+                                currentPassword: values.currentPassword || '',
+                                newPassword: values.newPassword,
+                            }),
+                        )
+                    }
+                    onClose={() => setPasswordOpen(false)}
+                />
             </Toolbar>
         </AppBar>
     );

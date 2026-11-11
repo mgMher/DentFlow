@@ -10,6 +10,8 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { CurrentUser, Roles, Role } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
+import { Types } from 'mongoose';
 import { ScheduleService } from './schedule.service';
 import { CreateRoomDto, UpdateRoomDto, CreateBlockedTimeDto } from './dto';
 
@@ -44,7 +46,7 @@ export class ScheduleController {
     @Roles(Role.CLINIC_ADMIN)
     updateRoom(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
         @Body() dto: UpdateRoomDto,
     ) {
         return this.scheduleService.updateRoom(user.clinicId, id, dto);
@@ -55,7 +57,7 @@ export class ScheduleController {
     @Roles(Role.CLINIC_ADMIN)
     deactivateRoom(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
         return this.scheduleService.deactivateRoom(user.clinicId, id);
     }
@@ -82,21 +84,23 @@ export class ScheduleController {
     }
 
     @Post('blocked-times')
-    @ApiOperation({ summary: 'Create a blocked time slot' })
+    @Roles(Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST)
+    @ApiOperation({ summary: 'Block a dentist\'s time (dentists: own time only)' })
     createBlockedTime(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
         @Body() dto: CreateBlockedTimeDto,
     ) {
-        return this.scheduleService.createBlockedTime(user.clinicId, dto);
+        return this.scheduleService.createBlockedTime(user.clinicId, dto, user);
     }
 
     @Delete('blocked-times/:id')
-    @ApiOperation({ summary: 'Delete a blocked time slot' })
+    @Roles(Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST)
+    @ApiOperation({ summary: 'Delete a blocked time slot (dentists: own time only)' })
     deleteBlockedTime(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('id') id: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
     ) {
-        return this.scheduleService.deleteBlockedTime(user.clinicId, id);
+        return this.scheduleService.deleteBlockedTime(user.clinicId, id, user);
     }
 
     // ─── Availability ─────────────────────────────────────────────────
@@ -106,7 +110,7 @@ export class ScheduleController {
     @ApiQuery({ name: 'date', required: true, type: String, description: 'Date in YYYY-MM-DD format' })
     getDentistAvailability(
         @CurrentUser() user: { userId: string; clinicId: string; email: string; role: string },
-        @Param('dentistId') dentistId: string,
+        @Param('dentistId', ParseObjectIdPipe) dentistId: Types.ObjectId,
         @Query('date') date: string,
     ) {
         return this.scheduleService.getDentistAvailability(

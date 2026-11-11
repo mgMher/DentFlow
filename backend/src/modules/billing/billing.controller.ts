@@ -1,38 +1,40 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    Patch,
-    Post,
-    Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
-import { CurrentUser } from 'src/common/decorators';
+import { CurrentUser, Role, Roles } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
 import { BillingService } from './billing.service';
 import {
     CreateInvoiceDto,
     UpdateInvoiceDto,
     CreatePaymentDto,
     QueryInvoiceDto,
-    QueryRevenueDto,
+    VoidPaymentDto,
+    CancelInvoiceDto,
 } from './dto';
+
+/** Role matrix (D5): dentists view billing, assistants have none. */
+const BILLING_VIEWERS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST];
+/** Create, edit, issue, take payments, cancel drafts. */
+const BILLING_EDITORS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST];
+/** Refunds (cancelling an issued invoice is checked in the service). Revenue lives in /reports/revenue. */
+const BILLING_ADMINS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN];
+
+type AuthUser = { userId: string; clinicId: string; role: Role };
 
 @ApiTags('Billing')
 @ApiBearerAuth()
+@Roles(...BILLING_VIEWERS)
 @Controller('billing')
 export class BillingController {
     constructor(private readonly billingService: BillingService) {}
 
     @Post('invoices')
-    @ApiOperation({ summary: 'Create a new invoice' })
-    @ApiResponse({ status: 201, description: 'Invoice created successfully' })
-    @ApiResponse({ status: 400, description: 'Validation error' })
-    async createInvoice(
-        @CurrentUser() user: { userId: string; clinicId: string },
-        @Body() dto: CreateInvoiceDto,
-    ) {
+    @Roles(...BILLING_EDITORS)
+    @ApiOperation({ summary: 'Create an invoice (draft, or issued with `issue: true`)' })
+    @ApiResponse({ status: 201, description: 'Invoice created' })
+    @ApiResponse({ status: 409, description: 'A treatment line is already billed (treatmentAlreadyBilled)' })
+    async createInvoice(@CurrentUser() user: AuthUser, @Body() dto: CreateInvoiceDto) {
         return this.billingService.createInvoice(
             new Types.ObjectId(user.clinicId),
             new Types.ObjectId(user.userId),
@@ -41,129 +43,130 @@ export class BillingController {
     }
 
     @Get('invoices')
-    @ApiOperation({ summary: 'List invoices with filters and pagination' })
+    @ApiOperation({ summary: 'List invoices (status incl. overdue, patient, search, dates, pages)' })
     @ApiResponse({ status: 200, description: 'Paginated invoice list' })
-    async findAllInvoices(
-        @CurrentUser('clinicId') clinicId: string,
-        @Query() query: QueryInvoiceDto,
-    ) {
-        return this.billingService.findAllInvoices(
-            new Types.ObjectId(clinicId),
-            query,
-        );
-    }
-
-    @Get('invoices/overdue')
-    @ApiOperation({ summary: 'Get all overdue invoices' })
-    @ApiResponse({ status: 200, description: 'List of overdue invoices' })
-    async getOverdueInvoices(@CurrentUser('clinicId') clinicId: string) {
-        return this.billingService.getOverdueInvoices(
-            new Types.ObjectId(clinicId),
-        );
+    async findAllInvoices(@CurrentUser('clinicId') clinicId: string, @Query() query: QueryInvoiceDto) {
+        return this.billingService.findAllInvoices(new Types.ObjectId(clinicId), query);
     }
 
     @Get('invoices/:id')
-    @ApiOperation({ summary: 'Get a single invoice by ID' })
-    @ApiResponse({ status: 200, description: 'Invoice details' })
+    @ApiOperation({ summary: 'Get a single invoice' })
     @ApiResponse({ status: 404, description: 'Invoice not found' })
     async findInvoiceById(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
     ) {
-        return this.billingService.findInvoiceById(
-            new Types.ObjectId(clinicId),
-            new Types.ObjectId(invoiceId),
-        );
+        return this.billingService.findInvoiceById(new Types.ObjectId(clinicId), invoiceId);
     }
 
     @Patch('invoices/:id')
-    @ApiOperation({ summary: 'Update an invoice (draft status only)' })
-    @ApiResponse({ status: 200, description: 'Invoice updated successfully' })
-    @ApiResponse({ status: 400, description: 'Invoice is not in draft status' })
-    @ApiResponse({ status: 404, description: 'Invoice not found' })
+    @Roles(...BILLING_EDITORS)
+    @ApiOperation({ summary: 'Update a draft invoice' })
+    @ApiResponse({ status: 400, description: 'Not a draft' })
     async updateInvoice(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
         @Body() dto: UpdateInvoiceDto,
     ) {
-        return this.billingService.updateInvoice(
-            new Types.ObjectId(clinicId),
-            new Types.ObjectId(invoiceId),
-            dto,
+        return this.billingService.updateInvoice(new Types.ObjectId(clinicId), invoiceId, dto);
+    }
+
+    @Patch('invoices/:id/issue')
+    @Roles(...BILLING_EDITORS)
+    @ApiOperation({ summary: 'Issue a draft invoice (it can then take payments)' })
+    async issueInvoice(
+        @CurrentUser() user: AuthUser,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
+    ) {
+        return this.billingService.issueInvoice(
+            new Types.ObjectId(user.clinicId),
+            invoiceId,
+            new Types.ObjectId(user.userId),
         );
     }
 
     @Patch('invoices/:id/cancel')
-    @ApiOperation({ summary: 'Cancel an invoice' })
-    @ApiResponse({ status: 200, description: 'Invoice cancelled' })
-    @ApiResponse({ status: 400, description: 'Cannot cancel a paid invoice' })
-    @ApiResponse({ status: 404, description: 'Invoice not found' })
+    @Roles(...BILLING_EDITORS)
+    @ApiOperation({
+        summary: 'Cancel an invoice with nothing paid',
+        description: 'Drafts: anyone who bills. Issued: clinic admin only. Paid amounts must be refunded first.',
+    })
+    @ApiResponse({ status: 400, description: 'Has payments (invoiceHasPayments) or already cancelled' })
+    @ApiResponse({ status: 403, description: 'Issued invoice and not admin (cancelIssuedForbidden)' })
     async cancelInvoice(
-        @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @CurrentUser() user: AuthUser,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
+        @Body() dto: CancelInvoiceDto,
     ) {
         return this.billingService.cancelInvoice(
-            new Types.ObjectId(clinicId),
-            new Types.ObjectId(invoiceId),
+            new Types.ObjectId(user.clinicId),
+            invoiceId,
+            new Types.ObjectId(user.userId),
+            user.role,
+            dto.reason,
         );
     }
 
     @Post('invoices/:id/payments')
-    @ApiOperation({ summary: 'Record a payment against an invoice' })
-    @ApiResponse({ status: 201, description: 'Payment recorded, invoice updated' })
-    @ApiResponse({ status: 400, description: 'Payment exceeds balance or invoice is cancelled/paid' })
-    @ApiResponse({ status: 404, description: 'Invoice not found' })
+    @Roles(...BILLING_EDITORS)
+    @ApiOperation({ summary: 'Record a payment (issued invoices, at most the balance, invoice currency)' })
+    @ApiResponse({ status: 201, description: 'Payment recorded; returns the payment and the updated invoice' })
+    @ApiResponse({ status: 400, description: 'Exceeds balance, wrong currency, draft, paid or cancelled' })
     async addPayment(
-        @CurrentUser() user: { userId: string; clinicId: string },
-        @Param('id') invoiceId: string,
+        @CurrentUser() user: AuthUser,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
         @Body() dto: CreatePaymentDto,
     ) {
         return this.billingService.addPayment(
             new Types.ObjectId(user.clinicId),
-            new Types.ObjectId(invoiceId),
+            invoiceId,
             new Types.ObjectId(user.userId),
             dto,
         );
     }
 
     @Get('invoices/:id/payments')
-    @ApiOperation({ summary: 'List all payments for an invoice' })
-    @ApiResponse({ status: 200, description: 'List of payments' })
-    @ApiResponse({ status: 404, description: 'Invoice not found' })
+    @ApiOperation({ summary: 'Payments of an invoice, voided ones included (marked)' })
     async getPaymentsByInvoice(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('id') invoiceId: string,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
     ) {
-        return this.billingService.getPaymentsByInvoice(
-            new Types.ObjectId(clinicId),
-            new Types.ObjectId(invoiceId),
+        return this.billingService.getPaymentsByInvoice(new Types.ObjectId(clinicId), invoiceId);
+    }
+
+    @Patch('invoices/:id/payments/:paymentId/void')
+    @Roles(...BILLING_ADMINS)
+    @ApiOperation({ summary: 'Refund or void a payment (admin); the invoice balance goes back up' })
+    async voidPayment(
+        @CurrentUser() user: AuthUser,
+        @Param('id', ParseObjectIdPipe) invoiceId: Types.ObjectId,
+        @Param('paymentId', ParseObjectIdPipe) paymentId: Types.ObjectId,
+        @Body() dto: VoidPaymentDto,
+    ) {
+        return this.billingService.voidPayment(
+            new Types.ObjectId(user.clinicId),
+            invoiceId,
+            paymentId,
+            new Types.ObjectId(user.userId),
+            dto,
         );
     }
 
-    @Get('revenue')
-    @ApiOperation({ summary: 'Get revenue statistics for a date range' })
-    @ApiResponse({ status: 200, description: 'Revenue statistics' })
-    async getRevenueStats(
+    @Get('patients/:patientId/summary')
+    @ApiOperation({ summary: "A patient's billed / paid / balance per currency, and unbilled treatments" })
+    async getPatientSummary(
         @CurrentUser('clinicId') clinicId: string,
-        @Query() query: QueryRevenueDto,
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
     ) {
-        return this.billingService.getRevenueStats(
-            new Types.ObjectId(clinicId),
-            query.startDate,
-            query.endDate,
-        );
+        return this.billingService.getPatientSummary(new Types.ObjectId(clinicId), patientId);
     }
 
-    @Get('patients/:patientId/history')
-    @ApiOperation({ summary: 'Get billing history for a patient' })
-    @ApiResponse({ status: 200, description: 'Patient billing history' })
-    async getPatientBillingHistory(
+    @Get('patients/:patientId/unbilled-treatments')
+    @ApiOperation({ summary: 'Done treatment entries not on a live invoice yet' })
+    async getUnbilledTreatments(
         @CurrentUser('clinicId') clinicId: string,
-        @Param('patientId') patientId: string,
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
     ) {
-        return this.billingService.getPatientBillingHistory(
-            new Types.ObjectId(clinicId),
-            new Types.ObjectId(patientId),
-        );
+        return this.billingService.getUnbilledTreatments(new Types.ObjectId(clinicId), patientId);
     }
 }

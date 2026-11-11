@@ -4,36 +4,46 @@ import { useTranslation } from 'react-i18next';
 import api from '../../api/axios';
 import { Patient } from '../../types';
 import { formatDate, getFullName } from '../../utils/formatters';
+import { formatArmenianPhone, isArmenianPhone, normalizeArmenianPhone } from '../../utils/validators';
 
 interface DuplicatePatientWarningProps {
     firstName: string;
     lastName: string;
     dateOfBirth: string;
+    phone?: string;
+    email?: string;
     /** Excluded from the results, so editing a patient never flags itself. */
     excludeId?: string;
-    onOpen: (patientId: string) => void;
 }
 
+const CHECK_DELAY_MS = 500;
+
 /**
- * Email is unique per clinic, but nothing stops a second record for the same
- * person under a different (or no) email. Warn — never block: real clinics do
- * have two patients sharing a name and birthday.
+ * "Is this person already registered?" — same name and date of birth, same
+ * phone, or same email, matched exactly on the server.
+ *
+ * Warns, never blocks: twins, namesakes and a family sharing one email are
+ * all legitimate. Matches open in a new tab so the half-filled form survives.
  */
 const DuplicatePatientWarning: React.FC<DuplicatePatientWarningProps> = ({
     firstName,
     lastName,
     dateOfBirth,
+    phone = '',
+    email = '',
     excludeId,
-    onOpen,
 }) => {
     const { t } = useTranslation();
     const [matches, setMatches] = useState<Patient[]>([]);
 
-    const first = firstName.trim().toLowerCase();
-    const last = lastName.trim().toLowerCase();
+    const first = firstName.trim();
+    const last = lastName.trim();
+    const normalizedPhone = isArmenianPhone(phone) ? normalizeArmenianPhone(phone) : '';
+    const trimmedEmail = email.trim().toLowerCase();
+    const hasNameKey = !!(first && last && dateOfBirth);
 
     useEffect(() => {
-        if (!first || !last || !dateOfBirth) {
+        if (!hasNameKey && !normalizedPhone && !trimmedEmail) {
             setMatches([]);
             return;
         }
@@ -41,32 +51,26 @@ const DuplicatePatientWarning: React.FC<DuplicatePatientWarningProps> = ({
         let cancelled = false;
         const timer = setTimeout(async () => {
             try {
-                const res: any = await api.get('/patients', {
-                    params: { search: last, limit: 50 },
+                const res: any = await api.get('/patients/duplicates', {
+                    params: {
+                        ...(hasNameKey ? { firstName: first, lastName: last, dateOfBirth } : {}),
+                        phone: normalizedPhone || undefined,
+                        email: trimmedEmail || undefined,
+                        excludeId,
+                    },
                 });
-                const payload = res.data?.data || res.data;
-                const candidates: Patient[] = payload?.data || payload || [];
-
-                const duplicates = candidates.filter(
-                    (p) =>
-                        p._id !== excludeId &&
-                        p.firstName?.trim().toLowerCase() === first &&
-                        p.lastName?.trim().toLowerCase() === last &&
-                        (p.dateOfBirth || '').substring(0, 10) === dateOfBirth,
-                );
-
-                if (!cancelled) setMatches(duplicates);
+                if (!cancelled) setMatches(res.data?.data ?? []);
             } catch {
                 // A failed check must never block the form.
                 if (!cancelled) setMatches([]);
             }
-        }, 500);
+        }, CHECK_DELAY_MS);
 
         return () => {
             cancelled = true;
             clearTimeout(timer);
         };
-    }, [first, last, dateOfBirth, excludeId]);
+    }, [first, last, dateOfBirth, hasNameKey, normalizedPhone, trimmedEmail, excludeId]);
 
     if (matches.length === 0) {
         return null;
@@ -82,15 +86,16 @@ const DuplicatePatientWarning: React.FC<DuplicatePatientWarningProps> = ({
                 {matches.map((match) => (
                     <Link
                         key={match._id}
-                        component="button"
-                        type="button"
+                        href={`/patients/${match._id}`}
+                        target="_blank"
+                        rel="noopener"
                         underline="hover"
-                        onClick={() => onOpen(match._id)}
-                        sx={{ textAlign: 'left', width: 'fit-content' }}
+                        sx={{ width: 'fit-content' }}
                     >
                         {getFullName(match.firstName, match.lastName, match.patronymic)}
                         {match.dateOfBirth && ` · ${formatDate(match.dateOfBirth)}`}
-                        {match.phone && ` · ${match.phone}`}
+                        {match.phone && ` · ${formatArmenianPhone(match.phone)}`}
+                        {match.email && ` · ${match.email}`}
                     </Link>
                 ))}
             </Box>

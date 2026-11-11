@@ -1,12 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type TreatmentRoomDocument = TreatmentRoom & Document;
 
 @Schema({ timestamps: true })
 export class TreatmentRoom {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,

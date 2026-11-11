@@ -42,6 +42,8 @@ const LoginPage: React.FC = () => {
     const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
 
     const [showPassword, setShowPassword] = React.useState(false);
+    // No self-service reset yet (needs email delivery): an admin resets it from the staff page.
+    const [showForgotHint, setShowForgotHint] = React.useState(false);
     const [langAnchor, setLangAnchor] = React.useState<null | HTMLElement>(null);
 
     const {
@@ -197,13 +199,9 @@ const LoginPage: React.FC = () => {
                         <Controller
                             name="password"
                             control={control}
-                            rules={{
-                                required: t('validation.required'),
-                                minLength: {
-                                    value: 8,
-                                    message: t('validation.passwordMin'),
-                                },
-                            }}
+                            // Presence only: accounts created under the old 6-character
+                            // rule must still be able to sign in.
+                            rules={{ required: t('validation.required') }}
                             render={({ field }) => (
                                 <TextField
                                     {...field}
@@ -238,10 +236,16 @@ const LoginPage: React.FC = () => {
                                 type="button"
                                 variant="body2"
                                 underline="hover"
+                                onClick={() => setShowForgotHint((v) => !v)}
                                 sx={{ color: 'primary.main', fontWeight: 500 }}
                             >
                                 {t('auth.forgotPassword')}
                             </Link>
+                            {showForgotHint && (
+                                <Alert severity="info" sx={{ mt: 1, textAlign: 'left' }}>
+                                    {t('auth.forgotPasswordHint')}
+                                </Alert>
+                            )}
                         </Box>
 
                         <Button

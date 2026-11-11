@@ -9,7 +9,13 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { Role } from 'src/common/decorators';
+import { errorBody, escapeRegex } from 'src/common/utils';
 import { User, UserDocument } from '../auth/auth.schema';
+import { SessionsService } from '../auth/sessions.service';
+import { Clinic, ClinicDocument } from '../clinics/clinic.schema';
+import { UpcomingAppointmentsService } from 'src/common/clinic-refs';
+import { PASSWORD_HASH_COST } from '../auth/auth.service';
+import { ResetPasswordDto } from '../auth/dto';
 import { UserProfile, UserProfileDocument } from './user.schema';
 import {
     CreateUserDto,
@@ -25,15 +31,6 @@ export interface PaginatedResult<T> {
     limit: number;
     totalPages: number;
 }
-
-/**
- * Errors carry a stable `code` next to the message so the UI can translate
- * them; the message stays as the developer-facing fallback.
- */
-const errorBody = (code: string, message: string) => ({ code, message });
-
-/** Escapes a user-supplied search term so it can be used inside a RegExp. */
-const escapeRegex = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /**
  * Availability is stored one entry per weekday, so a day the user switched off
@@ -68,6 +65,9 @@ export class UsersService {
     constructor(
         @InjectModel(UserProfile.name) private readonly userProfileModel: Model<UserProfileDocument>,
         @InjectModel(User.name) private readonly authModel: Model<UserDocument>,
+        private readonly sessions: SessionsService,
+        @InjectModel(Clinic.name) private readonly clinicModel: Model<ClinicDocument>,
+        private readonly upcoming: UpcomingAppointmentsService,
     ) {}
 
     /**
@@ -95,10 +95,12 @@ export class UsersService {
             );
         }
 
-        const availability = dto.defaultAvailability || [];
+        // Without hours a new dentist had no bookable time until an admin set
+        // them. Start from the clinic's opening hours; they can be edited later.
+        const availability = dto.defaultAvailability ?? (await this.clinicOpeningHours(clinicId));
         assertValidAvailability(availability);
 
-        const hashedPassword = await bcrypt.hash(dto.password, 12);
+        const hashedPassword = await bcrypt.hash(dto.password, PASSWORD_HASH_COST);
 
         // Create the auth record
         const authRecord = await this.authModel.create({
@@ -134,6 +136,13 @@ export class UsersService {
             await this.authModel.findByIdAndDelete(authRecord._id);
             throw err;
         }
+    }
+
+    private async clinicOpeningHours(clinicId: string) {
+        const clinic = await this.clinicModel.findById(clinicId).select('workingHours').lean();
+        return (clinic?.workingHours ?? [])
+            .filter((day) => day.isOpen !== false && day.endTime > day.startTime)
+            .map(({ dayOfWeek, startTime, endTime }) => ({ dayOfWeek, startTime, endTime }));
     }
 
     /**
@@ -256,9 +265,6 @@ export class UsersService {
         if (dto.role && dto.role !== existingProfile.role) {
             await this.assertNotLastAdmin(clinicId, existingProfile, 'roleChange');
         }
-        if (dto.isActive === false && existingProfile.isActive) {
-            await this.assertNotLastAdmin(clinicId, existingProfile, 'deactivate');
-        }
 
         if (dto.defaultAvailability) {
             assertValidAvailability(dto.defaultAvailability);
@@ -274,7 +280,6 @@ export class UsersService {
         if (dto.role !== undefined) profileUpdate.role = dto.role;
         if (dto.licenseNumber !== undefined) profileUpdate.licenseNumber = dto.licenseNumber;
         if (dto.avatar !== undefined) profileUpdate.avatar = dto.avatar;
-        if (dto.isActive !== undefined) profileUpdate.isActive = dto.isActive;
         if (dto.defaultAvailability !== undefined) {
             profileUpdate['schedule.defaultAvailability'] = dto.defaultAvailability;
         }
@@ -305,7 +310,6 @@ export class UsersService {
         if (dto.patronymic !== undefined) authUpdate.patronymic = dto.patronymic;
         if (dto.email !== undefined) authUpdate.email = dto.email;
         if (dto.role !== undefined) authUpdate.role = dto.role;
-        if (dto.isActive !== undefined) authUpdate.isActive = dto.isActive;
 
         if (Object.keys(authUpdate).length > 0) {
             await this.authModel.findByIdAndUpdate(existingProfile.authId, { $set: authUpdate });
@@ -323,7 +327,8 @@ export class UsersService {
         userId: string,
         isActive: boolean,
         actingAuthId: string,
-    ): Promise<UserProfileDocument> {
+        cancelUpcomingAppointments = false,
+    ): Promise<UserProfileDocument & { cancelledAppointments?: number }> {
         const profile = await this.userProfileModel
             .findOne({
                 _id: new Types.ObjectId(userId),
@@ -354,9 +359,66 @@ export class UsersService {
                 .findByIdAndUpdate(profile._id, { $set: { isActive } }, { new: true })
                 .lean(),
             this.authModel.findByIdAndUpdate(profile.authId, { $set: { isActive } }),
+            // Signed-in devices go too, so reactivating later doesn't revive old sessions.
+            !isActive && profile.authId && this.sessions.revokeAllForUser(profile.authId),
         ]);
 
-        return updated as UserProfileDocument;
+        // Appointments reference the dentist's auth id.
+        const cancelledAppointments =
+            !isActive && cancelUpcomingAppointments && profile.authId
+                ? await this.upcoming.cancel(clinicId, { dentistId: profile.authId }, 'Dentist deactivated', actingAuthId)
+                : undefined;
+
+        return { ...(updated as UserProfileDocument), cancelledAppointments } as UserProfileDocument & {
+            cancelledAppointments?: number;
+        };
+    }
+
+    /** Booked appointments still ahead for this member (as dentist), for the deactivate dialog. */
+    async countUpcomingAppointments(clinicId: string, userId: string): Promise<{ count: number }> {
+        const profile = await this.userProfileModel
+            .findOne({ _id: new Types.ObjectId(userId), clinicId: new Types.ObjectId(clinicId) })
+            .select('authId')
+            .lean();
+        if (!profile) throw new NotFoundException(errorBody('staffNotFound', 'User not found'));
+        return { count: profile.authId ? await this.upcoming.count(clinicId, { dentistId: profile.authId }) : 0 };
+    }
+
+    /**
+     * An admin sets a new password for a staff member who forgot theirs. All
+     * of that member's devices are signed out. Your own password goes through
+     * change-password, which asks for the current one.
+     */
+    async resetPassword(
+        clinicId: string,
+        userId: string,
+        actingAuthId: string,
+        dto: ResetPasswordDto,
+    ): Promise<{ message: string }> {
+        const profile = await this.userProfileModel
+            .findOne({ _id: new Types.ObjectId(userId), clinicId: new Types.ObjectId(clinicId) })
+            .select('authId')
+            .lean();
+
+        if (!profile?.authId) {
+            throw new NotFoundException(errorBody('staffNotFound', 'User not found'));
+        }
+        if (profile.authId.toString() === actingAuthId) {
+            throw new BadRequestException(
+                errorBody('useChangePassword', 'Use "Change password" for your own account'),
+            );
+        }
+
+        await this.authModel.updateOne(
+            { _id: profile.authId, clinicId: new Types.ObjectId(clinicId) },
+            {
+                $set: { password: await bcrypt.hash(dto.newPassword, PASSWORD_HASH_COST), failedLoginAttempts: 0 },
+                $unset: { lockedUntil: 1 },
+            },
+        );
+        await this.sessions.revokeAllForUser(profile.authId);
+
+        return { message: 'Password reset' };
     }
 
     /**

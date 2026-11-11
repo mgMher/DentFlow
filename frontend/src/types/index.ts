@@ -225,7 +225,7 @@ export interface Appointment {
     dentistId: string | UserProfile;
     // Populated by the API on findById/findAll — string only before it is sent.
     treatmentRoomId?: string | TreatmentRoom;
-    title: string;
+    title?: string;
     startTime: string;
     endTime: string;
     duration: number;
@@ -233,8 +233,13 @@ export interface Appointment {
     treatmentType?: string;
     treatmentIds?: (string | Treatment)[];
     notes?: string;
+    /** A code (see CANCEL_REASONS) or, on older records, free text. */
     cancelReason?: string;
+    cancelNote?: string;
+    cancelledAt?: string;
+    cancelledBy?: string | UserProfile;
     isRecurring: boolean;
+    seriesId?: string;
     color?: string;
     createdAt: string;
 }
@@ -256,11 +261,13 @@ export interface Treatment {
     code?: string;
     duration: number;
     price: { amount: number; currency: Currency };
+    /** What a tooth becomes once this is done; prefills chart entries. */
+    toothStatus?: ToothStatus;
     isCustom: boolean;
     isActive: boolean;
 }
 
-// Dental Record types
+// Dental Record types — tooth numbers are FDI (11–48, primary 51–85)
 export type ToothStatus =
     | 'healthy' | 'filled' | 'crown' | 'missing' | 'implant'
     | 'needs_treatment' | 'root_canal' | 'decayed' | 'bridge' | 'veneer';
@@ -269,25 +276,38 @@ export type ToothSurface =
     | 'mesial' | 'distal' | 'occlusal' | 'incisal'
     | 'buccal' | 'lingual' | 'palatal' | 'cervical';
 
+export type SurfaceStatus = 'decayed' | 'filled' | 'sealant';
+
+export interface SurfaceState {
+    surface: ToothSurface;
+    status: SurfaceStatus;
+}
+
+export type ChartType = 'adult' | 'pediatric';
+
+type PersonRef = string | { _id?: string; firstName?: string; lastName?: string };
+
 export interface ToothStatusChange {
     _id?: string;
     previousStatus?: ToothStatus;
     status: ToothStatus;
-    surfaces: ToothSurface[];
+    surfaces: SurfaceState[];
     conditions: string[];
     notes?: string;
-    changedBy?: string | UserProfile;
+    changedBy?: PersonRef;
     changedAt: string;
+    treatmentEntryId?: string;
 }
 
 export interface ToothRecord {
     toothNumber: number;
     status: ToothStatus;
-    surfaces: ToothSurface[];
+    surfaces: SurfaceState[];
     conditions: string[];
     notes?: string;
     history?: ToothStatusChange[];
     updatedAt?: string;
+    updatedBy?: string;
 }
 
 export interface DentalChart {
@@ -295,51 +315,70 @@ export interface DentalChart {
     clinicId: string;
     patientId: string;
     teeth: ToothRecord[];
-    chartType: 'adult' | 'pediatric';
+    chartType: ChartType;
+    /** Chart types switched away from; switching back restores them. */
+    archivedChartTypes: ChartType[];
     notes?: string;
 }
 
 export interface ToothHistory {
     toothNumber: number;
+    /** Null when the tooth is not on the current chart (e.g. a permanent tooth on a primary chart). */
     current: {
         status: ToothStatus;
-        surfaces: ToothSurface[];
+        surfaces: SurfaceState[];
         conditions: string[];
         notes?: string;
         updatedAt?: string;
-    };
+    } | null;
     statusHistory: ToothStatusChange[];
     treatments: TreatmentEntry[];
 }
+
+export type TreatmentEntryStatus = 'planned' | 'done';
 
 export interface TreatmentEntry {
     _id: string;
     clinicId: string;
     patientId: string;
-    toothNumber: number;
-    // These three are populated by the API on read — plain ids on write.
+    /** Empty for whole-mouth work (exam, X-ray, cleaning). */
+    teeth: number[];
+    status: TreatmentEntryStatus;
+    // These are populated by the API on read — plain ids on write.
     treatmentId?: string | Treatment;
     treatmentName: string;
-    dentistId: string | UserProfile;
+    dentistId: PersonRef;
     appointmentId?: string | Appointment;
     date: string;
     surfaces: ToothSurface[];
+    resultStatus?: ToothStatus;
     notes?: string;
     images: { url: string; description: string; uploadedAt: string }[];
     cost?: number;
     currency?: Currency;
+    createdBy?: PersonRef;
+    completedAt?: string;
+    completedBy?: PersonRef;
+    voidedAt?: string;
+    voidedBy?: PersonRef;
+    voidReason?: string;
 }
 
-// Billing types
-export type InvoiceStatus = 'draft' | 'pending' | 'partial' | 'paid' | 'overdue' | 'cancelled';
+// Billing types — amounts arrive in major units (dram, dollars)
+/** Stored statuses. "Overdue" is computed: see `Invoice.isOverdue`. */
+export type InvoiceStatus = 'draft' | 'issued' | 'partial' | 'paid' | 'cancelled';
 export type PaymentMethod = 'cash' | 'card' | 'bank_transfer';
+export type PaymentVoidType = 'refund' | 'mistake';
 
 export interface InvoiceItem {
     /** Populated by the API on read — a plain id on write. */
     treatmentId?: string | Treatment;
+    /** The chart entry this line bills. */
+    treatmentEntryId?: string;
     description: string;
     quantity: number;
     unitPrice: number;
+    /** Percent, 0–100. */
     discount: number;
     total: number;
 }
@@ -357,11 +396,20 @@ export interface Invoice {
     taxAmount: number;
     totalAmount: number;
     paidAmount: number;
+    balance: number;
     currency: Currency;
     status: InvoiceStatus;
+    /** Issued or partly paid and past the due date. */
+    isOverdue: boolean;
     dueDate?: string;
     notes?: string;
     createdAt: string;
+    createdBy?: PersonRef;
+    issuedAt?: string;
+    issuedBy?: PersonRef;
+    cancelledAt?: string;
+    cancelledBy?: PersonRef;
+    cancelReason?: string;
 }
 
 export interface Payment {
@@ -375,6 +423,16 @@ export interface Payment {
     date: string;
     reference?: string;
     notes?: string;
+    receivedBy?: PersonRef;
+    voidedAt?: string;
+    voidedBy?: PersonRef;
+    voidType?: PaymentVoidType;
+    voidReason?: string;
+}
+
+export interface PatientBillingSummary {
+    byCurrency: { currency: Currency; billed: number; paid: number; balance: number; invoices: number; overdue: number }[];
+    unbilledTreatments: number;
 }
 
 // Schedule types
@@ -407,46 +465,156 @@ export interface BlockedTime {
 }
 
 // Notification types
+export type NotificationType =
+    | 'appointment_created'
+    | 'appointment_rescheduled'
+    | 'appointment_reminder'
+    | 'appointment_cancelled'
+    | 'appointment_confirmed'
+    | 'dentist_appointments_cancelled'
+    | 'new_patient'
+    | 'payment_received'
+    | 'payment_refunded'
+    | 'system'
+    | 'custom';
+
 export interface Notification {
     _id: string;
     clinicId: string;
     recipientId: string;
-    type: string;
-    title: string;
-    message: string;
+    type: NotificationType;
+    /** Free text for system / custom and older notifications. */
+    title?: string;
+    message?: string;
+    /** Values for the wording of typed notifications. */
+    data?: {
+        patientName?: string;
+        dentistName?: string;
+        startTime?: string;
+        previousStartTime?: string;
+        dentistChanged?: boolean;
+        count?: number;
+        reason?: string;
+        voidType?: string;
+        invoiceNumber?: string;
+        amount?: number;
+        currency?: Currency;
+    };
+    /** Who did it (populated). */
+    actorId?: { _id: string; firstName: string; lastName: string } | null;
     isRead: boolean;
     relatedId?: string;
-    relatedType?: string;
+    relatedType?: 'appointment' | 'invoice' | 'patient' | 'staff' | string;
     createdAt: string;
 }
 
 // Report types
+type PersonName = { firstName: string; lastName: string };
+
+/** GET /reports/dashboard — parts the role may not see are absent. */
 export interface DashboardSummary {
-    todayAppointments: number;
-    monthRevenue: number;
-    totalActivePatients: number;
-    pendingInvoices: number;
+    timezone: string;
+    /** Dentists see their own appointments. */
+    ownAppointments: boolean;
+    today: { appointments: number; completed: number; noShow: number };
+    activePatients: number;
+    newPatientsThisMonth: number;
+    /** Billing viewers only. */
+    invoices?: { currency: Currency; open: number; overdue: number; outstanding: number };
+    /** Admins only: collected this month. */
+    monthRevenue?: { currency: Currency; amount: number };
     upcomingAppointments: Appointment[];
     recentActivity: ActivityItem[];
 }
 
 export interface ActivityItem {
-    _id: string;
-    type: 'appointment' | 'patient' | 'invoice' | 'treatment';
-    description: string;
-    timestamp: string;
-    userId: string;
-    userName: string;
+    type: 'patient' | 'appointment' | 'treatment' | 'invoice' | 'payment';
+    /** What to open: patient, appointment or invoice id (patient id for a treatment). */
+    id: string;
+    at: string;
+    patient?: (PersonName & { _id: string; patronymic?: string }) | null;
+    by?: PersonName | null;
+    startTime?: string;
+    treatmentName?: string;
+    invoiceNumber?: string;
+    amount?: number;
+    currency?: Currency;
+}
+
+export type ReportGroupBy = 'day' | 'week' | 'month';
+
+export interface ReportRange {
+    startDate: string;
+    endDate: string;
+    timezone: string;
+}
+
+/** GET /reports/revenue (admins). "Collected" = payments received, not voided. */
+export interface RevenueReport extends ReportRange {
+    groupBy: ReportGroupBy;
+    currency: Currency;
+    collected: number;
+    paymentCount: number;
+    invoiced: number;
+    invoiceCount: number;
+    outstanding: { balance: number; invoices: number; overdue: number; overdueInvoices: number };
+    byPeriod: { period: string; total: number; count: number }[];
+    byMethod: { method: PaymentMethod; total: number; count: number }[];
+    /** Legacy payments in another currency, never added to the totals. */
+    otherCurrencies: { currency: Currency; total: number; count: number }[];
+}
+
+export interface AppointmentReport extends ReportRange {
+    ownOnly: boolean;
+    total: number;
+    byStatus: Record<AppointmentStatus, number>;
+    completed: number;
+    cancelled: number;
+    noShow: number;
+    completionRate: number;
+    cancellationRate: number;
+    noShowRate: number;
+}
+
+export interface DentistPerformanceReport extends ReportRange {
+    ownOnly: boolean;
+    /** With money (admins). */
+    currency?: Currency;
+    unassignedCollected?: number;
+    rows: (PersonName & {
+        dentistId: string;
+        isActive: boolean;
+        appointments: number;
+        completed: number;
+        cancelled: number;
+        noShow: number;
+        treatmentsDone: number;
+        collected?: number;
+    })[];
+}
+
+export interface TreatmentReport extends ReportRange {
+    ownOnly: boolean;
+    currency?: Currency;
+    rows: {
+        treatmentId?: string;
+        name: string;
+        nameHy?: string;
+        nameRu?: string;
+        code?: string;
+        done: number;
+        collected?: number;
+    }[];
+}
+
+export interface PatientReport extends ReportRange {
+    total: number;
+    active: number;
+    newInRange: number;
+    newByGender: Record<string, number>;
 }
 
 // Pagination
-export interface PaginatedResponse<T> {
-    data: T[];
-    total: number;
-    page: number;
-    limit: number;
-    totalPages: number;
-}
 
 // API Response wrapper
 export interface ApiResponse<T> {

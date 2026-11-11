@@ -28,6 +28,8 @@ import { RootState } from '../../store';
 import { authActions } from '../../store/auth';
 import { RegisterRequest } from '../../types';
 import { LANGUAGES } from '../../utils/constants';
+import { PASSWORD_MAX_LENGTH, PASSWORD_MIN_LENGTH } from '../../utils/password';
+import { isArmenianPhone } from '../../utils/validators';
 
 interface RegisterFormData extends RegisterRequest {
     confirmPassword: string;
@@ -274,6 +276,10 @@ const RegisterPage: React.FC = () => {
                         <Controller
                             name="phone"
                             control={control}
+                            rules={{
+                                validate: (value?: string) =>
+                                    !value?.trim() || isArmenianPhone(value) || t('validation.invalidPhone'),
+                            }}
                             render={({ field }) => (
                                 <TextField
                                     {...field}
@@ -298,8 +304,12 @@ const RegisterPage: React.FC = () => {
                                     rules={{
                                         required: t('validation.required'),
                                         minLength: {
-                                            value: 8,
+                                            value: PASSWORD_MIN_LENGTH,
                                             message: t('validation.passwordMin'),
+                                        },
+                                        maxLength: {
+                                            value: PASSWORD_MAX_LENGTH,
+                                            message: t('validation.passwordMax', { max: PASSWORD_MAX_LENGTH }),
                                         },
                                     }}
                                     render={({ field }) => (

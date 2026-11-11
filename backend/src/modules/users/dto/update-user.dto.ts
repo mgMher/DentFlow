@@ -16,9 +16,10 @@ import {
     ValidateNested,
 } from 'class-validator';
 import { Transform, Type } from 'class-transformer';
-import { Role } from 'src/common/decorators';
+import { IsOptionalNotNull, Role } from 'src/common/decorators';
+import { normalizeArmenianPhone } from 'src/common/utils';
 import { ARMENIAN_PHONE, TIME_OF_DAY } from './create-user.dto';
-import { STAFF_ROLES } from './query-user.dto';
+import { AVATAR_PATTERN, DENTIST_SPECIALIZATIONS, MAX_AVATAR_LENGTH, STAFF_ROLES } from './query-user.dto';
 
 const trim = ({ value }: { value: unknown }) =>
     typeof value === 'string' ? value.trim() : value;
@@ -44,7 +45,7 @@ export class UpdateDayAvailabilityDto {
 
 export class UpdateUserDto {
     @ApiPropertyOptional({ example: 'Armen' })
-    @IsOptional()
+    @IsOptionalNotNull()
     @Transform(trim)
     @IsNotEmpty()
     @IsString()
@@ -52,7 +53,7 @@ export class UpdateUserDto {
     firstName?: string;
 
     @ApiPropertyOptional({ example: 'Hakobyan' })
-    @IsOptional()
+    @IsOptionalNotNull()
     @Transform(trim)
     @IsNotEmpty()
     @IsString()
@@ -67,7 +68,7 @@ export class UpdateUserDto {
     patronymic?: string;
 
     @ApiPropertyOptional({ example: 'armen@brightsmile.am' })
-    @IsOptional()
+    @IsOptionalNotNull()
     @Transform(({ value }) => (typeof value === 'string' ? value.trim().toLowerCase() : value))
     @IsEmail({}, { message: 'email must be a valid email address' })
     @MaxLength(254)
@@ -78,7 +79,7 @@ export class UpdateUserDto {
         description: 'Empty string clears the stored number',
     })
     @IsOptional()
-    @Transform(trim)
+    @Transform(({ value }) => normalizeArmenianPhone(value))
     @IsString()
     @ValidateIf((dto: UpdateUserDto) => dto.phone !== '')
     @Matches(ARMENIAN_PHONE, {
@@ -87,15 +88,14 @@ export class UpdateUserDto {
     phone?: string;
 
     @ApiPropertyOptional({ enum: STAFF_ROLES, example: Role.DENTIST })
-    @IsOptional()
+    @IsOptionalNotNull()
     @IsIn(STAFF_ROLES as unknown as string[], { message: 'role is not a valid staff role' })
     role?: Role;
 
     @ApiPropertyOptional({ example: 'orthodontics' })
     @IsOptional()
     @Transform(trim)
-    @IsString()
-    @MaxLength(120)
+    @IsIn(['', ...DENTIST_SPECIALIZATIONS], { message: 'specialization is not a known specialization' })
     specialization?: string;
 
     @ApiPropertyOptional({ example: 'DL-2024-12345' })
@@ -108,17 +108,14 @@ export class UpdateUserDto {
     @ApiPropertyOptional({ example: 'https://cdn.example.com/avatars/armen.jpg' })
     @IsOptional()
     @IsString()
+    @MaxLength(MAX_AVATAR_LENGTH)
+    @ValidateIf((_, v) => v !== '')
+    @Matches(AVATAR_PATTERN, { message: 'avatar must be a JPEG/PNG/WebP image or an https link' })
     avatar?: string;
 
-    @ApiPropertyOptional({ description: 'Activate or deactivate the account' })
-    @IsOptional()
-    @Transform(({ value }) => {
-        if (value === true || value === 'true') return true;
-        if (value === false || value === 'false') return false;
-        return value;
-    })
-    @IsBoolean()
-    isActive?: boolean;
+    // `isActive` is deliberately not editable here: it goes through
+    // PATCH /users/:id/status, which enforces "not yourself" and "not the last
+    // admin" — editing it here bypassed both.
 
     @ApiPropertyOptional({ type: [UpdateDayAvailabilityDto] })
     @IsOptional()
@@ -137,6 +134,11 @@ export class UpdateUserStatusDto {
     })
     @IsBoolean()
     isActive: boolean;
+
+    @ApiPropertyOptional({ description: "When deactivating: also cancel this dentist's upcoming appointments" })
+    @IsOptional()
+    @IsBoolean()
+    cancelUpcomingAppointments?: boolean;
 }
 
 export class UpdateAvailabilityDto {

@@ -14,6 +14,7 @@ import { reportsReducer, watchReports } from './reports';
 import { settingsReducer, watchSettings } from './settings';
 import { clinicReducer, watchClinic } from './clinic';
 import { httpReducer } from './http';
+import { watchHttpToasts } from './http/toasts';
 
 const rootReducer = combineReducers({
     auth: authReducer,
@@ -47,6 +48,7 @@ function* rootSaga() {
         watchReports(),
         watchSettings(),
         watchClinic(),
+        watchHttpToasts(),
     ]);
 }
 

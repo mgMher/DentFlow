@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
+import { Currency } from 'src/common/utils';
 
 export type PaymentDocument = Payment & Document;
 
@@ -9,16 +10,16 @@ export enum PaymentMethod {
     BANK_TRANSFER = 'bank_transfer',
 }
 
-export enum PaymentCurrency {
-    AMD = 'AMD',
-    USD = 'USD',
-    RUB = 'RUB',
+/** Why a payment no longer counts: money given back, or entered by mistake. */
+export enum PaymentVoidType {
+    REFUND = 'refund',
+    MISTAKE = 'mistake',
 }
 
 @Schema({ timestamps: true })
 export class Payment {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -26,7 +27,7 @@ export class Payment {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Invoice',
         required: true,
         index: true,
@@ -34,21 +35,23 @@ export class Payment {
     invoiceId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
     })
     patientId: Types.ObjectId;
 
-    @Prop({ required: true, min: 0 })
+    /** Integer in the currency's smallest unit (see money.util). */
+    @Prop({ required: true, min: 1 })
     amount: number;
 
+    /** Always the invoice's currency (D3). */
     @Prop({
         required: true,
-        enum: PaymentCurrency,
-        default: PaymentCurrency.AMD,
+        enum: Currency,
+        default: Currency.AMD,
     })
-    currency: PaymentCurrency;
+    currency: Currency;
 
     @Prop({
         required: true,
@@ -65,8 +68,24 @@ export class Payment {
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     receivedBy: Types.ObjectId;
+
+    /** Payments are never deleted; a voided one stays with who, when, why. */
+    @Prop()
+    voidedAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    voidedBy: Types.ObjectId;
+
+    @Prop({ enum: PaymentVoidType })
+    voidType: PaymentVoidType;
+
+    @Prop({ trim: true })
+    voidReason: string;
+
+    @Prop({ enum: ['minor'], default: 'minor' })
+    moneyUnits: string;
 }
 
 export const PaymentSchema = SchemaFactory.createForClass(Payment);

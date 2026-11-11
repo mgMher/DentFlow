@@ -1,12 +1,12 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
-    IsBoolean,
     IsDateString,
     IsEnum,
     IsMongoId,
     IsNotEmpty,
     IsOptional,
     IsString,
+    MaxLength,
 } from 'class-validator';
 import { BlockedTimeReason } from '../blocked-time.schema';
 
@@ -34,10 +34,9 @@ export class CreateBlockedTimeDto {
     @ApiPropertyOptional({ example: 'Lunch break' })
     @IsOptional()
     @IsString()
+    @MaxLength(200)
     title?: string;
 
-    @ApiPropertyOptional({ default: false })
-    @IsOptional()
-    @IsBoolean()
-    isRecurring?: boolean;
+    // `isRecurring` was accepted but never expanded into repeats; it is gone
+    // until recurring blocks (e.g. a weekly lunch) are actually built.
 }

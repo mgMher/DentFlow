@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type DentalRecordDocument = DentalRecord & Document;
 
@@ -35,6 +35,24 @@ export enum ToothSurface {
     CERVICAL = 'cervical',
 }
 
+/** What is on one surface. A tooth can be decayed mesially and filled occlusally. */
+export enum SurfaceStatus {
+    DECAYED = 'decayed',
+    FILLED = 'filled',
+    SEALANT = 'sealant',
+}
+
+@Schema({ _id: false })
+export class SurfaceState {
+    @Prop({ required: true, enum: ToothSurface })
+    surface: ToothSurface;
+
+    @Prop({ required: true, enum: SurfaceStatus })
+    status: SurfaceStatus;
+}
+
+export const SurfaceStateSchema = SchemaFactory.createForClass(SurfaceState);
+
 /**
  * One snapshot of a tooth taken every time its status/surfaces/notes change, so
  * the previous state is never silently overwritten.
@@ -47,8 +65,8 @@ export class ToothStatusChange {
     @Prop({ required: true, enum: ToothStatus })
     status: ToothStatus;
 
-    @Prop({ type: [String], default: [] })
-    surfaces: string[];
+    @Prop({ type: [SurfaceStateSchema], default: [] })
+    surfaces: SurfaceState[];
 
     @Prop({ type: [String], default: [] })
     conditions: string[];
@@ -56,11 +74,15 @@ export class ToothStatusChange {
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     changedBy: Types.ObjectId;
 
     @Prop({ required: true, default: () => new Date() })
     changedAt: Date;
+
+    /** Set when the change came from completing a treatment entry. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'TreatmentEntry' })
+    treatmentEntryId: Types.ObjectId;
 }
 
 export const ToothStatusChangeSchema = SchemaFactory.createForClass(ToothStatusChange);
@@ -68,13 +90,15 @@ export const ToothStatusChangeSchema = SchemaFactory.createForClass(ToothStatusC
 @Schema({ _id: false })
 export class ToothRecord {
     @Prop({ required: true })
-    toothNumber: number; // Universal numbering: 1-32 adult, 51-70 pediatric (A-T mapped)
+    toothNumber: number; // FDI, see tooth-numbering.ts
 
+    /** The whole tooth. Surface findings (caries, fillings) live in `surfaces`. */
     @Prop({ enum: ToothStatus, default: ToothStatus.HEALTHY })
     status: ToothStatus;
 
-    @Prop({ type: [String], default: [] })
-    surfaces: string[]; // see ToothSurface
+    /** At most one entry per surface. */
+    @Prop({ type: [SurfaceStateSchema], default: [] })
+    surfaces: SurfaceState[];
 
     @Prop({ type: [String], default: [] })
     conditions: string[];
@@ -88,14 +112,37 @@ export class ToothRecord {
 
     @Prop()
     updatedAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    updatedBy: Types.ObjectId;
 }
 
 export const ToothRecordSchema = SchemaFactory.createForClass(ToothRecord);
 
-@Schema({ timestamps: true })
+/** The teeth of a chart type the patient was switched away from, kept so a switch never loses data. */
+@Schema({ _id: false })
+export class ArchivedChart {
+    @Prop({ required: true, enum: ['adult', 'pediatric'] })
+    chartType: string;
+
+    @Prop({ type: [ToothRecordSchema], default: [] })
+    teeth: ToothRecord[];
+
+    @Prop({ required: true })
+    archivedAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    archivedBy: Types.ObjectId;
+}
+
+export const ArchivedChartSchema = SchemaFactory.createForClass(ArchivedChart);
+
+// Optimistic concurrency: two people saving the same chart used to end in a
+// 500 (VersionError) or, worse, one silently overwriting the other.
+@Schema({ timestamps: true, optimisticConcurrency: true })
 export class DentalRecord {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -103,7 +150,7 @@ export class DentalRecord {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Patient',
         required: true,
         index: true,
@@ -116,10 +163,17 @@ export class DentalRecord {
     @Prop({ enum: ['adult', 'pediatric'], default: 'adult' })
     chartType: string;
 
+    /** Charts without it still use Universal numbers and are converted at startup. */
+    @Prop({ enum: ['fdi'], default: 'fdi' })
+    numbering: string;
+
+    @Prop({ type: [ArchivedChartSchema], default: [] })
+    archivedCharts: ArchivedChart[];
+
     @Prop({ trim: true })
     notes: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     lastUpdatedBy: Types.ObjectId;
 }
 

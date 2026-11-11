@@ -19,8 +19,8 @@ These preconditions are easy to miss and cause false failures.
 | S5 | At least one patient with a **completed** appointment | Needed for `lastVisit` and the billing/appointment tabs |
 | S6 | Test in all three languages (hy / ru / en) | Several bugs were untranslated hardcoded labels |
 
-> ⚠️ **Do not run the seed script** to create test data. `backend/src/seed.ts` starts with
-> `deleteMany({})` on clinics, users and patients — it will wipe the existing database.
+> The seed script (`npm run seed`) now only replaces its own demo clinic ("Ararat Dental") and
+> refuses to run with `MODE=PROD`. It still connects to whatever `MONGO_URI` points at — check it first.
 
 ### Already verified (no need to retest)
 
@@ -149,12 +149,12 @@ These preconditions are easy to miss and cause false failures.
 |---|---|---|---|---|
 | DEN-01 | Chart loads | Open the chart tab | Odontogram renders, no `Cannot GET /api/dental-records/.../history` error | — |
 | DEN-02 | Tooth click | Click a tooth | Drawer opens with that tooth's status, surfaces, notes | — |
-| DEN-03 | Save status | Change status to Filled, save | Tooth changes colour on the chart | — |
+| DEN-03 | Save status | Change "Whole tooth" to Crown, save | Tooth gets a coloured outline and the mark under it | — |
 | DEN-04 | **Status history** | Reopen the same tooth | "Status History" shows `Healthy → Filled`, timestamp | — |
 | DEN-05 | **History accumulates** | Change to Crown, then Root canal | Three entries, newest first — **old status is not lost** (this was the main bug) | — |
 | DEN-06 | Notes in history | Change status with a note | Note appears under the entry | — |
-| DEN-07 | Surfaces | Open the surfaces list | **8 options**: Mesial, Distal, Occlusal, Incisal, Buccal, Lingual, Palatal, Cervical — all translated | — |
-| DEN-08 | Legend | Below the chart | All 10 statuses with colours, translated | — |
+| DEN-07 | Surfaces | Tooth drawer → surface diagram | Centre is Occlusal (molars/premolars) or Incisal (front teeth); sides Mesial / Distal / Buccal / Lingual or Palatal; bar = Cervical — hover names, all translated | — |
+| DEN-08 | Legend | Below the chart | Whole-tooth statuses (outline + mark) and surface findings (fill), translated | — |
 | DEN-09 | Drawer on narrow window | Shrink the window | Drawer is full width, no page overflow | — |
 
 ### Record treatment (new form)
@@ -163,12 +163,12 @@ These preconditions are easy to miss and cause false failures.
 |---|---|---|---|---|
 | DEN-20 | Form present | Tooth drawer → "Record Treatment" | Collapsible section opens | — |
 | DEN-21 | Catalogue autofill | Pick a treatment from the dropdown | Name **and price + currency** auto-fill from the catalogue | — |
-| DEN-22 | Custom treatment | Pick "Other (type manually)", type a name | Accepted | — |
+| DEN-22 | Custom treatment | Leave the catalogue empty, type a name | Accepted | — |
 | DEN-23 | Name required | Submit with an empty name | Inline required error | — |
 | DEN-24 | Dentist default | Open the form as a dentist | Your own name preselected | — |
 | DEN-25 | Dentist choice | Pick another dentist | Accepted | — |
-| DEN-26 | Date | Defaults to today; try a future date | Today by default; future dates blocked | — |
-| DEN-27 | Surfaces prefilled | Tooth already has surfaces | Same surfaces ticked in the treatment form | — |
+| DEN-26 | Date | Defaults to today; try a future date | Done: future blocked. Planned: future allowed | — |
+| DEN-27 | Surfaces prefilled | Tooth has caries on some surfaces | Those surfaces ticked in the treatment form | — |
 | DEN-28 | Save | Fill and submit | Success toast; form collapses and clears | — |
 | DEN-29 | **Appears in history** | Look at "Treatment History" below | New entry with name, date, **dentist name and cost** | — |
 | DEN-30 | Currency | Clinic currency vs catalogue currency | Cost shows with the right symbol (֏ / $ / ₽) | — |
@@ -178,10 +178,10 @@ These preconditions are easy to miss and cause false failures.
 
 | ID | What to test | Steps | Expected | Status |
 |---|---|---|---|---|
-| DEN-40 | Child default | Create a patient **under 13**, open the chart tab | Chart created as **pediatric** — 20 teeth (51–70), two arches of 10 | — |
-| DEN-41 | Adult default | Patient 13 or older | 32 teeth (1–32) | — |
+| DEN-40 | Child default | Create a patient **under 13**, open the chart tab | Chart created as **primary teeth** — 20 teeth, FDI 55…51 / 61…65 over 85…81 / 71…75 | — |
+| DEN-41 | Adult default | Patient 13 or older | 32 teeth, FDI 18…11 / 21…28 over 48…41 / 31…38 | — |
 | DEN-42 | Toggle present | Above the chart | Adult / Child toggle showing the current type | — |
-| DEN-43 | Switch warns | Click the other type | Confirm dialog explains statuses and history reset, treatments are kept | — |
+| DEN-43 | Switch warns | Click the other type | Confirm dialog says the current chart is kept and comes back on switching again | — |
 | DEN-44 | Switch works | Confirm | Teeth renumber; drawer closes | — |
 | DEN-45 | Treatments survive | After switching, check a recorded treatment | Treatment entries still exist (separate collection) | — |
 | DEN-46 | Cancel switch | Open the dialog, cancel | Nothing changes; toggle stays put | — |
@@ -283,6 +283,289 @@ each module, not just patients.
 
 ---
 
+## 12. Phase 0 — foundation (branch `fix/phase-0-foundation`)
+
+**Before testing:** set `JWT_ACCESS_EXPIRATION=15m` in `backend/.env` (it still says `1d`).
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F0-01 | `.env` secrets used | Change `JWT_ACCESS_SECRET` in `backend/.env`, restart, log in | Works. A token signed with `dev-access-secret` (old default) is rejected | — |
+| F0-02 | PROD refuses weak secrets | Start with `MODE=PROD` and a 10-char secret | Backend exits at startup with a clear error | — |
+| F0-03 | Deactivation is immediate | Admin deactivates staff B while B is logged in; B clicks anything | B is sent to login on the next request (used to keep access up to 24h) | — |
+| F0-04 | Demotion is immediate | Change B from admin to receptionist while B is logged in | B's next action silently refreshes; admin-only pages disappear from B's sidebar after reload | — |
+| F0-05 | Wrong password message stays | Log in with a wrong password | "Invalid email or password" stays on screen, page does **not** reload | — |
+| F0-06 | Same message for unknown email | Log in with an email that has no account | Same message as F0-05 | — |
+| F0-07 | Parallel refresh | Wait 15+ min (token expired), open the Dashboard (several requests at once) | Page loads; you are **not** logged out | — |
+| F0-08 | Reload keeps the user | Log in as admin, press F5 on Staff detail | Avatar shows initials (not "?"), admin buttons still visible | — |
+| F0-09 | Logout revokes | Log out, then reuse the old refresh token (`POST /api/auth/refresh`) | 401 | — |
+| F0-10 | Bad id = 400 | Open `/appointments/abc`, `/billing/abc` | Translated error, not "Internal server error" | — |
+| F0-11 | Cross-clinic patient blocked | Clinic A: `POST /api/appointments` with a patientId from clinic B | 404 "Patient not found"; nothing created | — |
+| F0-12 | Cross-clinic dentist blocked | Same with clinic B's dentistId; also on invoices and treatment entries | 404 | — |
+| F0-13 | Deceased patient | Try to book or invoice a deceased/archived patient | Shown greyed out in the picker; API refuses with a translated message | — |
+| F0-14 | Patient picker search | Clinic with 25+ patients: book patient #25 by typing part of the name or phone | Found and bookable (used to show only the first 20) | — |
+| F0-15 | Invoice patient picker | Billing → New invoice | Patient search works (list used to be empty) | — |
+| F0-16 | Translated errors | In hy and ru, trigger a failed save on any page | Error in that language, not English | — |
+| F0-17 | No repeated toasts | Save a treatment, then save a patient | One toast each; the old toast does not reappear | — |
+| F0-18 | Second save toasts | Save the same treatment twice | Two toasts (the second used to be silent) | — |
+| F0-19 | Role gating | Log in as receptionist | No Reports / Settings in the sidebar; typing `/settings` lands on Dashboard | — |
+| F0-20 | Profile load failure | Stop the backend, reload the app | "Could not load your profile" + Try again button, not an endless spinner | — |
+| F0-21 | "Today" after midnight | Set the computer clock to 01:00, open Record treatment / new patient | Today's date is selectable and is the default | — |
+| F0-22 | Duplicate value | Create two treatment rooms or records that hit a unique index at the same time | 409 translated "already exists", not 500 | — |
+| F0-23 | Seed is scoped | Run `npm run seed` on a DB with another clinic | Other clinic untouched; seeded users can log in | — |
+
+## 13. Phase 1 — auth & clinic settings
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F1-01 | Founder in staff list | Register a new clinic, open Staff | The founder is listed as admin | — |
+| F1-02 | Founder backfill | Restart backend on a DB with clinics registered before this change | Log: `Created staff profiles for N account(s)`; those founders appear in Staff | — |
+| F1-03 | New clinic has a catalogue | Register, open Treatments | Default treatments present | — |
+| F1-04 | Duplicate email on register | Register with an email that already has an account | Translated "account with this email already exists"; no orphan clinic in DB | — |
+| F1-05 | Register password rule | Password of 7 characters | Inline "min 8" error; API also refuses | — |
+| F1-06 | Lockout | 5 wrong passwords for one account | 6th attempt: "Too many failed attempts. Try again in 15 min…" even with the right password | — |
+| F1-07 | Lockout cleared by reset | Admin resets that member's password | Member can log in immediately with the new password | — |
+| F1-08 | Two devices | Log in on Chrome and Firefox with the same account; use both for 20+ min | Both stay signed in (used to kick each other out) | — |
+| F1-09 | Two tabs refresh | Two tabs open, wait 15+ min, click in both quickly | Neither is logged out | — |
+| F1-10 | Logout one device | Log out in Chrome | Firefox stays signed in | — |
+| F1-11 | Log out everywhere | Profile menu → Sign out of all devices | Every device is sent to login on its next action | — |
+| F1-12 | Change password | Profile menu → Change password; wrong current password | Inline translated error, dialog stays open | — |
+| F1-13 | Change password OK | Correct current + new | Toast; this device stays signed in; other devices are signed out | — |
+| F1-14 | Admin reset | Staff → member → Reset password | Toast; member signed out everywhere; old password no longer works | — |
+| F1-15 | No reset for self | Open your own staff page as admin | No "Reset password" button | — |
+| F1-16 | Forgot password | Login → "Forgot password?" | Hint to ask the administrator | — |
+| F1-17 | Empty clinic email | Freshly registered clinic → Settings → Save profile without email | Saves (used to fail "email must be an email") | — |
+| F1-18 | Clinic phone | Enter `123` | Inline error, Save disabled; `093123456` saves as `+37493123456` | — |
+| F1-19 | Working hours | Set Monday 18:00–09:00 | Inline error, Save disabled; API also refuses | — |
+| F1-20 | Edit room | Settings → Rooms → edit name | Saved (used to fail with 400) | — |
+| F1-21 | Deactivate / activate room | Deactivate a room, then activate it | Confirm text explains effect; room greyed with "Inactive" chip; activate restores it | — |
+| F1-22 | Dialog keeps input on error | Make a room save fail (e.g. stop backend) | Dialog stays open with your text | — |
+| F1-23 | Settings load failure | Stop backend, open Settings | Error + Retry, no forms with default hours | — |
+| F1-24 | Regional tab | Settings → Language & currency | No dark-mode switch; changing the default language does **not** change your UI language | — |
+| F1-25 | Timezone list | Open the timezone select | Full IANA list; current value selected | — |
+| F1-26 | Subscription not editable | `PATCH /api/clinics/current` with `{"subscription":{"status":"active"}}` | 400 (property should not exist) | — |
+| F1-27 | Suspended clinic | Set `isActive:false` on a clinic in DB | Within a minute its users get "clinic's account is suspended" | — |
+| F1-28 | Rate limit | 31 logins from one IP within a minute | 31st: "Too many attempts" (429) | — |
+| F1-29 | Sign in once after deploy | Existing logged-in user after upgrading | Sent to login once, then normal | — |
+
+## 14. Data repair (check the backend log once, on each existing database)
+
+| ID | What to test | Expected | Status |
+|---|---|---|---|
+| MIG-07 | ObjectId repair | First start logs `Converted string ids to ObjectIds in N <collection> document(s)` (or nothing); a `migrations` document `2026-10-28-objectid-repair` exists | — |
+| MIG-08 | Runs once | Restart again | No repair log line | — |
+| MIG-09 | Old data visible | Patients/appointments/invoices created through the app **before** this change | Listed, searchable, bookable and billable | — |
+| MIG-10 | No string ids left | `mongosh`: count `{clinicId: {$type: "string"}}` in every collection | 0 | — |
+
+## 15. Phase 2 — patients & staff
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F2-01 | Shared email | Create two patients (siblings) with the same email | Both saved; the second shows the "possible duplicate" warning, not an error | — |
+| F2-02 | Duplicate by phone | New patient, type an existing patient's phone as `077…` | Warning lists that patient; link opens in a new tab, form kept | — |
+| F2-03 | Duplicate on edit | Edit a patient | Never warns about itself | — |
+| F2-04 | Full-name search | Patients list: search "Firstname Lastname" | Finds the patient | — |
+| F2-05 | Search keeps focus | Type a search that returns nothing, keep typing | Search box stays, no page spinner | — |
+| F2-06 | Emergency contact | Fill emergency phone, leave name empty, save | Inline error on the name | — |
+| F2-07 | Insurance | Fill policy number, leave provider empty, save | Inline error on the provider | — |
+| F2-08 | No status on edit form | Edit patient | No status select; status only via the patient page | — |
+| F2-09 | Archive with appointments | Patient with booked future visits → Archived | Dialog says "N upcoming appointments", cancel ticked; after confirm they show Cancelled | — |
+| F2-10 | Inactive keeps appointments | Same, choose Inactive | Cancel option unticked by default | — |
+| F2-11 | Archived not bookable | Book an archived patient | Greyed out in the picker; API refuses | — |
+| F2-12 | Receptionist | Log in as receptionist, edit a patient | Medical history fields read-only with an explanation; no status select; can change phone | — |
+| F2-13 | Assistant | Log in as assistant | Patients readable; no Add / Edit / status buttons | — |
+| F2-14 | Staff list roles | Non-admin opens Staff | No "Add staff", no status menu | — |
+| F2-15 | Deactivate dentist | Dentist with booked visits → Deactivate | Dialog shows count and an opt-in to cancel them | — |
+| F2-16 | New staff hours | Add a dentist | Working hours prefilled from the clinic's opening hours | — |
+| F2-17 | Old specialization | Staff member with free-text specialization | Shown in the select (disabled option) instead of blank | — |
+| F2-18 | Stats after status change | Archive from the list page | Stat cards update without reload | — |
+| F2-19 | Startup log | Restart backend twice | Fixes log at most once; `migrations` collection lists them | — |
+
+## 16. Phase 3 — appointments & schedule
+
+Set the clinic's working hours first (Settings → Working hours), e.g. Mon–Fri 09:00–18:00.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F3-01 | Calendar shows visits | Month with appointments | They appear in their day cells (used to be empty) | — |
+| F3-02 | Filters | Filter by status / dentist; switch to List | Both views filtered; list paginates past 20 | — |
+| F3-03 | Free time | New appointment → pick dentist and a working day | Chips "09:00 – 18:00" minus bookings/blocks, in local time | — |
+| F3-04 | Treatments set duration | Pick a 60-min treatment | Duration becomes 60 min (until you change it by hand) | — |
+| F3-05 | Dentist clash | Book the same dentist at an overlapping time | "The dentist already has an appointment at this time" | — |
+| F3-06 | Patient clash | Same patient with another dentist at the same time | "The patient already has an appointment…" | — |
+| F3-07 | Room clash | Same room, other dentist and patient | "The room is already booked…" | — |
+| F3-08 | Back-to-back | 09:00–09:30 then 09:30–10:00 | Both saved | — |
+| F3-09 | Outside hours | Book 19:00 | Warning with **Book anyway**; that button saves it | — |
+| F3-10 | Blocked time | Block 12–13, book 12:15 | Refused even with Book anyway | — |
+| F3-11 | Block over bookings | Block a time that has a booked visit | Saved, with a warning to move the visit | — |
+| F3-12 | Future visit actions | Open a visit next week | Only Confirm / Reschedule / Cancel (no Start / Complete / No-show) | — |
+| F3-13 | Walk-in | Visit starting now (scheduled) | Start visit and Mark as completed available | — |
+| F3-14 | Completed is final | Complete a visit | No more actions; patient's Last visit updated | — |
+| F3-15 | Cancel needs a reason | Cancel a visit | Reason required; shown with note, who and when on the detail page | — |
+| F3-16 | Rebook | Cancel, then "Book again at this time" | Works if the slot is still free; refused if someone took it | — |
+| F3-17 | Reschedule | Reschedule into a busy time / a free time | Refused / saved; duration updated | — |
+| F3-18 | Weekly series | Repeat weekly until in 5 weeks | 5 visits, same local time; toast lists skipped dates if any | — |
+| F3-19 | Cancel series | Cancel the 2nd one → "This and all following" | It and all later ones cancelled, earlier kept | — |
+| F3-20 | Series limits | Repeat daily for 2 years | Refused ("at most one year"); daily for 3 months → max 52, weekends skipped | — |
+| F3-21 | Patient tab | Patient page → Appointments | Their visits newest first, paginated, "Book appointment"; Appointments page list unaffected | — |
+| F3-22 | Dentist blocks | Log in as dentist → Schedule | Can block only own time; cannot delete a colleague's block | — |
+| F3-23 | Assistant | Log in as assistant | Sees calendar and visits; no booking / status / block buttons | — |
+| F3-24 | Delete block | Delete a blocked time | Confirmation first | — |
+| F3-25 | Room names | Add a room with an existing name (any case) | Translated "already exists" | — |
+| F3-26 | Status labels | In progress / no-show chips in hy, ru, en | Translated, never `in_progress` | — |
+| F3-27 | After midnight | Clock 01:00, open Appointments | "Today" is today; free time correct | — |
+
+## 17. Phase 4 — treatments catalogue & dental chart
+
+Log in as the clinic admin and as a dentist; some rows need a receptionist or assistant too.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F4-01 | FDI layout | Open an adult chart | Upper row 18…11 \| 21…28, lower row 48…41 \| 31…38; "Patient's right" on the left. Lower arch no longer mirrored | — |
+| F4-02 | Old charts converted | Existing database, first start after deploy | Log: "Converted N charts/entries to FDI numbering"; a tooth that was #3 is now 16 with the same status and history | — |
+| F4-03 | Per-surface findings | Tooth 26: Caries brush → mesial, Filling brush → occlusal, save | Both shown on the tooth; mesial red, occlusal blue | — |
+| F4-04 | Clear a surface | Click a marked surface again (or use "Sound") | Surface cleared | — |
+| F4-05 | Who changed it | Tooth drawer → status history | Every change shows "Changed by" with a name | — |
+| F4-06 | Planned treatment | Record treatment → Planned, catalogue filling, mesial | In the tooth's list as Planned; chart unchanged | — |
+| F4-07 | Mark done | "Mark done" on it | Mesial turns from caries to filling, tooth Filled, history "via treatment" | — |
+| F4-08 | Catalogue default | Record a done "Simple Tooth Extraction" on 38 | "Tooth becomes" prefilled Missing; 38 crossed out | — |
+| F4-09 | No tooth | Patient → Treatments → Add treatment, no teeth (exam) | Saved as "Whole mouth" | — |
+| F4-10 | Several teeth | Add a bridge on 14, 15, 16 | One entry; shows in each of those teeth's drawers | — |
+| F4-11 | Void | Treatments tab → Void, reason "Wrong patient" | Hidden from the list; "Show voided" shows it struck through with who, when, why | — |
+| F4-12 | Void needs a reason | Void with fewer than 3 characters | Confirm disabled | — |
+| F4-13 | Switch and back | Mark some teeth, switch to Primary teeth, then back | Primary chart fresh; switching back restores the permanent chart exactly | — |
+| F4-14 | Roles | Receptionist / assistant: open chart | "View only"; no Save, no Record treatment, toggle disabled; API returns 403 | — |
+| F4-15 | Switch patients | Open patient A's chart, then patient B's | Never shows A's teeth under B | — |
+| F4-16 | Two people at once | Two browsers edit different teeth of one chart | Both kept; if a clash remains: "changed at the same time", chart reloads | — |
+| F4-17 | Keyboard | Tab to a tooth, press Enter | Drawer opens; screen reader reads "Tooth 26, Filled, Mesial: Filling…" | — |
+| F4-18 | Dark mode | Header → dark theme, open chart | Numbers, outlines, surfaces readable | — |
+| F4-19 | Catalogue paging | Treatments page | Real total, pages of 20/50/100, search on the server (try `(((`) | — |
+| F4-20 | Localized names | Switch UI to hy / ru | Catalogue and pickers show nameHy / nameRu when set | — |
+| F4-21 | Deactivate / reactivate | Deactivate an item, filter Inactive, Reactivate | Hidden from pickers while inactive; back after reactivate | — |
+| F4-22 | Unique code | Add an item with code `d0150` (exists) | "Another treatment already uses this code" on the code field; dialog stays open | — |
+| F4-23 | Clear fields | Edit an item, empty description and Armenian name, save | They are gone after reload | — |
+| F4-24 | Catalogue roles | Dentist opens Treatments | List only, "Only the clinic admin can change the catalogue" | — |
+| F4-25 | Empty catalogue | Clinic with no items (admin) | "Add the standard catalogue" button creates 20 items | — |
+
+## 18. Phase 5 — billing
+
+Log in as the clinic admin, a receptionist, a dentist and an assistant.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F5-01 | Create from treatments | Patient → Billing → Create invoice → "From treatments", tick two | Lines with the recorded cost, "From the dental chart"; patient pre-filled | — |
+| F5-02 | No double billing | Create a second invoice and look at "From treatments" | Already billed treatments are not offered; API refuses them (409) | — |
+| F5-03 | Discount % | 20 000 with 10% | Line 18 000; detail page shows "10%" (not "10 ֏") | — |
+| F5-04 | Currency | Open the form | Currency is the clinic's, read-only | — |
+| F5-05 | Draft → issue | Save as draft; open it; Edit; Issue | Draft editable; after Issue no Edit; payments allowed only after Issue | — |
+| F5-06 | Exact balance | Pay the whole remaining amount | Accepted; status Paid, balance 0 | — |
+| F5-07 | Overpay | Pay more than the balance | Inline "The remaining balance is …" | — |
+| F5-08 | Two cashiers | Two browsers pay the last 5 000 at the same time | One succeeds, the other gets the balance error | — |
+| F5-09 | Half a dram | Price or payment 100.5 in an AMD clinic | Refused ("Too many decimals") | — |
+| F5-10 | Cancel with payments | Cancel a partly paid invoice | Not offered; API says refund first | — |
+| F5-11 | Refund | Admin → payment → Refund / void, reason | Payment struck through with who / when / why; balance back up; status Partly paid / Issued | — |
+| F5-12 | Cancel | Admin cancels an issued unpaid invoice with a reason; receptionist cancels a draft | Cancelled with reason shown; its treatments become billable again | — |
+| F5-13 | Receptionist limits | Receptionist on an issued invoice | No Cancel (hint shown), no Refund | — |
+| F5-14 | Dentist / assistant | Dentist opens Billing; assistant looks for Billing | Dentist: view only, no Create; assistant: no menu item, `/billing` redirects | — |
+| F5-15 | Overdue | Issued invoice with yesterday's due date | Red "Overdue" chip, Overdue tab lists it, due date red | — |
+| F5-16 | Search | Type a patient's first + last name, then an invoice number | Matches; no 400 on typing | — |
+| F5-17 | Numbers | Create several invoices | `INV-2026-00001`, `…00002`, …, never duplicated | — |
+| F5-18 | Patient balance | Patient → Billing | Billed / paid / balance ignore drafts and cancelled; "Treatments not billed yet: N" | — |
+| F5-19 | Print | Invoice → Print | Only the invoice with the clinic's name/address/phone; no sidebar, header or buttons | — |
+| F5-20 | Old data | Existing database, first start after deploy | Log "Converted N invoices/payments to integer amounts"; old USD 12.50 still shows 12.50; `pending` invoices show Issued / Partly paid | — |
+| F5-21 | Billed treatment | Void a treatment that is on an invoice | "This treatment is on an invoice. Cancel the invoice first." | — |
+| F5-22 | Languages | Billing screens in hy / ru / en | All labels and errors translated | — |
+
+## 19. Phase 6 — reports & dashboard
+
+Log in as the clinic admin, a receptionist, a dentist and an assistant. Have at least one paid, one partly paid and one refunded payment this month.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F6-01 | Dashboard per role | Log in as each role | Opens for everyone (no "Insufficient permissions"). Admin: today, revenue, patients, open invoices. Receptionist/dentist: no revenue card. Assistant: no revenue, no invoices | — |
+| F6-02 | Dashboard numbers | Compare with Appointments / Billing | Today's count excludes cancelled; active patients = Patients page "Active"; open invoices + overdue match the Billing tabs | — |
+| F6-03 | Month revenue | Admin dashboard vs Reports "This month" | Same amount; refunded payments not counted | — |
+| F6-04 | Recent activity | Register a patient, book, take a payment | Newest first with who did it; click opens the patient / appointment / invoice; assistant sees no payments or invoices | — |
+| F6-05 | Dentist dashboard | Log in as a dentist | "My appointments today", own upcoming only, no Create invoice button | — |
+| F6-06 | Reports — revenue | Reports → This month | Collected / Invoiced / Outstanding / New patients filled; chart has a bar per day (zero days included) | — |
+| F6-07 | Grouping | Daily → Weekly → Monthly; presets This year / Last month | Periods start on Mondays / the 1st; totals unchanged; only the revenue request reloads when grouping changes | — |
+| F6-08 | Clinic day | Payment at 00:30 Yerevan time | Counted on that day, not the day before; end date included | — |
+| F6-09 | Bad range | Start after end | Red fields, "The start date is after the end date", nothing loaded | — |
+| F6-10 | Table view | Collected → Table | Same numbers as the chart; hover / focus a bar shows date, amount, payments | — |
+| F6-11 | Dentist performance | Admin view | Every active dentist; collected per dentist + "Lines without a dentist" add up to Collected | — |
+| F6-12 | Treatments | Admin view | Done count from the chart; collected per treatment; manual lines grouped by name | — |
+| F6-13 | Dentist reports | Log in as a dentist → Reports | Own appointments, own row, own treatments; no money anywhere; no 403 in the network tab | — |
+| F6-14 | Receptionist / assistant | Look for Reports | No menu item; `/reports` redirects | — |
+| F6-15 | USD clinic | Clinic in USD, payments 0.10 + 0.20 | Collected 0.30 (not 30) | — |
+| F6-16 | Staff → Performance | Admin opens a dentist; dentist opens own profile | This year's appointments, completion, treatments, collected (admin only); a dentist doesn't see the tab on colleagues | — |
+| F6-17 | Languages | Dashboard and Reports in hy / ru / en | All labels, activity lines and month names translated | — |
+
+## 20. Phase 7 — notifications
+
+Two browsers: a receptionist in one, the dentist (or admin) in the other.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F7-01 | Booking | Receptionist books for the dentist | Within a minute (or on switching back to the tab) the dentist's bell shows 1; "New appointment: patient, time"; the receptionist's bell does not move | — |
+| F7-02 | Own action | Dentist books for himself | No notification | — |
+| F7-03 | Series | Book a weekly series | One notification with the number of visits | — |
+| F7-04 | Move | Change the time; then change only the note | Time change: "old → new"; note change: nothing | — |
+| F7-05 | Other dentist | Move the appointment to another dentist | Both dentists notified | — |
+| F7-06 | Confirm / cancel | Confirm, then cancel with a reason | Dentist gets both; the cancel shows the reason in the reader's language | — |
+| F7-07 | Patient archived | Archive a patient with future visits, cancel them | Each dentist gets one notification with the count; click opens the patient | — |
+| F7-08 | Dentist leaves | Deactivate a dentist with future visits, cancel them | Admins and receptionists: "Patients to call", with the count | — |
+| F7-09 | Payments | Receptionist takes a payment; admin refunds it | Admin told of the payment; receptionist told of the refund with the reason; click opens the invoice | — |
+| F7-10 | Privacy | Try `PATCH /notifications/<someone else's id>/read` | 404; their notification unchanged | — |
+| F7-11 | Unread tab | Open Unread | Only unread items (the old filter returned read ones too) | — |
+| F7-12 | Read | Click an unread item | Marked read in place, bell drops by one, the linked page opens | — |
+| F7-13 | Delete | Delete one; "Delete read" | Each asks first; list and bell update | — |
+| F7-14 | Paging | More than 20 notifications | Pages of 20; deleting the last item of the last page steps back a page | — |
+| F7-15 | Offline | Stop the API for two minutes | No error toast every minute; the bell recovers when the API is back | — |
+| F7-16 | Languages | Switch hy / ru / en | Existing notifications re-worded in the new language | — |
+
+## 21. Phase 8 — safety net
+
+### Automated runs (2026-10-30)
+
+| Check | How | Result |
+|---|---|---|
+| Backend e2e, 121 tests in 5 files (auth/refresh, tenant isolation, payments, appointments, patients) | `cd backend && npm run test:e2e` (needs a local MongoDB; see `test/e2e/README.md`) | PASS |
+| API smoke suites 01–07, 341 checks | `test/smoke/README.md` (fresh seed before 01–02, API restart between batches) | PASS |
+| Unit tests, 22 | `npm test` | PASS |
+| TypeScript `strict`, backend and frontend | `npx tsc --noEmit` in each | PASS |
+| Frontend lint | `npx eslint src --ext .ts,.tsx` | PASS |
+| Translation audit | every `t('…')` key and every enum-driven key (statuses, reasons, roles, categories, days…) exists in en / hy / ru; no missing or empty keys (except the deliberately blank `dental.short.healthy`); placeholders match; every backend error `code` has `errors.<code>`; no hard-coded English in JSX | PASS |
+| Browser walk, hy / ru / en | all 18 routes (lists, detail pages, forms, editor) and their 27 tabs as clinic admin, scanned for raw keys, `undefined` / `NaN` / `Invalid Date`, untranslated text and console errors; Armenian layout checked on invoice and reports | PASS |
+
+> The earlier sections' rows were **not** each clicked through by hand. Their API behaviour is covered
+> by the e2e and smoke suites above; rows that are about the UI itself (dialog wording, toasts, focus,
+> layout) still need a person. Their Status column is left as it was.
+
+### Bugs found by the new tests (now fixed)
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| F8-01 | Several tabs refresh at once | Open the app in 3 tabs, wait for the access token to expire (or shorten `JWT_ACCESS_EXPIRATION`), then click in all tabs quickly | All tabs stay signed in (it used to revoke the session and sign everyone out) | PASS (e2e) |
+| F8-02 | Two moves into one slot | Two receptionists drag/edit two appointments of the same dentist into the same free time at the same moment | At most one succeeds; the other gets "already has an appointment" and stays where it was | PASS (e2e) |
+| F8-03 | Move vs new booking | One moves an appointment into a slot while another books that slot | Never both | PASS (e2e) |
+| F8-04 | Restore vs new booking | Restore a cancelled appointment while someone books its old slot | Never both; a refused restore stays cancelled with its reason | PASS (e2e) |
+| F8-05 | Edit vs cancel | Open the edit dialog, someone else cancels the appointment, save | "Someone else just changed this appointment" — the cancelled appointment is not moved | PASS (e2e) |
+| F8-06 | Family email on a new install | On a fresh database, add two children with the same parent email | Both saved (the unique index came back on fresh databases) | PASS (e2e + smoke 02) |
+| F8-07 | Unknown patient | Open `/patients/<deleted or other clinic id>` and its tabs | "Patient not found" everywhere — upcoming count, billing summary, unbilled treatments and history used to show empty data | PASS (e2e) |
+| F8-08 | Backend log on an existing database | Start the API once | `2026-10-patient-email-not-unique-again` runs once; no index error | — |
+
+## 22. Layout on phones
+
+Log in as the clinic admin. Use the browser's device toolbar at 375×812 (iPhone-sized), then at ≥ 900px wide.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| M-01 | Phone layout | 375px wide, open every menu page plus a patient, staff member and appointment | No sidebar beside the page; content fills the width; no sideways scrolling (wide tables scroll inside their own box) | — |
+| M-02 | Menu | Tap ☰ in the header; tap outside the drawer; open it again and tap a menu item | Drawer slides in over a dimmed page; tapping outside or the ‹ button closes it; a menu item opens that page and closes the drawer | — |
+| M-03 | Desktop unchanged | ≥ 900px wide; click ‹ / › at the top of the sidebar | No ☰ button; sidebar sits beside the page and collapses to icons and back as before | — |
+| M-04 | Print from a phone | 375px wide, print an invoice | Only the invoice prints — no header, no drawer | — |
+
+---
+
 ## Known gaps (not bugs — not yet built)
 
 | Area | Note |
@@ -291,4 +574,7 @@ each module, not just patients.
 | Patient audit | Only **status** changes are audited. Edits to name, phone, medical history are not |
 | Photos | Stored as base64 on the patient document (192px, ~8KB). Fine at this scale; would need a file store if photos get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
-| JWT secrets | `backend/.env` has dev placeholders. Must be changed before production (`config/jwt.config.ts` already throws if they're missing when `NODE_ENV=production`) |
+| JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |
+| Mobile layout | Below 900px the sidebar is an overlay drawer opened from the header (M-01–M-04). Pages themselves aren't redesigned for phones: wide tables scroll sideways inside their own box |
+| Type safety | `strict` is on, but 177 explicit `any` remain in the frontend (mostly saga `action: any`) and 18 in the backend |
+| Backend lint | The backend has no ESLint config; `npm run lint` there fails to start |

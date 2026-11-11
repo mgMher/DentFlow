@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type BlockedTimeDocument = BlockedTime & Document;
 
@@ -15,7 +15,7 @@ export enum BlockedTimeReason {
 @Schema({ timestamps: true })
 export class BlockedTime {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -23,7 +23,7 @@ export class BlockedTime {
     clinicId: Types.ObjectId;
 
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'User',
         required: true,
         index: true,

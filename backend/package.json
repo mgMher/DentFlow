@@ -16,7 +16,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed": "ts-node -r tsconfig-paths/register src/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/seed.ts",
+    "test:smoke": "node test/smoke/01-auth-tenancy.mjs && node test/smoke/02-patients-staff.mjs && node test/smoke/03-appointments-schedule.mjs && node test/smoke/04-dental-treatments.mjs && node test/smoke/05-billing.mjs && node test/smoke/06-reports-dashboard.mjs && node test/smoke/07-notifications.mjs"
   },
   "dependencies": {
     "@nestjs/common": "^9.0.0",
@@ -27,6 +28,7 @@
     "@nestjs/platform-express": "^9.0.0",
     "@nestjs/schedule": "^2.2.3",
     "@nestjs/swagger": "^6.3.0",
+    "@nestjs/throttler": "^4.2.1",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
@@ -64,13 +66,19 @@
     "typescript": "^5.0.0"
   },
   "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts"
+    ],
     "rootDir": "src",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
-    "collectCoverageFrom": ["**/*.(t|j)s"],
+    "collectCoverageFrom": [
+      "**/*.(t|j)s"
+    ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node",
     "moduleNameMapper": {

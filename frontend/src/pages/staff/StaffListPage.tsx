@@ -34,6 +34,7 @@ import {
     Search as SearchIcon,
     ToggleOff as DeactivateIcon,
     ToggleOn as ActivateIcon,
+    RestartAlt as ResetIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
@@ -42,13 +43,13 @@ import { Controller, useForm } from 'react-hook-form';
 import { RootState } from '../../store';
 import { staffActions } from '../../store/staff';
 import {
-    ConfirmDialog,
     EmptyState,
     LoadingSpinner,
     PageHeader,
     StatusChip,
 } from '../../components/ui';
-import { useHttpState } from '../../hooks';
+import { useHttpState, usePermission } from '../../hooks';
+import StaffStatusDialog from './StaffStatusDialog';
 import { getFullName, getInitials } from '../../utils/formatters';
 import { DEFAULT_PAGE_SIZE } from '../../utils/constants';
 import { EMAIL_PATTERN, formatArmenianPhone, isArmenianPhone } from '../../utils/validators';
@@ -79,6 +80,10 @@ const StaffListPage: React.FC = () => {
 
     const { list: staffList, total } = useSelector((state: RootState) => state.staff);
     const loading = useSelector((state: RootState) => state.http.loading.includes('GET_STAFF'));
+    const startedLoading = useRef(false);
+    if (loading) startedLoading.current = true;
+    const can = usePermission();
+    const canManageStaff = can('manageStaff');
     const listError = useSelector(
         (state: RootState) => state.http.errors.find((e) => e.type === 'GET_STAFF')?.error,
     );
@@ -217,16 +222,6 @@ const StaffListPage: React.FC = () => {
         setPendingStatus({ member, isActive });
     };
 
-    const confirmStatusChange = () => {
-        if (!pendingStatus) return;
-        dispatch(
-            staffActions.updateStaffStatus({
-                id: pendingStatus.member._id,
-                isActive: pendingStatus.isActive,
-            }),
-        );
-        setPendingStatus(null);
-    };
 
     const isFiltered = search.trim() !== '' || roleFilter !== 'all' || statusFilter !== 'active';
 
@@ -248,7 +243,10 @@ const StaffListPage: React.FC = () => {
         [t],
     );
 
-    if (loading && staffList.length === 0) {
+    // Full-page spinner only before the first response, so an empty search
+    // result does not unmount the search box while the user is typing.
+    const hasLoaded = staffList.length > 0 || (startedLoading.current && !loading);
+    if (loading && !hasLoaded) {
         return <LoadingSpinner fullPage />;
     }
 
@@ -257,8 +255,8 @@ const StaffListPage: React.FC = () => {
             <PageHeader
                 title={t('staff.title')}
                 subtitle={`${t('staff.totalStaff')}: ${total}`}
-                actionLabel={t('staff.addStaff')}
-                onAction={openDialog}
+                actionLabel={canManageStaff ? t('staff.addStaff') : undefined}
+                onAction={canManageStaff ? openDialog : undefined}
             />
 
             <Paper sx={{ mb: 2 }}>
@@ -336,12 +334,13 @@ const StaffListPage: React.FC = () => {
                         description={t('staff.tryDifferentFilters')}
                         actionLabel={t('common.reset')}
                         onAction={clearFilters}
+                        actionIcon={<ResetIcon />}
                     />
                 ) : (
                     <EmptyState
                         title={t('staff.noStaff')}
-                        actionLabel={t('staff.addStaff')}
-                        onAction={openDialog}
+                        actionLabel={canManageStaff ? t('staff.addStaff') : undefined}
+                        onAction={canManageStaff ? openDialog : undefined}
                     />
                 )
             ) : (
@@ -419,7 +418,7 @@ const StaffListPage: React.FC = () => {
                                                 sx={{ display: 'flex', justifyContent: 'flex-end' }}
                                                 onClick={(e) => e.stopPropagation()}
                                             >
-                                                <Tooltip title={t('common.edit')}>
+                                                <Tooltip title={canManageStaff ? t('common.edit') : t('common.view')}>
                                                     <IconButton
                                                         size="small"
                                                         onClick={() => navigate(`/staff/${member._id}`)}
@@ -427,14 +426,16 @@ const StaffListPage: React.FC = () => {
                                                         <EditIcon fontSize="small" />
                                                     </IconButton>
                                                 </Tooltip>
-                                                <Tooltip title={t('staff.changeStatus')}>
-                                                    <IconButton
-                                                        size="small"
-                                                        onClick={(e) => openMenu(e, member)}
-                                                    >
-                                                        <MoreIcon fontSize="small" />
-                                                    </IconButton>
-                                                </Tooltip>
+                                                {canManageStaff && (
+                                                    <Tooltip title={t('staff.changeStatus')}>
+                                                        <IconButton
+                                                            size="small"
+                                                            onClick={(e) => openMenu(e, member)}
+                                                        >
+                                                            <MoreIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Tooltip>
+                                                )}
                                             </Box>
                                         </TableCell>
                                     </TableRow>
@@ -482,25 +483,10 @@ const StaffListPage: React.FC = () => {
                 </MenuItem>
             </Menu>
 
-            <ConfirmDialog
-                open={!!pendingStatus}
-                title={t('staff.changeStatus')}
-                message={
-                    pendingStatus
-                        ? t('staff.confirmStatusChange', {
-                              name: getFullName(
-                                  pendingStatus.member.firstName,
-                                  pendingStatus.member.lastName,
-                              ),
-                              status: pendingStatus.isActive
-                                  ? t('common.active')
-                                  : t('common.inactive'),
-                          })
-                        : ''
-                }
-                variant={pendingStatus?.isActive ? 'default' : 'danger'}
-                onConfirm={confirmStatusChange}
-                onCancel={() => setPendingStatus(null)}
+            <StaffStatusDialog
+                member={pendingStatus?.member ?? null}
+                isActive={pendingStatus?.isActive ?? false}
+                onClose={() => setPendingStatus(null)}
             />
 
             {/* Add Staff Dialog */}

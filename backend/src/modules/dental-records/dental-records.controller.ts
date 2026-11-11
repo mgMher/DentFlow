@@ -1,25 +1,22 @@
-import {
-    Body,
-    Controller,
-    Get,
-    Param,
-    ParseIntPipe,
-    Patch,
-    Post,
-    Query,
-} from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
-import { CurrentUser } from 'src/common/decorators';
+import { CurrentUser, Role, Roles } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { DentalRecordsService } from './dental-records.service';
 import {
     UpdateToothDto,
     UpdateTeethDto,
     SetChartTypeDto,
+    GetChartQueryDto,
     CreateTreatmentEntryDto,
+    CompleteTreatmentEntryDto,
+    VoidTreatmentEntryDto,
     QueryRecordsDto,
 } from './dto';
+
+/** Role matrix (D5): the chart and treatment entries are clinical records. Everyone else views. */
+const CHART_EDITORS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.DENTIST];
 
 @ApiTags('Dental Records')
 @ApiBearerAuth()
@@ -33,20 +30,16 @@ export class DentalRecordsController {
     async getChart(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
         @CurrentUser('clinicId') clinicId: string,
-        @Query('chartType') chartType?: 'adult' | 'pediatric',
+        @Query() query: GetChartQueryDto,
     ) {
-        return this.dentalRecordsService.getOrCreateChart(
-            new Types.ObjectId(clinicId),
-            patientId,
-            chartType,
-        );
+        return this.dentalRecordsService.getChart(new Types.ObjectId(clinicId), patientId, query.chartType);
     }
 
     @Patch(':patientId/chart-type')
+    @Roles(...CHART_EDITORS)
     @ApiOperation({
-        summary: 'Switch a chart between adult and pediatric numbering',
-        description:
-            'Rebuilds the teeth array for the new numbering. Per-tooth status and history do not carry over; treatment entries are preserved.',
+        summary: 'Switch a chart between permanent and primary teeth',
+        description: 'The current teeth are archived; switching back restores them. Treatment entries are untouched.',
     })
     @ApiResponse({ status: 200, description: 'Chart type updated' })
     async setChartType(
@@ -64,9 +57,11 @@ export class DentalRecordsController {
     }
 
     @Patch(':patientId/tooth')
-    @ApiOperation({ summary: 'Update a single tooth status in the dental chart' })
+    @Roles(...CHART_EDITORS)
+    @ApiOperation({ summary: 'Update one tooth (status, surfaces, notes)' })
     @ApiResponse({ status: 200, description: 'Tooth updated' })
-    @ApiResponse({ status: 404, description: 'Tooth number not found in chart' })
+    @ApiResponse({ status: 404, description: 'Tooth number not on this chart' })
+    @ApiResponse({ status: 409, description: 'Chart changed by someone else (chartChanged)' })
     async updateTooth(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
         @Body() dto: UpdateToothDto,
@@ -82,9 +77,10 @@ export class DentalRecordsController {
     }
 
     @Patch(':patientId/teeth')
+    @Roles(...CHART_EDITORS)
     @ApiOperation({ summary: 'Batch update multiple teeth in the dental chart' })
     @ApiResponse({ status: 200, description: 'Teeth updated' })
-    @ApiResponse({ status: 404, description: 'One or more tooth numbers not found in chart' })
+    @ApiResponse({ status: 404, description: 'One or more tooth numbers not on this chart' })
     async updateMultipleTeeth(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
         @Body() dto: UpdateTeethDto,
@@ -100,25 +96,22 @@ export class DentalRecordsController {
     }
 
     @Get(':patientId/tooth/:toothNumber/history')
-    @ApiOperation({
-        summary: 'Get the full timeline of one tooth (status changes + treatments)',
-    })
+    @ApiOperation({ summary: 'Get the full timeline of one tooth (status changes + treatments)' })
     @ApiResponse({ status: 200, description: 'Tooth history returned' })
-    @ApiResponse({ status: 404, description: 'Tooth number not found in chart' })
     async getToothHistory(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
         @Param('toothNumber', ParseIntPipe) toothNumber: number,
         @CurrentUser('clinicId') clinicId: string,
     ) {
-        return this.dentalRecordsService.getToothHistory(
-            new Types.ObjectId(clinicId),
-            patientId,
-            toothNumber,
-        );
+        return this.dentalRecordsService.getToothHistory(new Types.ObjectId(clinicId), patientId, toothNumber);
     }
 
     @Post(':patientId/treatment-entry')
-    @ApiOperation({ summary: 'Add a treatment entry for a specific tooth' })
+    @Roles(...CHART_EDITORS)
+    @ApiOperation({
+        summary: 'Record a treatment (done or planned), on zero, one or several teeth',
+        description: 'A done treatment with a result status updates the chart.',
+    })
     @ApiResponse({ status: 201, description: 'Treatment entry created' })
     async addTreatmentEntry(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
@@ -134,19 +127,56 @@ export class DentalRecordsController {
         );
     }
 
+    @Patch(':patientId/treatment-entry/:entryId/complete')
+    @Roles(...CHART_EDITORS)
+    @ApiOperation({ summary: 'Mark a planned treatment as done (updates the chart)' })
+    @ApiResponse({ status: 200, description: 'Entry done' })
+    @ApiResponse({ status: 400, description: 'Already done or voided' })
+    async completeTreatmentEntry(
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
+        @Param('entryId', ParseObjectIdPipe) entryId: Types.ObjectId,
+        @Body() dto: CompleteTreatmentEntryDto,
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') userId: string,
+    ) {
+        return this.dentalRecordsService.completeTreatmentEntry(
+            new Types.ObjectId(clinicId),
+            patientId,
+            entryId,
+            new Types.ObjectId(userId),
+            dto,
+        );
+    }
+
+    @Patch(':patientId/treatment-entry/:entryId/void')
+    @Roles(...CHART_EDITORS)
+    @ApiOperation({ summary: 'Void a treatment entry (kept, hidden from history, with a reason)' })
+    @ApiResponse({ status: 200, description: 'Entry voided' })
+    async voidTreatmentEntry(
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
+        @Param('entryId', ParseObjectIdPipe) entryId: Types.ObjectId,
+        @Body() dto: VoidTreatmentEntryDto,
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') userId: string,
+    ) {
+        return this.dentalRecordsService.voidTreatmentEntry(
+            new Types.ObjectId(clinicId),
+            patientId,
+            entryId,
+            new Types.ObjectId(userId),
+            dto.reason,
+        );
+    }
+
     @Get(':patientId/treatment-history')
-    @ApiOperation({ summary: 'Get treatment history for a patient (optional tooth filter)' })
+    @ApiOperation({ summary: 'Treatment history for a patient (filters: tooth, status, dates, voided)' })
     @ApiResponse({ status: 200, description: 'Treatment history returned' })
     async getTreatmentHistory(
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
         @Query() query: QueryRecordsDto,
         @CurrentUser('clinicId') clinicId: string,
     ) {
-        return this.dentalRecordsService.getTreatmentHistory(
-            new Types.ObjectId(clinicId),
-            patientId,
-            query,
-        );
+        return this.dentalRecordsService.getTreatmentHistory(new Types.ObjectId(clinicId), patientId, query);
     }
 
     @Get(':patientId/summary')
@@ -156,9 +186,6 @@ export class DentalRecordsController {
         @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
         @CurrentUser('clinicId') clinicId: string,
     ) {
-        return this.dentalRecordsService.getPatientDentalSummary(
-            new Types.ObjectId(clinicId),
-            patientId,
-        );
+        return this.dentalRecordsService.getPatientDentalSummary(new Types.ObjectId(clinicId), patientId);
     }
 }

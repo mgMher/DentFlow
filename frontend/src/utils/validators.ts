@@ -39,4 +39,5 @@ export const formatArmenianPhone = (value: string): string => {
 export const EMAIL_PATTERN = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
 
 /** Largest photo we are willing to send to the API (~1.5MB of base64). */
-export const MAX_PHOTO_DATA_URL_LENGTH = 2_000_000;
+/** Must match the photo/avatar MaxLength on the API (150 000). */
+export const MAX_PHOTO_DATA_URL_LENGTH = 150_000;

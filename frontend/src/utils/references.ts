@@ -1,5 +1,6 @@
 import { Patient, Treatment, TreatmentRoom, UserProfile } from '../types';
 import { getFullName } from './formatters';
+import { localizedTreatmentName } from './appointments';
 
 /**
  * The API returns Mongo references either populated (an object) or as a bare
@@ -40,9 +41,10 @@ export const roomName = (room?: string | TreatmentRoom | null): string => {
     return room.name || PLACEHOLDER;
 };
 
+/** In the UI language when the catalogue has a translation. */
 export const treatmentName = (treatment?: string | Treatment | null): string => {
     if (!treatment || typeof treatment === 'string') return PLACEHOLDER;
-    return treatment.name || treatment.nameHy || treatment.nameRu || PLACEHOLDER;
+    return localizedTreatmentName(treatment) || PLACEHOLDER;
 };
 
 /** Stable React key for a possibly-populated reference. */

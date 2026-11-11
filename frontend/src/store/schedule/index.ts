@@ -1,6 +1,10 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
+import { AxiosResponse } from 'axios';
 import api from '../../api/axios';
 import { httpActions } from '../http';
+import { apiErrorMessage } from '../../utils/apiError';
+import { toast } from 'react-toastify';
+import i18n from '../../locales/i18n';
 import { TreatmentRoom, BlockedTime } from '../../types';
 
 // ── Action Types ──────────────────────────────────────────────────────────────
@@ -8,6 +12,8 @@ import { TreatmentRoom, BlockedTime } from '../../types';
 const GET_ROOMS = 'GET_ROOMS';
 const GET_ROOMS_SUCCESS = 'GET_ROOMS_SUCCESS';
 const CREATE_ROOM = 'CREATE_ROOM';
+const UPDATE_ROOM = 'UPDATE_ROOM';
+const DEACTIVATE_ROOM = 'DEACTIVATE_ROOM';
 const GET_BLOCKED = 'GET_BLOCKED';
 const GET_BLOCKED_SUCCESS = 'GET_BLOCKED_SUCCESS';
 const CREATE_BLOCKED = 'CREATE_BLOCKED';
@@ -21,6 +27,10 @@ export const scheduleActions = {
     getRooms: () => ({ type: GET_ROOMS }),
     getRoomsSuccess: (payload: TreatmentRoom[]) => ({ type: GET_ROOMS_SUCCESS, payload }),
     createRoom: (payload: Partial<TreatmentRoom>) => ({ type: CREATE_ROOM, payload }),
+    /** Also reactivates a room: `{ id, data: { isActive: true } }`. */
+    updateRoom: (payload: { id: string; data: Partial<TreatmentRoom> }) => ({ type: UPDATE_ROOM, payload }),
+    /** Rooms are never hard-deleted: past appointments still point at them. */
+    deactivateRoom: (payload: string) => ({ type: DEACTIVATE_ROOM, payload }),
     getBlocked: (payload?: any) => ({ type: GET_BLOCKED, payload }),
     getBlockedSuccess: (payload: BlockedTime[]) => ({ type: GET_BLOCKED_SUCCESS, payload }),
     createBlocked: (payload: Partial<BlockedTime>) => ({ type: CREATE_BLOCKED, payload }),
@@ -38,6 +48,7 @@ const service = {
     getRooms: () => api.get('/schedule/rooms'),
     createRoom: (data: Partial<TreatmentRoom>) => api.post('/schedule/rooms', data),
     updateRoom: (id: string, data: Partial<TreatmentRoom>) => api.patch(`/schedule/rooms/${id}`, data),
+    deactivateRoom: (id: string) => api.delete(`/schedule/rooms/${id}`),
     getBlocked: (params?: any) => api.get('/schedule/blocked-times', { params }),
     createBlocked: (data: Partial<BlockedTime>) => api.post('/schedule/blocked-times', data),
     deleteBlocked: (id: string) => api.delete(`/schedule/blocked-times/${id}`),
@@ -51,12 +62,12 @@ function* getRoomsSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getRooms);
+        const res: AxiosResponse = yield call(service.getRooms);
         yield put({ type: GET_ROOMS_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load rooms'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadRooms')));
     }
 }
 
@@ -70,7 +81,35 @@ function* createRoomSaga(action: any) {
         yield put({ type: GET_ROOMS });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create room'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createRoom')));
+    }
+}
+
+function* updateRoomSaga(action: ReturnType<typeof scheduleActions.updateRoom>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        yield call(service.updateRoom, action.payload.id, action.payload.data);
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+        yield put({ type: GET_ROOMS });
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateRoom')));
+    }
+}
+
+function* deactivateRoomSaga(action: ReturnType<typeof scheduleActions.deactivateRoom>) {
+    yield put(httpActions.removeError(action.type));
+    yield put(httpActions.appendLoading(action.type));
+    try {
+        yield call(service.deactivateRoom, action.payload);
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendSuccess(action.type));
+        yield put({ type: GET_ROOMS });
+    } catch (err: any) {
+        yield put(httpActions.removeLoading(action.type));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.updateRoom')));
     }
 }
 
@@ -78,12 +117,12 @@ function* getBlockedSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(service.getBlocked, action.payload);
+        const res: AxiosResponse = yield call(service.getBlocked, action.payload);
         yield put({ type: GET_BLOCKED_SUCCESS, payload: res.data?.data || res.data });
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load blocked times'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadBlockedTimes')));
     }
 }
 
@@ -91,13 +130,17 @@ function* createBlockedSaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        yield call(service.createBlocked, action.payload);
+        const res: AxiosResponse = yield call(service.createBlocked, action.payload);
         yield put(httpActions.removeLoading(action.type));
         yield put(httpActions.appendSuccess(action.type));
+        // Blocking over booked visits is allowed (sick day), but say so — the
+        // patients still need to be moved.
+        const overlapping = (res.data?.data ?? res.data)?.overlappingAppointments ?? 0;
+        if (overlapping > 0) toast.warning(i18n.t('schedule.blockOverlapsAppointments', { count: overlapping }));
         yield put({ type: GET_BLOCKED });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to create blocked time'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.createBlockedTime')));
     }
 }
 
@@ -111,7 +154,7 @@ function* deleteBlockedSaga(action: any) {
         yield put({ type: GET_BLOCKED });
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to delete blocked time'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.deleteBlockedTime')));
     }
 }
 
@@ -119,7 +162,7 @@ function* getAvailabilitySaga(action: any) {
     yield put(httpActions.removeError(action.type));
     yield put(httpActions.appendLoading(action.type));
     try {
-        const res: any = yield call(
+        const res: AxiosResponse = yield call(
             service.getAvailability,
             action.payload.dentistId,
             action.payload.date,
@@ -128,13 +171,15 @@ function* getAvailabilitySaga(action: any) {
         yield put(httpActions.removeLoading(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
-        yield put(httpActions.appendError(action.type, err?.data?.message || 'Failed to load availability'));
+        yield put(httpActions.appendError(action.type, apiErrorMessage(err, 'errors.loadAvailability')));
     }
 }
 
 export function* watchSchedule() {
     yield takeLatest(GET_ROOMS, getRoomsSaga);
     yield takeLatest(CREATE_ROOM, createRoomSaga);
+    yield takeLatest(UPDATE_ROOM, updateRoomSaga);
+    yield takeLatest(DEACTIVATE_ROOM, deactivateRoomSaga);
     yield takeLatest(GET_BLOCKED, getBlockedSaga);
     yield takeLatest(CREATE_BLOCKED, createBlockedSaga);
     yield takeLatest(DELETE_BLOCKED, deleteBlockedSaga);

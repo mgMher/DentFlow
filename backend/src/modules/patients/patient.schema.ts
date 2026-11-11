@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type PatientDocument = Patient & Document;
 
@@ -106,7 +106,7 @@ export class PatientStatusChange {
     @Prop({ trim: true })
     reason: string;
 
-    @Prop({ type: Types.ObjectId, ref: 'User' })
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     changedBy: Types.ObjectId;
 
     @Prop({ required: true, default: () => new Date() })
@@ -118,7 +118,7 @@ export const PatientStatusChangeSchema = SchemaFactory.createForClass(PatientSta
 @Schema({ timestamps: true })
 export class Patient {
     @Prop({
-        type: Types.ObjectId,
+        type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
         required: true,
         index: true,
@@ -189,15 +189,5 @@ export const PatientSchema = SchemaFactory.createForClass(Patient);
 
 PatientSchema.index({ clinicId: 1, lastName: 1, firstName: 1 });
 
-// One patient per email *inside a clinic* — the clinic is the tenant boundary,
-// so two clinics may each have a patient with the same address.
-// The partial filter keeps patients with no email (and legacy empty strings)
-// out of the index, so they are never duplicates of each other.
-PatientSchema.index(
-    { clinicId: 1, email: 1 },
-    {
-        unique: true,
-        name: 'clinicId_1_email_1_unique',
-        partialFilterExpression: { email: { $type: 'string', $gt: '' } },
-    },
-);
+// Email is deliberately not unique (D4): a parent registers several children
+// under one address. The create form warns about matches instead.

@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout';
 import ProtectedRoute from './ProtectedRoute';
+import RequirePermission from './RequirePermission';
 
 // Auth pages
 import LoginPage from '../pages/auth/LoginPage';
@@ -15,11 +16,10 @@ import PatientDetailPage from '../pages/patients/PatientDetailPage';
 import PatientEditPage from '../pages/patients/PatientEditPage';
 import AppointmentsPage from '../pages/appointments/AppointmentsPage';
 import AppointmentDetailPage from '../pages/appointments/AppointmentDetailPage';
-import DentalChartPage from '../pages/dental-records/DentalChartPage';
 import TreatmentsPage from '../pages/treatments/TreatmentsPage';
 import BillingListPage from '../pages/billing/BillingListPage';
 import InvoiceDetailPage from '../pages/billing/InvoiceDetailPage';
-import InvoiceCreatePage from '../pages/billing/InvoiceCreatePage';
+import InvoiceEditorPage from '../pages/billing/InvoiceEditorPage';
 import StaffListPage from '../pages/staff/StaffListPage';
 import StaffDetailPage from '../pages/staff/StaffDetailPage';
 import ReportsPage from '../pages/reports/ReportsPage';
@@ -48,24 +48,32 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     <Route path="/patients/new" element={<PatientCreatePage />} />
                     <Route path="/patients/:id" element={<PatientDetailPage />} />
                     <Route path="/patients/:id/edit" element={<PatientEditPage />} />
-                    <Route path="/patients/:id/chart" element={<DentalChartPage />} />
 
                     <Route path="/appointments" element={<AppointmentsPage />} />
                     <Route path="/appointments/:id" element={<AppointmentDetailPage />} />
 
                     <Route path="/treatments" element={<TreatmentsPage />} />
 
-                    <Route path="/billing" element={<BillingListPage />} />
-                    <Route path="/billing/new" element={<InvoiceCreatePage />} />
-                    <Route path="/billing/:id" element={<InvoiceDetailPage />} />
+                    <Route element={<RequirePermission permission="viewBilling" />}>
+                        <Route path="/billing" element={<BillingListPage />} />
+                        <Route path="/billing/:id" element={<InvoiceDetailPage />} />
+                    </Route>
+                    <Route element={<RequirePermission permission="manageBilling" />}>
+                        <Route path="/billing/new" element={<InvoiceEditorPage />} />
+                        <Route path="/billing/:id/edit" element={<InvoiceEditorPage />} />
+                    </Route>
 
                     <Route path="/staff" element={<StaffListPage />} />
                     <Route path="/staff/:id" element={<StaffDetailPage />} />
 
-                    <Route path="/reports" element={<ReportsPage />} />
+                    <Route element={<RequirePermission permission="viewReports" />}>
+                        <Route path="/reports" element={<ReportsPage />} />
+                    </Route>
                     <Route path="/schedule" element={<SchedulePage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
+                    <Route element={<RequirePermission permission="manageClinic" />}>
+                        <Route path="/settings" element={<SettingsPage />} />
+                    </Route>
 
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />

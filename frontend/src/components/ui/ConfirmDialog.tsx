@@ -16,11 +16,13 @@ interface ConfirmDialogProps {
     onConfirm: () => void;
     onCancel: () => void;
     variant?: 'danger' | 'default';
+    /** E.g. while a required reason is empty or the request is running. */
+    confirmDisabled?: boolean;
 }
 
 const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
     open, title, message, children, confirmLabel, cancelLabel,
-    onConfirm, onCancel, variant = 'default',
+    onConfirm, onCancel, variant = 'default', confirmDisabled,
 }) => {
     const { t } = useTranslation();
 
@@ -37,6 +39,7 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
                 </Button>
                 <Button
                     onClick={onConfirm}
+                    disabled={confirmDisabled}
                     variant="contained"
                     color={variant === 'danger' ? 'error' : 'primary'}
                 >

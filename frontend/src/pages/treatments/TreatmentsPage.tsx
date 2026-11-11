@@ -1,51 +1,52 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
 import { useForm, Controller } from 'react-hook-form';
 import {
+    Alert,
     Box,
-    Typography,
+    Button,
+    Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    Grid,
+    IconButton,
+    InputAdornment,
+    MenuItem,
     Paper,
     Table,
     TableBody,
     TableCell,
     TableContainer,
     TableHead,
+    TablePagination,
     TableRow,
-    IconButton,
-    Tooltip,
     TextField,
-    MenuItem,
-    Dialog,
-    DialogTitle,
-    DialogContent,
-    DialogActions,
-    Button,
-    Grid,
-    Chip,
-    InputAdornment,
-    Card,
-    CardContent,
-    CardActions,
-    ToggleButtonGroup,
     ToggleButton,
+    ToggleButtonGroup,
+    Tooltip,
+    Typography,
 } from '@mui/material';
 import {
     Edit as EditIcon,
-    Delete as DeleteIcon,
     Search as SearchIcon,
-    ViewList as ListIcon,
-    GridView as GridViewIcon,
-    AccessTime as ClockIcon,
+    VisibilityOff as DeactivateIcon,
+    Restore as ReactivateIcon,
+    LibraryAdd as SeedIcon,
 } from '@mui/icons-material';
 import { RootState } from '../../store';
-import { treatmentsActions } from '../../store/treatments';
+import { treatmentsActions, TreatmentInput } from '../../store/treatments';
 import { PageHeader, StatusChip, EmptyState, LoadingSpinner, ConfirmDialog } from '../../components/ui';
+import { useHttpState, usePermission } from '../../hooks';
 import { formatCurrency } from '../../utils/formatters';
-import { TREATMENT_CATEGORIES, CURRENCY_SYMBOLS } from '../../utils/constants';
-import { Treatment, TreatmentCategory, Currency } from '../../types';
+import { localizedTreatmentName } from '../../utils/appointments';
+import { TOOTH_STATUSES, toothStatusKey } from '../../utils/dental';
+import { TREATMENT_CATEGORIES } from '../../utils/constants';
+import { Currency, ToothStatus, Treatment, TreatmentCategory } from '../../types';
 
-// ── Form type ───────────────────────────────────────────────────────────────
+const CURRENCIES: Currency[] = ['AMD', 'USD', 'RUB'];
 
 interface TreatmentForm {
     name: string;
@@ -56,116 +57,125 @@ interface TreatmentForm {
     duration: number;
     priceAmount: number;
     priceCurrency: Currency;
+    toothStatus: ToothStatus | '';
     description: string;
 }
 
-// ── Category color map ──────────────────────────────────────────────────────
-
-const CATEGORY_COLORS: Record<string, { bg: string; color: string }> = {
-    general: { bg: '#EBF4FF', color: '#3182CE' },
-    surgical: { bg: '#FFF5F5', color: '#E53E3E' },
-    cosmetic: { bg: '#FAF5FF', color: '#805AD5' },
-    orthodontic: { bg: '#FFFFF0', color: '#D69E2E' },
-    endodontic: { bg: '#FFFAF0', color: '#ED8936' },
-    periodontic: { bg: '#E6FFFA', color: '#0B5E6E' },
-    prosthodontic: { bg: '#F0FFF4', color: '#38A169' },
-    pediatric: { bg: '#EBF4FF', color: '#3182CE' },
-    diagnostic: { bg: '#F7FAFC', color: '#4A5568' },
-    preventive: { bg: '#F0FFF4', color: '#2F855A' },
+const CATEGORY_COLORS: Record<string, string> = {
+    general: '#3182CE',
+    surgical: '#E53E3E',
+    cosmetic: '#805AD5',
+    orthodontic: '#D69E2E',
+    endodontic: '#DD6B20',
+    periodontic: '#0B5E6E',
+    prosthodontic: '#38A169',
+    pediatric: '#D53F8C',
+    diagnostic: '#4A5568',
+    preventive: '#2F855A',
 };
 
-// ── Component ───────────────────────────────────────────────────────────────
+type StatusFilter = 'all' | 'active' | 'inactive';
 
+/**
+ * The clinic's treatment catalogue. Search, filters and pages run on the
+ * server — the page used to load the first 20 items and filter those, with a
+ * total that always read 0. Only the clinic admin edits (D5).
+ */
 const TreatmentsPage: React.FC = () => {
     const { t } = useTranslation();
     const dispatch = useDispatch();
+    const can = usePermission();
+    const canEdit = can('editTreatments');
 
     const { list: treatments, total } = useSelector((state: RootState) => state.treatments);
-    const { loading } = useSelector((state: RootState) => state.http);
+    const clinicCurrency = (useSelector((state: RootState) => state.clinic.clinic?.currency) as Currency) || 'AMD';
+    const isLoading = useSelector((state: RootState) => state.http.loading.includes('GET_TREATMENTS'));
+    const loadError = useSelector((state: RootState) => state.http.errors.find((e) => e.type === 'GET_TREATMENTS'));
+    const create = useHttpState('CREATE_TREATMENT');
+    const update = useHttpState('UPDATE_TREATMENT');
+    const deactivate = useHttpState('DELETE_TREATMENT');
+    const seed = useHttpState('SEED_TREATMENTS');
 
-    const isLoading = loading.includes('GET_TREATMENTS');
-    const isSaving = loading.includes('CREATE_TREATMENT') || loading.includes('UPDATE_TREATMENT');
-
-    // ── Local state ─────────────────────────────────────────────────────────
-
-    const [viewMode, setViewMode] = useState<'table' | 'grid'>('table');
+    const [page, setPage] = useState(0);
+    const [rowsPerPage, setRowsPerPage] = useState(20);
+    const [searchInput, setSearchInput] = useState('');
+    const [search, setSearch] = useState('');
+    const [category, setCategory] = useState<TreatmentCategory | 'all'>('all');
+    const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [dialogOpen, setDialogOpen] = useState(false);
-    const [editingTreatment, setEditingTreatment] = useState<Treatment | null>(null);
-    const [deleteTarget, setDeleteTarget] = useState<Treatment | null>(null);
-    const [searchQuery, setSearchQuery] = useState('');
-    const [selectedCategory, setSelectedCategory] = useState<string>('all');
+    const [editing, setEditing] = useState<Treatment | null>(null);
+    const [deactivateTarget, setDeactivateTarget] = useState<Treatment | null>(null);
+    const [reloadKey, setReloadKey] = useState(0);
 
-    // ── Form ────────────────────────────────────────────────────────────────
+    const blank: TreatmentForm = {
+        name: '',
+        nameHy: '',
+        nameRu: '',
+        category: 'general',
+        code: '',
+        duration: 30,
+        priceAmount: 0,
+        priceCurrency: clinicCurrency,
+        toothStatus: '',
+        description: '',
+    };
 
     const {
         control,
         handleSubmit,
         reset,
         formState: { errors },
-    } = useForm<TreatmentForm>({
-        defaultValues: {
-            name: '',
-            nameHy: '',
-            nameRu: '',
-            category: 'general',
-            code: '',
-            duration: 30,
-            priceAmount: 0,
-            priceCurrency: 'AMD',
-            description: '',
-        },
-    });
+    } = useForm<TreatmentForm>({ defaultValues: blank });
 
-    // ── Effects ─────────────────────────────────────────────────────────────
+    // Typing waits a moment before searching, so each keystroke is not a request.
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setSearch(searchInput.trim());
+            setPage(0);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchInput]);
 
     useEffect(() => {
-        dispatch(treatmentsActions.getTreatments());
-    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+        dispatch(
+            treatmentsActions.getTreatments({
+                page: page + 1,
+                limit: rowsPerPage,
+                search: search || undefined,
+                category: category === 'all' ? undefined : category,
+                isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
+            }),
+        );
+    }, [dispatch, page, rowsPerPage, search, category, statusFilter, reloadKey]);
 
-    // ── Filtered list ───────────────────────────────────────────────────────
+    const saving = create.loading || update.loading;
+    const saveFailure = editing ? update : create;
 
-    const filteredTreatments = useMemo(() => {
-        let result = [...treatments];
-        if (selectedCategory !== 'all') {
-            result = result.filter((tr) => tr.category === selectedCategory);
-        }
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase();
-            result = result.filter(
-                (tr) =>
-                    tr.name.toLowerCase().includes(q) ||
-                    (tr.nameHy || '').toLowerCase().includes(q) ||
-                    (tr.nameRu || '').toLowerCase().includes(q) ||
-                    (tr.code || '').toLowerCase().includes(q),
-            );
-        }
-        return result;
-    }, [treatments, selectedCategory, searchQuery]);
+    // The dialog closes only once the server has accepted the change.
+    useEffect(() => {
+        if (!create.success && !update.success) return;
+        create.clearSuccess();
+        update.clearSuccess();
+        setDialogOpen(false);
+        setEditing(null);
+    }, [create.success, update.success]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    // ── Handlers ────────────────────────────────────────────────────────────
+    useEffect(() => {
+        if (!deactivate.success) return;
+        deactivate.clearSuccess();
+        setDeactivateTarget(null);
+    }, [deactivate.success]); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleViewChange = (_: React.MouseEvent<HTMLElement>, value: 'table' | 'grid' | null) => {
-        if (value) setViewMode(value);
-    };
-
-    const handleOpenCreate = () => {
-        setEditingTreatment(null);
-        reset({
-            name: '',
-            nameHy: '',
-            nameRu: '',
-            category: 'general',
-            code: '',
-            duration: 30,
-            priceAmount: 0,
-            priceCurrency: 'AMD',
-            description: '',
-        });
+    const openCreate = () => {
+        create.clearError();
+        setEditing(null);
+        reset(blank);
         setDialogOpen(true);
     };
 
-    const handleOpenEdit = (treatment: Treatment) => {
-        setEditingTreatment(treatment);
+    const openEdit = (treatment: Treatment) => {
+        update.clearError();
+        setEditing(treatment);
         reset({
             name: treatment.name,
             nameHy: treatment.nameHy || '',
@@ -175,65 +185,39 @@ const TreatmentsPage: React.FC = () => {
             duration: treatment.duration,
             priceAmount: treatment.price.amount,
             priceCurrency: treatment.price.currency,
+            toothStatus: treatment.toothStatus || '',
             description: treatment.description || '',
         });
         setDialogOpen(true);
     };
 
-    const handleCloseDialog = () => {
-        setDialogOpen(false);
-        setEditingTreatment(null);
-        reset();
-    };
-
     const onSubmit = (data: TreatmentForm) => {
-        const payload: Partial<Treatment> = {
-            name: data.name,
-            nameHy: data.nameHy || undefined,
-            nameRu: data.nameRu || undefined,
+        // Empty optional fields are sent as '' when editing, which clears them.
+        const optional = (value: string) => (editing ? value.trim() : value.trim() || undefined);
+        const payload: TreatmentInput = {
+            name: data.name.trim(),
+            nameHy: optional(data.nameHy),
+            nameRu: optional(data.nameRu),
             category: data.category,
-            code: data.code || undefined,
-            duration: data.duration,
-            price: { amount: data.priceAmount, currency: data.priceCurrency },
-            description: data.description || undefined,
+            code: optional(data.code),
+            duration: Number(data.duration),
+            price: { amount: Number(data.priceAmount), currency: data.priceCurrency },
+            toothStatus: editing ? data.toothStatus : data.toothStatus || undefined,
+            description: optional(data.description),
         };
-
-        if (editingTreatment) {
-            dispatch(treatmentsActions.updateTreatment({ id: editingTreatment._id, data: payload }));
-        } else {
-            dispatch(treatmentsActions.createTreatment(payload));
-        }
-        handleCloseDialog();
+        if (editing) dispatch(treatmentsActions.updateTreatment({ id: editing._id, data: payload }));
+        else dispatch(treatmentsActions.createTreatment(payload));
     };
 
-    const handleDeleteConfirm = () => {
-        if (deleteTarget) {
-            dispatch(treatmentsActions.deleteTreatment(deleteTarget._id));
-            setDeleteTarget(null);
-        }
+    const otherNames = (tr: Treatment) => {
+        const shown = localizedTreatmentName(tr);
+        return [tr.name, tr.nameHy, tr.nameRu].filter((n) => n && n !== shown).join(' · ');
     };
 
-    // ── Category chip rendering ─────────────────────────────────────────────
+    const filtered = !!search || category !== 'all' || statusFilter !== 'all';
+    const codeTaken = saveFailure.errorCode === 'treatmentCodeTaken';
 
-    const renderCategoryChip = (category: string) => {
-        const colors = CATEGORY_COLORS[category] || { bg: '#F7FAFC', color: '#A0AEC0' };
-        return (
-            <Chip
-                label={t(`treatments.${category}`)}
-                size="small"
-                sx={{
-                    backgroundColor: colors.bg,
-                    color: colors.color,
-                    fontWeight: 600,
-                    fontSize: 12,
-                }}
-            />
-        );
-    };
-
-    // ── Render ───────────────────────────────────────────────────────────────
-
-    if (isLoading && treatments.length === 0) {
+    if (isLoading && treatments.length === 0 && !filtered && page === 0) {
         return <LoadingSpinner fullPage />;
     }
 
@@ -241,36 +225,19 @@ const TreatmentsPage: React.FC = () => {
         <Box>
             <PageHeader
                 title={t('treatments.title')}
-                actionLabel={t('treatments.addTreatment')}
-                onAction={handleOpenCreate}
-            >
-                <ToggleButtonGroup
-                    value={viewMode}
-                    exclusive
-                    onChange={handleViewChange}
-                    size="small"
-                >
-                    <ToggleButton value="table">
-                        <Tooltip title={t('appointments.listView')}>
-                            <ListIcon />
-                        </Tooltip>
-                    </ToggleButton>
-                    <ToggleButton value="grid">
-                        <Tooltip title="Grid">
-                            <GridViewIcon />
-                        </Tooltip>
-                    </ToggleButton>
-                </ToggleButtonGroup>
-            </PageHeader>
+                subtitle={canEdit ? undefined : t('treatments.viewOnly')}
+                actionLabel={canEdit ? t('treatments.addTreatment') : undefined}
+                onAction={canEdit ? openCreate : undefined}
+            />
 
-            {/* Search + Category filter bar */}
             <Paper sx={{ p: 2, mb: 3 }}>
                 <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'center', mb: 2 }}>
                     <TextField
                         size="small"
-                        placeholder={t('common.search')}
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder={t('treatments.searchPlaceholder')}
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
+                        inputProps={{ maxLength: 100, 'aria-label': t('common.search') }}
                         InputProps={{
                             startAdornment: (
                                 <InputAdornment position="start">
@@ -278,54 +245,60 @@ const TreatmentsPage: React.FC = () => {
                                 </InputAdornment>
                             ),
                         }}
-                        sx={{ minWidth: 240 }}
+                        sx={{ minWidth: 240, flex: { xs: 1, sm: 'none' } }}
                     />
-                    <Box sx={{ flex: 1 }} />
-                    <Typography variant="body2" color="text.secondary">
-                        {filteredTreatments.length} / {total}
-                    </Typography>
-                </Box>
-
-                {/* Category chips (horizontal scrollable) */}
-                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                    <Chip
-                        label={t('common.all')}
+                    <ToggleButtonGroup
+                        exclusive
                         size="small"
-                        variant={selectedCategory === 'all' ? 'filled' : 'outlined'}
-                        color={selectedCategory === 'all' ? 'primary' : 'default'}
-                        onClick={() => setSelectedCategory('all')}
-                    />
-                    {TREATMENT_CATEGORIES.map((cat) => (
+                        value={statusFilter}
+                        onChange={(_, value) => {
+                            if (!value) return;
+                            setStatusFilter(value);
+                            setPage(0);
+                        }}
+                    >
+                        <ToggleButton value="all">{t('common.all')}</ToggleButton>
+                        <ToggleButton value="active">{t('common.active')}</ToggleButton>
+                        <ToggleButton value="inactive">{t('common.inactive')}</ToggleButton>
+                    </ToggleButtonGroup>
+                </Box>
+                <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
+                    {(['all', ...TREATMENT_CATEGORIES] as const).map((cat) => (
                         <Chip
                             key={cat}
-                            label={t(`treatments.${cat}`)}
+                            label={cat === 'all' ? t('common.all') : t(`treatments.${cat}`)}
                             size="small"
-                            variant={selectedCategory === cat ? 'filled' : 'outlined'}
-                            color={selectedCategory === cat ? 'primary' : 'default'}
-                            onClick={() => setSelectedCategory(cat)}
-                            sx={
-                                selectedCategory !== cat
-                                    ? {
-                                        backgroundColor: CATEGORY_COLORS[cat]?.bg,
-                                        color: CATEGORY_COLORS[cat]?.color,
-                                        borderColor: CATEGORY_COLORS[cat]?.color,
-                                    }
-                                    : undefined
-                            }
+                            variant={category === cat ? 'filled' : 'outlined'}
+                            color={category === cat ? 'primary' : 'default'}
+                            onClick={() => {
+                                setCategory(cat);
+                                setPage(0);
+                            }}
                         />
                     ))}
                 </Box>
             </Paper>
 
-            {/* Content */}
-            {filteredTreatments.length === 0 ? (
+            {loadError && !treatments.length ? (
                 <EmptyState
-                    title={t('treatments.noTreatments')}
-                    actionLabel={t('treatments.addTreatment')}
-                    onAction={handleOpenCreate}
+                    title={loadError.error}
+                    actionLabel={t('common.retry')}
+                    onAction={() => setReloadKey((k) => k + 1)}
                 />
-            ) : viewMode === 'table' ? (
-                <TableContainer component={Paper}>
+            ) : treatments.length === 0 ? (
+                filtered ? (
+                    <EmptyState title={t('treatments.noTreatments')} />
+                ) : (
+                    <EmptyState
+                        title={t('treatments.emptyCatalogue')}
+                        description={canEdit ? t('treatments.seedHint') : undefined}
+                        actionLabel={canEdit ? t('treatments.seedDefaults') : undefined}
+                        actionIcon={<SeedIcon />}
+                        onAction={canEdit && !seed.loading ? () => dispatch(treatmentsActions.seedDefaults()) : undefined}
+                    />
+                )
+            ) : (
+                <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
                     <Table>
                         <TableHead>
                             <TableRow>
@@ -333,231 +306,134 @@ const TreatmentsPage: React.FC = () => {
                                 <TableCell>{t('treatments.category')}</TableCell>
                                 <TableCell>{t('treatments.code')}</TableCell>
                                 <TableCell>{t('treatments.duration')}</TableCell>
-                                <TableCell>{t('treatments.price')}</TableCell>
+                                <TableCell align="right">{t('treatments.price')}</TableCell>
+                                <TableCell>{t('treatments.toothStatus')}</TableCell>
                                 <TableCell>{t('common.status')}</TableCell>
-                                <TableCell align="right">{t('common.actions')}</TableCell>
+                                {canEdit && <TableCell align="right">{t('common.actions')}</TableCell>}
                             </TableRow>
                         </TableHead>
                         <TableBody>
-                            {filteredTreatments.map((tr) => (
-                                <TableRow key={tr._id} hover>
-                                    <TableCell>
+                            {treatments.map((tr) => (
+                                <TableRow key={tr._id} hover sx={tr.isActive ? undefined : { opacity: 0.6 }}>
+                                    <TableCell sx={{ minWidth: 200 }}>
                                         <Typography variant="body2" fontWeight={600}>
-                                            {tr.name}
+                                            {localizedTreatmentName(tr)}
                                         </Typography>
-                                        {tr.nameHy && (
+                                        {otherNames(tr) && (
                                             <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                                                {tr.nameHy}
+                                                {otherNames(tr)}
                                             </Typography>
                                         )}
                                     </TableCell>
-                                    <TableCell>{renderCategoryChip(tr.category)}</TableCell>
                                     <TableCell>
-                                        <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
-                                            {tr.code || '-'}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                            <ClockIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                                            <Typography variant="body2">
-                                                {tr.duration} {t('common.minutes').toLowerCase()}
-                                            </Typography>
-                                        </Box>
-                                    </TableCell>
-                                    <TableCell>
-                                        <Typography variant="body2" fontWeight={600}>
-                                            {formatCurrency(tr.price.amount, tr.price.currency)}
-                                        </Typography>
-                                    </TableCell>
-                                    <TableCell>
-                                        <StatusChip
-                                            status={tr.isActive ? 'active' : 'inactive'}
-                                            translationPrefix="common"
+                                        <Chip
+                                            label={t(`treatments.${tr.category}`)}
+                                            size="small"
+                                            variant="outlined"
+                                            sx={{ color: CATEGORY_COLORS[tr.category], borderColor: CATEGORY_COLORS[tr.category], fontWeight: 600 }}
                                         />
                                     </TableCell>
-                                    <TableCell align="right">
-                                        <Tooltip title={t('common.edit')}>
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => handleOpenEdit(tr)}
-                                            >
-                                                <EditIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title={t('common.delete')}>
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => setDeleteTarget(tr)}
-                                            >
-                                                <DeleteIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
+                                    <TableCell sx={{ fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{tr.code || '—'}</TableCell>
+                                    <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                        {t('appointments.minutes', { count: tr.duration })}
                                     </TableCell>
+                                    <TableCell align="right" sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>
+                                        {formatCurrency(tr.price.amount, tr.price.currency)}
+                                    </TableCell>
+                                    <TableCell>{tr.toothStatus ? t(toothStatusKey(tr.toothStatus)) : '—'}</TableCell>
+                                    <TableCell>
+                                        <StatusChip status={tr.isActive ? 'active' : 'inactive'} translationPrefix="common" />
+                                    </TableCell>
+                                    {canEdit && (
+                                        <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>
+                                            <Tooltip title={t('common.edit')}>
+                                                <IconButton size="small" onClick={() => openEdit(tr)} aria-label={t('common.edit')}>
+                                                    <EditIcon fontSize="small" />
+                                                </IconButton>
+                                            </Tooltip>
+                                            {tr.isActive ? (
+                                                <Tooltip title={t('common.deactivate')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => setDeactivateTarget(tr)}
+                                                        aria-label={t('common.deactivate')}
+                                                    >
+                                                        <DeactivateIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            ) : (
+                                                <Tooltip title={t('treatments.reactivate')}>
+                                                    <IconButton
+                                                        size="small"
+                                                        color="primary"
+                                                        onClick={() => dispatch(treatmentsActions.reactivateTreatment(tr._id))}
+                                                        aria-label={t('treatments.reactivate')}
+                                                    >
+                                                        <ReactivateIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                             ))}
                         </TableBody>
                     </Table>
+                    <TablePagination
+                        component="div"
+                        count={total}
+                        page={page}
+                        onPageChange={(_, p) => setPage(p)}
+                        rowsPerPage={rowsPerPage}
+                        onRowsPerPageChange={(e) => {
+                            setRowsPerPage(Number(e.target.value));
+                            setPage(0);
+                        }}
+                        rowsPerPageOptions={[20, 50, 100]}
+                        labelRowsPerPage={t('common.rowsPerPage')}
+                        labelDisplayedRows={({ from, to, count }) => t('common.displayedRows', { from, to, total: count })}
+                    />
                 </TableContainer>
-            ) : (
-                /* Grid view */
-                <Grid container spacing={2}>
-                    {filteredTreatments.map((tr) => (
-                        <Grid item xs={12} sm={6} md={4} lg={3} key={tr._id}>
-                            <Card
-                                variant="outlined"
-                                sx={{
-                                    height: '100%',
-                                    display: 'flex',
-                                    flexDirection: 'column',
-                                    transition: 'box-shadow 0.2s',
-                                    '&:hover': {
-                                        boxShadow: '0 4px 20px rgba(0,0,0,0.08)',
-                                    },
-                                }}
-                            >
-                                <CardContent sx={{ flex: 1 }}>
-                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
-                                        <Typography variant="subtitle1" fontWeight={700} sx={{ flex: 1 }}>
-                                            {tr.name}
-                                        </Typography>
-                                        <StatusChip
-                                            status={tr.isActive ? 'active' : 'inactive'}
-                                            translationPrefix="common"
-                                        />
-                                    </Box>
-
-                                    <Box sx={{ mb: 1.5 }}>
-                                        {renderCategoryChip(tr.category)}
-                                    </Box>
-
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                                        {tr.code && (
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {t('treatments.code')}
-                                                </Typography>
-                                                <Typography variant="caption" sx={{ fontFamily: 'monospace', fontWeight: 600 }}>
-                                                    {tr.code}
-                                                </Typography>
-                                            </Box>
-                                        )}
-
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <Typography variant="caption" color="text.secondary">
-                                                {t('treatments.duration')}
-                                            </Typography>
-                                            <Typography variant="caption" fontWeight={600}>
-                                                {tr.duration} {t('common.minutes').toLowerCase()}
-                                            </Typography>
-                                        </Box>
-
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <Typography variant="caption" color="text.secondary">
-                                                {t('treatments.price')}
-                                            </Typography>
-                                            <Typography variant="body2" fontWeight={700} color="primary.main">
-                                                {formatCurrency(tr.price.amount, tr.price.currency)}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-                                </CardContent>
-
-                                <CardActions sx={{ px: 2, pb: 1.5, pt: 0 }}>
-                                    <Button
-                                        size="small"
-                                        startIcon={<EditIcon />}
-                                        onClick={() => handleOpenEdit(tr)}
-                                    >
-                                        {t('common.edit')}
-                                    </Button>
-                                    <Box sx={{ flex: 1 }} />
-                                    <IconButton
-                                        size="small"
-                                        color="error"
-                                        onClick={() => setDeleteTarget(tr)}
-                                    >
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
-                                </CardActions>
-                            </Card>
-                        </Grid>
-                    ))}
-                </Grid>
             )}
 
-            {/* Add/Edit Treatment Dialog */}
-            <Dialog open={dialogOpen} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-                <form onSubmit={handleSubmit(onSubmit)}>
-                    <DialogTitle>
-                        {editingTreatment ? t('common.edit') : t('treatments.addTreatment')}
-                    </DialogTitle>
+            {/* Create / Edit Dialog */}
+            <Dialog open={dialogOpen} onClose={() => !saving && setDialogOpen(false)} maxWidth="sm" fullWidth>
+                <form onSubmit={handleSubmit(onSubmit)} noValidate>
+                    <DialogTitle>{editing ? t('common.edit') : t('treatments.addTreatment')}</DialogTitle>
                     <DialogContent>
-                        <Grid container spacing={2} sx={{ mt: 0.5 }}>
-                            {/* Name (EN) */}
-                            <Grid item xs={12}>
-                                <Controller
-                                    name="name"
-                                    control={control}
-                                    rules={{ required: t('validation.required') }}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label={`${t('treatments.name')} (EN)`}
-                                            error={!!errors.name}
-                                            helperText={errors.name?.message}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Name (HY) */}
-                            <Grid item xs={12} sm={6}>
-                                <Controller
-                                    name="nameHy"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label={`${t('treatments.name')} (HY)`}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Name (RU) */}
-                            <Grid item xs={12} sm={6}>
-                                <Controller
-                                    name="nameRu"
-                                    control={control}
-                                    render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            fullWidth
-                                            label={`${t('treatments.name')} (RU)`}
-                                        />
-                                    )}
-                                />
-                            </Grid>
-
-                            {/* Category */}
+                        {saveFailure.error && !codeTaken && (
+                            <Alert severity="error" sx={{ mb: 2 }}>
+                                {saveFailure.error}
+                            </Alert>
+                        )}
+                        <Grid container spacing={2} sx={{ mt: 0 }}>
+                            {(['name', 'nameHy', 'nameRu'] as const).map((field) => (
+                                <Grid item xs={12} key={field}>
+                                    <Controller
+                                        name={field}
+                                        control={control}
+                                        rules={field === 'name' ? { validate: (v) => !!v.trim() || t('validation.required') } : undefined}
+                                        render={({ field: f }) => (
+                                            <TextField
+                                                {...f}
+                                                fullWidth
+                                                required={field === 'name'}
+                                                label={t(`treatments.${field}Label`)}
+                                                error={!!errors[field]}
+                                                helperText={errors[field]?.message}
+                                                inputProps={{ maxLength: 200 }}
+                                            />
+                                        )}
+                                    />
+                                </Grid>
+                            ))}
                             <Grid item xs={12} sm={6}>
                                 <Controller
                                     name="category"
                                     control={control}
-                                    rules={{ required: t('validation.required') }}
                                     render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            select
-                                            fullWidth
-                                            label={t('treatments.category')}
-                                            error={!!errors.category}
-                                            helperText={errors.category?.message}
-                                        >
+                                        <TextField {...field} select fullWidth label={t('treatments.category')}>
                                             {TREATMENT_CATEGORIES.map((cat) => (
                                                 <MenuItem key={cat} value={cat}>
                                                     {t(`treatments.${cat}`)}
@@ -567,8 +443,6 @@ const TreatmentsPage: React.FC = () => {
                                     )}
                                 />
                             </Grid>
-
-                            {/* Code */}
                             <Grid item xs={12} sm={6}>
                                 <Controller
                                     name="code"
@@ -578,51 +452,37 @@ const TreatmentsPage: React.FC = () => {
                                             {...field}
                                             fullWidth
                                             label={t('treatments.code')}
-                                            placeholder="D0120"
+                                            error={codeTaken}
+                                            helperText={codeTaken ? saveFailure.error : t('treatments.codeHelper')}
+                                            inputProps={{ maxLength: 40, style: { textTransform: 'uppercase' } }}
                                         />
                                     )}
                                 />
                             </Grid>
-
-                            {/* Duration */}
                             <Grid item xs={12} sm={4}>
                                 <Controller
                                     name="duration"
                                     control={control}
-                                    rules={{
-                                        required: t('validation.required'),
-                                        min: { value: 5, message: 'Min 5' },
-                                    }}
+                                    rules={{ min: { value: 5, message: t('treatments.durationRange') }, max: { value: 480, message: t('treatments.durationRange') } }}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
                                             fullWidth
                                             type="number"
                                             label={t('treatments.duration')}
-                                            InputProps={{
-                                                endAdornment: (
-                                                    <InputAdornment position="end">
-                                                        {t('common.minutes').toLowerCase()}
-                                                    </InputAdornment>
-                                                ),
-                                            }}
                                             error={!!errors.duration}
                                             helperText={errors.duration?.message}
-                                            onChange={(e) => field.onChange(Number(e.target.value))}
+                                            InputProps={{ endAdornment: <InputAdornment position="end">{t('common.minutes').toLowerCase()}</InputAdornment> }}
+                                            inputProps={{ min: 5, max: 480, step: 5 }}
                                         />
                                     )}
                                 />
                             </Grid>
-
-                            {/* Price amount */}
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={7} sm={5}>
                                 <Controller
                                     name="priceAmount"
                                     control={control}
-                                    rules={{
-                                        required: t('validation.required'),
-                                        min: { value: 0, message: 'Min 0' },
-                                    }}
+                                    rules={{ min: { value: 0, message: t('validation.required') } }}
                                     render={({ field }) => (
                                         <TextField
                                             {...field}
@@ -630,36 +490,48 @@ const TreatmentsPage: React.FC = () => {
                                             type="number"
                                             label={t('treatments.price')}
                                             error={!!errors.priceAmount}
-                                            helperText={errors.priceAmount?.message}
-                                            onChange={(e) => field.onChange(Number(e.target.value))}
+                                            inputProps={{ min: 0, step: 'any' }}
                                         />
                                     )}
                                 />
                             </Grid>
-
-                            {/* Currency */}
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={5} sm={3}>
                                 <Controller
                                     name="priceCurrency"
                                     control={control}
                                     render={({ field }) => (
-                                        <TextField
-                                            {...field}
-                                            select
-                                            fullWidth
-                                            label={t('billing.currency')}
-                                        >
-                                            {Object.entries(CURRENCY_SYMBOLS).map(([code, symbol]) => (
+                                        <TextField {...field} select fullWidth label={t('billing.currency')}>
+                                            {CURRENCIES.map((code) => (
                                                 <MenuItem key={code} value={code}>
-                                                    {symbol} {code}
+                                                    {code}
                                                 </MenuItem>
                                             ))}
                                         </TextField>
                                     )}
                                 />
                             </Grid>
-
-                            {/* Description */}
+                            <Grid item xs={12}>
+                                <Controller
+                                    name="toothStatus"
+                                    control={control}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            select
+                                            fullWidth
+                                            label={t('treatments.toothStatus')}
+                                            helperText={t('treatments.toothStatusHelper')}
+                                        >
+                                            <MenuItem value="">{t('dental.noChartChange')}</MenuItem>
+                                            {TOOTH_STATUSES.map((s) => (
+                                                <MenuItem key={s} value={s}>
+                                                    {t(toothStatusKey(s))}
+                                                </MenuItem>
+                                            ))}
+                                        </TextField>
+                                    )}
+                                />
+                            </Grid>
                             <Grid item xs={12}>
                                 <Controller
                                     name="description"
@@ -671,6 +543,7 @@ const TreatmentsPage: React.FC = () => {
                                             multiline
                                             rows={3}
                                             label={t('treatments.description')}
+                                            inputProps={{ maxLength: 2000 }}
                                         />
                                     )}
                                 />
@@ -678,25 +551,27 @@ const TreatmentsPage: React.FC = () => {
                         </Grid>
                     </DialogContent>
                     <DialogActions sx={{ px: 3, pb: 2 }}>
-                        <Button onClick={handleCloseDialog} color="inherit">
+                        <Button onClick={() => setDialogOpen(false)} color="inherit" disabled={saving}>
                             {t('common.cancel')}
                         </Button>
-                        <Button type="submit" variant="contained" disabled={isSaving}>
-                            {t('common.save')}
+                        <Button type="submit" variant="contained" disabled={saving}>
+                            {saving ? t('common.loading') : t('common.save')}
                         </Button>
                     </DialogActions>
                 </form>
             </Dialog>
 
-            {/* Delete confirmation dialog */}
             <ConfirmDialog
-                open={!!deleteTarget}
-                title={t('common.delete')}
-                message={`${t('common.delete')} "${deleteTarget?.name}"?`}
-                confirmLabel={t('common.delete')}
-                onConfirm={handleDeleteConfirm}
-                onCancel={() => setDeleteTarget(null)}
+                open={!!deactivateTarget}
+                title={t('treatments.deactivateTitle')}
+                message={t('treatments.deactivateMessage', {
+                    name: deactivateTarget ? localizedTreatmentName(deactivateTarget) : '',
+                })}
                 variant="danger"
+                confirmLabel={t('common.deactivate')}
+                confirmDisabled={deactivate.loading}
+                onConfirm={() => deactivateTarget && dispatch(treatmentsActions.deleteTreatment(deactivateTarget._id))}
+                onCancel={() => setDeactivateTarget(null)}
             />
         </Box>
     );

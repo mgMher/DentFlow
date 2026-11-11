@@ -34,10 +34,11 @@ import { RootState } from '../../store';
 import { scheduleActions } from '../../store/schedule';
 import { staffActions } from '../../store/staff';
 import { httpActions } from '../../store/http';
-import { PageHeader, EmptyState, LoadingSpinner } from '../../components/ui';
+import { PageHeader, EmptyState, LoadingSpinner, ConfirmDialog } from '../../components/ui';
 import { formatDate, getFullName } from '../../utils/formatters';
 import { staffRefId } from '../../utils/staff';
 import { BLOCKED_TIME_REASONS, BlockedTimeReason, UserProfile } from '../../types';
+import { usePermission } from '../../hooks';
 
 /** `BlockedTime.dentistId` comes back populated, so resolve it before rendering. */
 const blockedDentistName = (dentist: string | UserProfile): string => {
@@ -79,6 +80,16 @@ const SchedulePage: React.FC = () => {
         title: '',
     });
     const [blockedError, setBlockedError] = useState<string | null>(null);
+    const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+    const can = usePermission();
+    const currentUser = useSelector((state: RootState) => state.auth.user);
+    const canManageRooms = can('manageRooms');
+    // Dentists block only their own time (the API enforces it); assistants only view.
+    const isDentist = currentUser?.role === 'dentist';
+    const canBlock = can('manageAppointments');
+    const savingRoom = useSelector((state: RootState) => state.http.loading.includes('CREATE_ROOM'));
+    const savingBlocked = useSelector((state: RootState) => state.http.loading.includes('CREATE_BLOCKED'));
+    const blockableDentists = isDentist ? dentists.filter((d) => staffRefId(d) === currentUser?._id) : dentists;
 
     useEffect(() => {
         dispatch(scheduleActions.getRooms());
@@ -86,12 +97,12 @@ const SchedulePage: React.FC = () => {
         dispatch(staffActions.getDentists());
     }, [dispatch]);
 
-    // Preselect the first dentist once the list arrives.
+    // Preselect the first dentist (a dentist: themselves) once the list arrives.
     useEffect(() => {
-        if (!newBlocked.dentistId && dentists.length > 0) {
-            setNewBlocked((prev) => ({ ...prev, dentistId: staffRefId(dentists[0]) }));
+        if (!newBlocked.dentistId && blockableDentists.length > 0) {
+            setNewBlocked((prev) => ({ ...prev, dentistId: staffRefId(blockableDentists[0]) }));
         }
-    }, [dentists]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [blockableDentists.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // Close room dialog on success
     useEffect(() => {
@@ -152,8 +163,9 @@ const SchedulePage: React.FC = () => {
         );
     };
 
-    const handleDeleteBlocked = (id: string) => {
-        dispatch(scheduleActions.deleteBlocked(id));
+    const confirmDeleteBlocked = () => {
+        if (pendingDelete) dispatch(scheduleActions.deleteBlocked(pendingDelete));
+        setPendingDelete(null);
     };
 
     if (loading && rooms.length === 0) {
@@ -176,14 +188,16 @@ const SchedulePage: React.FC = () => {
                                         {t('settings.rooms')}
                                     </Typography>
                                 </Box>
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    startIcon={<AddIcon />}
-                                    onClick={() => setRoomDialogOpen(true)}
-                                >
-                                    {t('common.add')}
-                                </Button>
+                                {canManageRooms && (
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setRoomDialogOpen(true)}
+                                    >
+                                        {t('common.add')}
+                                    </Button>
+                                )}
                             </Box>
 
                             {rooms.length === 0 ? (
@@ -229,14 +243,16 @@ const SchedulePage: React.FC = () => {
                                         {t('schedule.blockedTimes')}
                                     </Typography>
                                 </Box>
-                                <Button
-                                    variant="contained"
-                                    size="small"
-                                    startIcon={<AddIcon />}
-                                    onClick={() => setBlockedDialogOpen(true)}
-                                >
-                                    {t('common.add')}
-                                </Button>
+                                {canBlock && (
+                                    <Button
+                                        variant="contained"
+                                        size="small"
+                                        startIcon={<AddIcon />}
+                                        onClick={() => setBlockedDialogOpen(true)}
+                                    >
+                                        {t('common.add')}
+                                    </Button>
+                                )}
                             </Box>
 
                             {blockedTimes.length === 0 ? (
@@ -272,13 +288,20 @@ const SchedulePage: React.FC = () => {
                                                         )}
                                                     </TableCell>
                                                     <TableCell align="right">
-                                                        <IconButton
-                                                            size="small"
-                                                            color="error"
-                                                            onClick={() => handleDeleteBlocked(bt._id)}
-                                                        >
-                                                            <DeleteIcon fontSize="small" />
-                                                        </IconButton>
+                                                        {canBlock &&
+                                                            (!isDentist ||
+                                                                (typeof bt.dentistId === 'object'
+                                                                    ? bt.dentistId?._id
+                                                                    : bt.dentistId) === currentUser?._id) && (
+                                                                <IconButton
+                                                                    size="small"
+                                                                    color="error"
+                                                                    aria-label={t('common.delete')}
+                                                                    onClick={() => setPendingDelete(bt._id)}
+                                                                >
+                                                                    <DeleteIcon fontSize="small" />
+                                                                </IconButton>
+                                                            )}
                                                     </TableCell>
                                                 </TableRow>
                                             ))}
@@ -314,7 +337,9 @@ const SchedulePage: React.FC = () => {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setRoomDialogOpen(false)}>{t('common.cancel')}</Button>
-                    <Button variant="contained" onClick={handleCreateRoom}>{t('common.save')}</Button>
+                    <Button variant="contained" onClick={handleCreateRoom} disabled={!newRoom.name.trim() || savingRoom}>
+                        {savingRoom ? t('common.loading') : t('common.save')}
+                    </Button>
                 </DialogActions>
             </Dialog>
 
@@ -327,7 +352,7 @@ const SchedulePage: React.FC = () => {
                             {blockedError}
                         </Alert>
                     )}
-                    {dentists.length === 0 ? (
+                    {blockableDentists.length === 0 ? (
                         <Alert severity="info" sx={{ mt: 1 }}>
                             {t('schedule.noDentists')}
                         </Alert>
@@ -343,7 +368,7 @@ const SchedulePage: React.FC = () => {
                             }
                             sx={{ mt: 1, mb: 2 }}
                         >
-                            {dentists.map((d: any) => (
+                            {blockableDentists.map((d: any) => (
                                 <MenuItem key={d._id} value={staffRefId(d)}>
                                     {d.lastName} {d.firstName}
                                 </MenuItem>
@@ -404,12 +429,21 @@ const SchedulePage: React.FC = () => {
                     <Button
                         variant="contained"
                         onClick={handleCreateBlocked}
-                        disabled={dentists.length === 0}
+                        disabled={blockableDentists.length === 0 || savingBlocked}
                     >
-                        {t('common.save')}
+                        {savingBlocked ? t('common.loading') : t('common.save')}
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            <ConfirmDialog
+                open={!!pendingDelete}
+                title={t('schedule.deleteBlockedTime')}
+                message={t('schedule.deleteBlockedTimeConfirm')}
+                variant="danger"
+                onConfirm={confirmDeleteBlocked}
+                onCancel={() => setPendingDelete(null)}
+            />
         </Box>
     );
 };
