@@ -20,6 +20,7 @@ import {NotificationsModule} from './modules/notifications/notifications.module'
 import {ReportsModule} from './modules/reports/reports.module';
 import {SettingsModule} from './modules/settings/settings.module';
 import {RemindersModule} from './modules/reminders/reminders.module';
+import {DocumentsModule} from './modules/documents/documents.module';
 
 @Module({
     imports: [
@@ -43,6 +44,7 @@ import {RemindersModule} from './modules/reminders/reminders.module';
         ReportsModule,
         SettingsModule,
         RemindersModule,
+        DocumentsModule,
     ],
     providers: [
         {provide: APP_GUARD, useClass: AuthGuard},

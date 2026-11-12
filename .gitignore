@@ -35,3 +35,7 @@ coverage/
 
 # Misc
 *.tsbuildinfo
+
+# Uploaded patient files (F6) — never commit
+uploads/
+backend/uploads/

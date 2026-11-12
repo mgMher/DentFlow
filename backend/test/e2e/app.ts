@@ -3,6 +3,7 @@ import { NestExpressApplication } from '@nestjs/platform-express';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { Connection } from 'mongoose';
+import { rm } from 'fs/promises';
 import { AppModule } from 'src/app.module';
 import { configureApp } from 'src/app.setup';
 
@@ -126,6 +127,7 @@ export async function startApp({ throttle = false } = {}) {
         await Promise.all(connection.modelNames().map((name) => connection.model(name).init()));
         await connection.dropDatabase();
         await app.close();
+        if (process.env.UPLOAD_DIR?.includes('dentflow-e2e-')) await rm(process.env.UPLOAD_DIR, { recursive: true, force: true });
     }
 
     return { app, url, api, call, registerClinic, login, addStaff, addPatient, close };

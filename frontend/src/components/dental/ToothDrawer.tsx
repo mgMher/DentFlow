@@ -49,6 +49,7 @@ import { StatusChip } from '../ui';
 import ToothGlyph from './ToothGlyph';
 import ToothStatusChip from './ToothStatusChip';
 import TreatmentEntryForm from './TreatmentEntryForm';
+import ToothDocuments from '../documents/ToothDocuments';
 
 const EDITOR_SIZE = 120;
 
@@ -288,6 +289,9 @@ const ToothDrawer: React.FC<ToothDrawerProps> = ({ patientId, toothNumber, tooth
                     </AccordionDetails>
                 </Accordion>
             )}
+
+            <Divider sx={{ my: 3 }} />
+            {toothNumber !== null && <ToothDocuments patientId={patientId} toothNumber={toothNumber} />}
 
             <Divider sx={{ my: 3 }} />
             <Typography variant="subtitle2" fontWeight={600} gutterBottom>

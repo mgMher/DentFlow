@@ -674,6 +674,28 @@ Receptionist and admin; a day with cash, card and transfer payments, an advance 
 | Z-11 | Filters | Overdue only; minimum amount; oldest first | Lists narrow / reorder accordingly | PASS (e2e) |
 | Z-12 | Languages | hy / ru / en | All texts translated | PASS (browser hy, audit) |
 
+## 28. F6 — patient documents and X-rays
+
+Receptionist, assistant, dentist; one patient; an X-ray (PNG or JPEG), a PDF and a photo.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| D-01 | Tab | Patient → Documents & X-rays | Empty state with a hint; `?tab=documents` opens it directly | PASS (browser) |
+| D-02 | Upload X-ray | Receptionist: Upload, X-ray, teeth 36, 37, note | Appears first in the grid with date, kind and teeth; toast | PASS (browser + e2e) |
+| D-03 | Several files | Drop a PDF and a photo at once | Both uploaded with the same details; "2 files uploaded" | PASS (browser) |
+| D-04 | Wrong file | A program renamed to `.jpg`; an empty file; a file over the limit | Refused: only JPEG, PNG, WebP, PDF, DICOM / choose a file / too large | PASS (browser + e2e) |
+| D-05 | Real type | A PNG named `.jpg` | Stored and served as PNG | PASS (e2e) |
+| D-06 | Viewer | Open the X-ray; ← / →; open the PDF | Image fits, click zooms; arrows page through; PDF shown in the page | PASS (browser) |
+| D-07 | DICOM | Upload a `.dcm` | Accepted, shown as a file icon; viewer offers download only | PASS (e2e) |
+| D-08 | Download | Download | The same bytes, under the original name | PASS (e2e) |
+| D-09 | Edit | Receptionist on own upload; on another's; dentist on any | Own: Edit shown and saves; another's: refused; dentist: allowed | PASS (browser + e2e) |
+| D-10 | Remove | Receptionist; dentist with a reason | Receptionist has no Remove; dentist removes, reason required; gone from the list, file kept on disk | PASS (browser + e2e) |
+| D-11 | Filters | Kind chips; tooth 36 | Lists narrow; "nothing matches" when empty | PASS (browser + e2e) |
+| D-12 | Tooth drawer | Chart → tooth 36 | "X-rays and files" shows the X-ray; Add opens the upload with 36 filled in; the viewer opens over the drawer | PASS (browser) |
+| D-13 | Other clinic | Another clinic's token | 404 on list, details, file, edit, upload; no token → 401 | PASS (e2e) |
+| D-14 | Phone | 375 px | Grid two across; viewer full screen | PASS (browser) |
+| D-15 | Languages | hy / ru / en | All texts translated | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
@@ -682,7 +704,7 @@ Receptionist and admin; a day with cash, card and transfer payments, an advance 
 |---|---|
 | Platform admin | `Role.SUPER_ADMIN` is declared but unused — no way to list clinics or support a customer |
 | Patient audit | Only **status** changes are audited. Edits to name, phone, medical history are not |
-| Photos | Stored as base64 on the patient document (192px, ~8KB). Fine at this scale; would need a file store if photos get bigger |
+| Photos | Profile photos are still base64 on the patient document (192px, ~8KB). The F6 file store could take them if they get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
 | JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |
 | Mobile layout | Below 900px the sidebar is an overlay drawer opened from the header (M-01–M-04). Pages themselves aren't redesigned for phones: wide tables scroll sideways inside their own box |

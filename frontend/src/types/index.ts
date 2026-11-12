@@ -567,6 +567,22 @@ export interface StatementLine {
     balance: number;
 }
 
+// Patient documents and X-rays (F6)
+export type DocumentKind = 'xray' | 'photo' | 'consent' | 'referral' | 'lab' | 'other';
+
+export interface PatientDocument {
+    _id: string;
+    patientId: string;
+    kind: DocumentKind;
+    title: string;
+    teeth: number[];
+    takenAt: string;
+    notes?: string;
+    file: { originalName: string; mimeType: string; size: number; sha256: string; viewable: boolean };
+    uploadedBy?: PersonRef;
+    createdAt: string;
+}
+
 // Day report and debtors (F5) — amounts in major units
 export interface CashReportLine {
     _id: string;

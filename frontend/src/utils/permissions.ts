@@ -37,6 +37,8 @@ export const PERMISSIONS = {
     editTreatmentPlans: ['super_admin', 'clinic_admin', 'dentist'],
     /** Record the patient's acceptance or refusal — PLAN_DECIDERS */
     decideTreatmentPlans: ['super_admin', 'clinic_admin', 'dentist', 'receptionist'],
+    /** Correct anyone's documents and remove them — documents.service CLINICAL, documents.controller DELETE */
+    manageDocuments: ['super_admin', 'clinic_admin', 'dentist'],
     /** POST/PATCH /appointments */
     manageAppointments: ['clinic_admin', 'dentist', 'receptionist'],
 } as const satisfies Record<string, readonly UserRole[]>;

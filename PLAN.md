@@ -260,7 +260,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F3 | ✅ Appointment reminders (SMS / Telegram) using existing templates — built 2026-11-12, see below | #1 no-show reducer |
 | F4 | ✅ Patient account: running balance, prepayment, one payment across invoices — built 2026-11-12, see below | Real clinics take deposits |
 | F5 | ✅ Daily cash report (Z-report) by method and cashier; debtors list — built 2026-11-12, see below | End-of-day routine |
-| F6 | X-rays / documents per patient and per tooth (file store, not base64) | Every clinic needs it |
+| F6 | ✅ X-rays / documents per patient and per tooth (file store, not base64) — built 2026-11-12, see below | Every clinic needs it |
 | F7 | Audit log: who changed what (patient data, chart, payments, settings) | Medical + money data |
 | F8 | Guardian / family links for children | Pediatric patients |
 | F9 | Password reset by email, 2FA for admins, "log out everywhere" | Security basics |
@@ -332,6 +332,21 @@ Decisions (mine — please check): a day is the clinic's calendar day. Money rec
 - [x] **UI.** Billing gets Invoices · Day report · Debtors tabs (for those who take payments). Day report: day picker, four totals, by method, by cashier, close with counted cash (difference shown live) or the closing with reopen for admins, payments and refunds lists, print. Debtors: filters, total owed and age groups, table linking to each patient's billing
 - [x] Tests: `test/e2e/cash-report.e2e-spec.ts` (14); all 195 e2e and 22 unit tests pass; browser (day of cash / card / transfer / advance / refund; close 500 short; debtors with an old overdue invoice; hy)
 - [ ] Not built: per-cashier shifts / opening float; blocking payments dated into a closed day (they are flagged instead); CSV / Excel export (F11); reminders to debtors (could reuse F3)
+
+### F6 — Patient documents and X-rays — ✅ built 2026-11-12, branch `feat/f6-documents` (stacked on F5)
+
+Decisions (mine — please check): files go to local disk under `UPLOAD_DIR` behind a small storage service (S3 or similar can replace it later without touching the rest), and are served only through the API with the user's token, never as public links. JPEG, PNG, WebP and PDF are shown in the browser; DICOM is accepted but download-only (open it in the X-ray software). Up to 20 MB per file (`DOCUMENTS_MAX_MB`). Every staff member may view and upload; the uploader or a dentist / admin may correct the details; dentists and admins remove, with a reason, and the file is kept. No server-side thumbnails: the browser scales the images.
+
+- [x] **Storage.** `UPLOAD_DIR/<clinic>/<yyyy>/<mm>/<random id>`, written to a temporary file and renamed, so a half-written file never shows; the path never comes from the user's file name; SHA-256 kept with each file. The record is created after the file is stored, and the file is deleted again if that fails
+- [x] **Type from the bytes.** The file's first bytes decide its type (a renamed `.exe` is refused, a PNG called `.jpg` is stored as PNG); the browser's claimed type and the name are ignored. Empty files and files over the limit are refused (`fileRequired`, `413 fileTooLarge`)
+- [x] **API.** `POST /patients/:id/documents` (multipart: file, kind, title, teeth "36,37", date, notes); `GET /patients/:id/documents?kind&tooth` newest first; `GET /documents/:id`; `GET /documents/:id/file` streams it with its type, size and name; `PATCH /documents/:id`; `DELETE /documents/:id` with `{ reason }`. The storage path is never returned. Other clinics get 404 for everything
+- [x] **Kinds.** X-ray, photo, consent form, referral, lab result, other; teeth as FDI numbers (`invalidTooth`)
+- [x] **Removing.** Hidden from the record with who, when and why; the file stays on disk (it is part of the medical record)
+- [x] **UI.** Patient → "Documents & X-rays" tab (`?tab=documents`): filter by kind and tooth, a grid of previews (images shown, PDF / DICOM as icons), upload button. Upload dialog: drop or choose one or more files, kind (guessed from the file), date, title, teeth, notes, progress; with several files a failure names the file and keeps the rest for a retry. Viewer: image (click to zoom to full size) or PDF in the page, ← / → through the list, details, download, edit, remove with a reason; full screen on phones. Tooth drawer on the chart: the tooth's files and "Add" with the tooth filled in
+- [x] Tests: `test/e2e/documents.e2e-spec.ts` (7); all 202 e2e and 22 unit tests pass; browser (receptionist uploads an X-ray for 36 / 37, a PDF and a photo at once, a fake `.jpg` refused; viewer, PDF, arrows; dentist corrects a kind and title, removes with a reason; filters; tooth drawer; hy / ru / en; phone width)
+- [x] **Fixed on the way.** The API client sends JSON by default, which turned the upload form into JSON; uploads now go as multipart
+- [ ] Not built: DICOM viewing in the browser; server-side thumbnails (large X-rays load in full for the grid); S3 / object storage; virus scanning; a per-clinic storage quota; patient photos still base64 on the patient (could move to this store); including documents in an export
+- [ ] Deploy: put `UPLOAD_DIR` on a persistent, backed-up volume (outside the container); without it, files are lost on redeploy
 
 ---
 

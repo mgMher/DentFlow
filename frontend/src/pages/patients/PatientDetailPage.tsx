@@ -50,6 +50,7 @@ import PatientChartTab from './PatientChartTab';
 import PatientTreatmentsTab from './PatientTreatmentsTab';
 import PatientBillingTab from './PatientBillingTab';
 import PatientPlansTab from './PatientPlansTab';
+import PatientDocumentsTab from './PatientDocumentsTab';
 import PatientStatusDialog from './PatientStatusDialog';
 import { ChartType, PATIENT_STATUSES, PatientStatus } from '../../types';
 
@@ -59,7 +60,8 @@ interface TabPanelProps {
     value: number;
 }
 
-const TABS = { profile: 0, chart: 1, treatments: 2, plans: 3, appointments: 4, billing: 5 } as const;
+// Billing stays last: it is the one tab some roles do not get, so the others keep their indexes.
+const TABS = { profile: 0, chart: 1, treatments: 2, plans: 3, appointments: 4, documents: 5, billing: 6 } as const;
 type TabName = keyof typeof TABS;
 
 const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
@@ -309,6 +311,7 @@ const PatientDetailPage: React.FC = () => {
                     <Tab label={t('dental.treatmentsTab')} />
                     <Tab label={t('plans.tab')} />
                     <Tab label={t('patients.appointmentHistory')} />
+                    <Tab label={t('documents.tab')} />
                     {can('viewBilling') && <Tab label={t('patients.billingHistory')} />}
                 </Tabs>
             </Paper>
@@ -336,6 +339,10 @@ const PatientDetailPage: React.FC = () => {
                     patientId={patient._id}
                     bookable={!['archived', 'deceased'].includes(currentStatus)}
                 />
+            </TabPanel>
+
+            <TabPanel value={tabValue} index={TABS.documents}>
+                <PatientDocumentsTab patientId={patient._id} />
             </TabPanel>
 
             {can('viewBilling') && (

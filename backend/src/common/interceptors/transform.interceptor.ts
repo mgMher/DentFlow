@@ -1,4 +1,4 @@
-import { CallHandler, ExecutionContext, Injectable, NestInterceptor } from '@nestjs/common';
+import { CallHandler, ExecutionContext, Injectable, NestInterceptor, StreamableFile } from '@nestjs/common';
 import { Observable, map } from 'rxjs';
 
 export interface ApiResponse<T> {
@@ -8,14 +8,19 @@ export interface ApiResponse<T> {
 }
 
 @Injectable()
-export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T>> {
-    intercept(context: ExecutionContext, next: CallHandler): Observable<ApiResponse<T>> {
+export class TransformInterceptor<T> implements NestInterceptor<T, ApiResponse<T> | StreamableFile> {
+    intercept(context: ExecutionContext, next: CallHandler): Observable<ApiResponse<T> | StreamableFile> {
         return next.handle().pipe(
-            map((data) => ({
-                statusCode: context.switchToHttp().getResponse().statusCode,
-                message: 'Success',
-                data,
-            })),
+            // Files (document downloads) go out as they are, not wrapped in JSON.
+            map((data) =>
+                data instanceof StreamableFile
+                    ? data
+                    : {
+                          statusCode: context.switchToHttp().getResponse().statusCode,
+                          message: 'Success',
+                          data,
+                      },
+            ),
         );
     }
 }

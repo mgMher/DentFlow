@@ -4,6 +4,8 @@
  * can never reach the database or secrets a developer's `.env` points at.
  */
 import { randomBytes } from 'crypto';
+import { tmpdir } from 'os';
+import { join } from 'path';
 
 const base = (process.env.E2E_MONGO_URI || 'mongodb://127.0.0.1:27017').replace(/\/+$/, '');
 const host = new URL(base).hostname;
@@ -24,3 +26,6 @@ delete process.env.TRUST_PROXY;
 process.env.REMINDERS_CRON = 'off';
 delete process.env.TELEGRAM_POLLING;
 delete process.env.PUBLIC_API_URL;
+// Uploaded files go to a throwaway folder (removed when the file's app closes); 1 MB keeps size tests cheap.
+process.env.UPLOAD_DIR = join(tmpdir(), `dentflow-e2e-${randomBytes(4).toString('hex')}`);
+process.env.DOCUMENTS_MAX_MB = '1';
