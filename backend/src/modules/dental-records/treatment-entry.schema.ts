@@ -92,6 +92,22 @@ export class TreatmentEntry {
     @Prop({ enum: Currency })
     currency: Currency;
 
+    /** The treatment plan this item belongs to, if any. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'TreatmentPlan' })
+    planId: Types.ObjectId;
+
+    /** Plan stage (visit 1, 2…) the item is grouped under on the estimate. */
+    @Prop({ type: Number, min: 1, max: 20 })
+    stage: number;
+
+    /** Percent off `cost` agreed in the plan; carried to the invoice line. */
+    @Prop({ type: Number, min: 0, max: 100 })
+    discount: number;
+
+    /** Set when the plan is accepted: `false` for items the patient declined. */
+    @Prop()
+    planAccepted: boolean;
+
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     createdBy: Types.ObjectId;
 
@@ -121,3 +137,4 @@ export const TreatmentEntrySchema = SchemaFactory.createForClass(TreatmentEntry)
 TreatmentEntrySchema.index({ clinicId: 1, patientId: 1, date: -1 });
 TreatmentEntrySchema.index({ clinicId: 1, patientId: 1, teeth: 1 });
 TreatmentEntrySchema.index({ invoiceId: 1 }, { sparse: true });
+TreatmentEntrySchema.index({ planId: 1 }, { sparse: true });

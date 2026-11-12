@@ -33,6 +33,10 @@ export const PERMISSIONS = {
     manageBilling: ['super_admin', 'clinic_admin', 'receptionist'],
     /** Refunds, cancelling issued invoices — BILLING_ADMINS */
     billingAdmin: ['super_admin', 'clinic_admin'],
+    /** Build, price, present, revise, cancel treatment plans — treatment-plans.controller PLAN_EDITORS */
+    editTreatmentPlans: ['super_admin', 'clinic_admin', 'dentist'],
+    /** Record the patient's acceptance or refusal — PLAN_DECIDERS */
+    decideTreatmentPlans: ['super_admin', 'clinic_admin', 'dentist', 'receptionist'],
     /** POST/PATCH /appointments */
     manageAppointments: ['clinic_admin', 'dentist', 'receptionist'],
 } as const satisfies Record<string, readonly UserRole[]>;

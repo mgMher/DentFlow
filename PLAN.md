@@ -255,7 +255,7 @@ built from treatment entries. Reports come after billing because they read billi
 
 | # | Feature | Why |
 |---|---|---|
-| F1 | Treatment plan (planned → accepted → done) with printable estimate | Core dental workflow; drives billing |
+| F1 | ✅ Treatment plan (planned → accepted → done) with printable estimate — built 2026-11-12, see below | Core dental workflow; drives billing |
 | F2 | Week / day calendar per dentist or chair, drag-to-reschedule, slot picker from availability | Reception works in day view |
 | F3 | Appointment reminders (SMS / Telegram) using existing templates | #1 no-show reducer |
 | F4 | Patient account: running balance, prepayment, one payment across invoices | Real clinics take deposits |
@@ -268,6 +268,18 @@ built from treatment entries. Reports come after billing because they read billi
 | F11 | Export reports to Excel/CSV; dentist commission from collected revenue | Owners ask for it |
 | F12 | Periodontal chart, mixed dentition | Specialist clinics |
 | F13 | Platform super-admin (list clinics, support) | Needed to run the SaaS |
+
+### F1 — Treatment plans — ✅ built 2026-11-12, branch `feat/f1-treatment-plans`
+
+Decisions (agreed 2026-11-12): several plans per patient (options); optional stages; acceptance per item; dentists and admins build and price plans, reception also records the patient's answer, assistants view.
+
+- [x] **Model.** `TreatmentPlan` (title, responsible dentist, status, clinic currency, notes, valid-until day, revision, history). Its items are the patient's planned treatment entries (`planId`, `stage`, `discount`, `planAccepted`), so they show on the chart and tooth drawer, are marked done with the usual action (which updates the chart) and are billed like any done entry
+- [x] **Lifecycle.** draft → presented (estimate given, valid 30 days by default) → accepted (declined items voided and kept as "declined"; prices locked) → completed automatically when every accepted item is done. Declined and cancelled are final and take the open items off the chart; done work stays. Revise sends presented / accepted back to draft; duplicate copies any plan into a new draft (option B, or to re-offer a declined plan)
+- [x] **Safety.** Every item write bumps `revision`; acceptance must name the revision the patient was shown, otherwise `409 planChanged`. Status changes are conditional updates (two people accepting at once: one wins). Items only change in a draft (`planNotEditable`)
+- [x] **Money.** Per-item percent discount, rounded exactly as an invoice line rounds it; the invoice editor carries the agreed discount onto the line, so the invoice total equals the estimate (checked to the dram). Prices in the clinic currency; `100.5 AMD` refused (`amountPrecision`)
+- [x] **UI.** Patient → "Treatment plans" tab (cards: status, total, discount, progress, validity; `?tab=plans` links back to it); plan page with stage groups and subtotals, add / edit / remove items (catalogue pick fills name, price and result), present, record acceptance with per-item ticks and a live total, decline / cancel with reason, revise, copy, mark done, history; printable estimate (clinic letterhead, patient, dentist, validity, items by stage, totals, notes, disclaimer, signature lines). Treatments tab links each plan item to its plan
+- [x] Tests: `test/e2e/treatment-plans.e2e-spec.ts` (15); all 136 e2e and 22 unit tests pass; browser in en / hy / ru (create → items → present → accept with one declined → done → completed; invoice from the done items = estimate total; phone width)
+- [ ] Not built: treatment-plan PDF (print-to-PDF works), patient e-signature, per-plan discount ("apply 10% to all"), notifications when a plan is accepted, plans in reports (acceptance rate, planned vs done revenue), adding existing loose planned entries to a plan
 
 ---
 

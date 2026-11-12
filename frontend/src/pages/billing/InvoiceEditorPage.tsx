@@ -188,12 +188,12 @@ const InvoiceEditorPage: React.FC = () => {
         const catalogueOf = (e: TreatmentEntry) => (typeof e.treatmentId === 'object' ? e.treatmentId : undefined);
         const newLines: Line[] = chosen.map((e) => {
             const fromCatalogue = catalogueOf(e);
-            const price =
-                e.cost != null && (e.currency ?? currency) === currency
-                    ? e.cost
-                    : fromCatalogue?.price?.currency === currency
-                      ? fromCatalogue.price.amount
-                      : undefined;
+            const ownPrice = e.cost != null && (e.currency ?? currency) === currency;
+            const price = ownPrice
+                ? e.cost
+                : fromCatalogue?.price?.currency === currency
+                  ? fromCatalogue.price.amount
+                  : undefined;
             const teeth = teethLabel(e.teeth);
             return {
                 key: nextKey++,
@@ -202,7 +202,8 @@ const InvoiceEditorPage: React.FC = () => {
                 description: teeth ? `${e.treatmentName} — ${teeth}` : e.treatmentName,
                 quantity: '1',
                 unitPrice: price != null ? String(price) : '',
-                discount: '0',
+                // A treatment-plan item carries the discount agreed on the estimate.
+                discount: ownPrice && e.discount ? String(e.discount) : '0',
             };
         });
         setLines((prev) => [...prev.filter((l) => l.description.trim() || l.unitPrice.trim()), ...newLines]);

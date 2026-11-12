@@ -24,6 +24,7 @@ npm run test:e2e -- appointments      # one file
 | `payments.e2e-spec.ts` | parallel payments never overpay, parallel voids, pay vs void, pay vs cancel, edit vs issue, invoice status lifecycle, roles, unique invoice numbers |
 | `appointments.e2e-spec.ts` | dentist / room / patient clashes, blocked time, hours, booking and move races, series, status lifecycle and its races |
 | `patients.e2e-spec.ts` | shared family email, archive with cancel, status race, 404 for unknown patients |
+| `treatment-plans.e2e-spec.ts` | roles, draft items and totals, present → accept (per item) → done → completed, invoice = estimate, stale acceptance, accept race, revise, decline, cancel, duplicate, tenancy |
 
 The smoke suites in `test/smoke/` overlap with these; they run against an
 already running API and are handy for checking a deployed environment.

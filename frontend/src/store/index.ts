@@ -13,6 +13,7 @@ import { notificationsReducer, watchNotifications } from './notifications';
 import { reportsReducer, watchReports } from './reports';
 import { settingsReducer, watchSettings } from './settings';
 import { clinicReducer, watchClinic } from './clinic';
+import { treatmentPlansReducer, watchTreatmentPlans } from './treatment-plans';
 import { httpReducer } from './http';
 import { watchHttpToasts } from './http/toasts';
 
@@ -29,6 +30,7 @@ const rootReducer = combineReducers({
     reports: reportsReducer,
     settings: settingsReducer,
     clinic: clinicReducer,
+    treatmentPlans: treatmentPlansReducer,
     http: httpReducer,
 });
 
@@ -48,6 +50,7 @@ function* rootSaga() {
         watchReports(),
         watchSettings(),
         watchClinic(),
+        watchTreatmentPlans(),
         watchHttpToasts(),
     ]);
 }

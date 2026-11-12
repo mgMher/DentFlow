@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useDispatch, useSelector } from 'react-redux';
+import { Link as RouterLink } from 'react-router-dom';
 import {
     Box,
     Button,
@@ -9,6 +10,7 @@ import {
     DialogTitle,
     FormControlLabel,
     IconButton,
+    Link,
     Paper,
     Switch,
     Table,
@@ -167,6 +169,16 @@ const PatientTreatmentsTab: React.FC<{ patientId: string }> = ({ patientId }) =>
                                                 <Typography variant="caption" color="text.secondary" component="div">
                                                     {entry.notes}
                                                 </Typography>
+                                            )}
+                                            {entry.planId && typeof entry.planId === 'object' && (
+                                                <Link
+                                                    component={RouterLink}
+                                                    to={`/patients/${patientId}/plans/${entry.planId._id}`}
+                                                    variant="caption"
+                                                    sx={{ display: 'block' }}
+                                                >
+                                                    {t('plans.fromPlan', { title: entry.planId.title })}
+                                                </Link>
                                             )}
                                             {state === 'voided' && (
                                                 <Typography variant="caption" color="error" component="div">

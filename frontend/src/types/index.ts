@@ -362,6 +362,74 @@ export interface TreatmentEntry {
     voidedAt?: string;
     voidedBy?: PersonRef;
     voidReason?: string;
+    /** The treatment plan this item belongs to (populated with title and status on read). */
+    planId?: string | { _id: string; title: string; status: TreatmentPlanStatus };
+    /** Plan stage (visit 1, 2…). */
+    stage?: number;
+    /** Percent off `cost` agreed in the plan; carried to the invoice line. */
+    discount?: number;
+    /** Set when the plan is accepted: false for items the patient declined. */
+    planAccepted?: boolean;
+}
+
+// Treatment plans (F1) — amounts in major units
+export type TreatmentPlanStatus = 'draft' | 'presented' | 'accepted' | 'completed' | 'declined' | 'cancelled';
+export type TreatmentPlanAction = 'created' | 'presented' | 'accepted' | 'declined' | 'revised' | 'cancelled' | 'completed';
+
+export interface TreatmentPlanSummary {
+    items: number;
+    done: number;
+    declined: number;
+    subtotal: number;
+    discount: number;
+    total: number;
+    doneTotal: number;
+    /** What the patient agreed to; null until accepted. */
+    acceptedTotal: number | null;
+}
+
+export interface TreatmentPlanItem extends TreatmentEntry {
+    /** Price after the item's discount. */
+    net: number;
+    invoiceId?: string | { _id: string; invoiceNumber: string; status: InvoiceStatus };
+}
+
+export interface TreatmentPlan {
+    _id: string;
+    patientId: string;
+    title: string;
+    dentistId: PersonRef;
+    status: TreatmentPlanStatus;
+    currency: Currency;
+    notes?: string;
+    /** Clinic day (YYYY-MM-DD) the estimate is valid until. */
+    validUntil?: string;
+    revision: number;
+    createdBy?: PersonRef;
+    presentedAt?: string;
+    acceptedAt?: string;
+    acceptedBy?: PersonRef;
+    closedAt?: string;
+    closeReason?: string;
+    history?: { action: TreatmentPlanAction; at: string; by?: PersonRef; note?: string }[];
+    createdAt: string;
+    updatedAt: string;
+    summary: TreatmentPlanSummary;
+    /** Only on the single-plan read. */
+    items?: TreatmentPlanItem[];
+}
+
+export interface TreatmentPlanItemInput {
+    teeth: number[];
+    treatmentId?: string;
+    treatmentName: string;
+    surfaces?: ToothSurface[];
+    resultStatus?: ToothStatus;
+    dentistId?: string;
+    cost: number;
+    discount?: number;
+    stage?: number;
+    notes?: string;
 }
 
 // Billing types — amounts arrive in major units (dram, dollars)

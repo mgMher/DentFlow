@@ -30,6 +30,10 @@ const statusColorMap: Record<string, { bg: string; color: string }> = {
     planned: { bg: '#EBF4FF', color: '#3182CE' },
     done: { bg: '#E6FFFA', color: '#0B5E6E' },
     voided: { bg: '#F7FAFC', color: '#718096' },
+    // Treatment plans (draft, completed and cancelled share the colours above)
+    presented: { bg: '#FFFAF0', color: '#ED8936' },
+    accepted: { bg: '#F0FFF4', color: '#38A169' },
+    declined: { bg: '#FFF5F5', color: '#E53E3E' },
 };
 
 const StatusChip: React.FC<StatusChipProps> = ({ status, translationPrefix = 'appointments', label: customLabel, sx, ...props }) => {

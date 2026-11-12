@@ -564,6 +564,30 @@ Log in as the clinic admin. Use the browser's device toolbar at 375×812 (iPhone
 | M-03 | Desktop unchanged | ≥ 900px wide; click ‹ / › at the top of the sidebar | No ☰ button; sidebar sits beside the page and collapses to icons and back as before | — |
 | M-04 | Print from a phone | 375px wide, print an invoice | Only the invoice prints — no header, no drawer | — |
 
+## 23. F1 — treatment plans
+
+Log in as a dentist; for the acceptance steps also try a receptionist. Use a patient with a free tooth 36.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| P-01 | New plan | Patient → Treatment plans → New plan | Title "Option A", you as the dentist; the plan page opens as a draft | PASS (browser) |
+| P-02 | Items | Add a filling on 16 from the catalogue with 10%; a crown on 36 at stage 2; a cleaning (no tooth) | Price filled from the catalogue; line total shown live; table grouped by stage with subtotals; totals = subtotal − discount | PASS (browser) |
+| P-03 | Bad input | Price 100.5 in AMD; discount 101; tooth 19 | Refused with a translated message | PASS (e2e) |
+| P-04 | Edit / remove | Change the cleaning's price; remove it | Totals follow; removal asks first | — |
+| P-05 | Present | Present to patient, keep the default date | Status Presented, valid until +30 days; edit and remove disappear | PASS (browser) |
+| P-06 | Print | Print estimate | Clinic letterhead, patient, dentist, valid until, items by stage, totals, notes, disclaimer, two signature lines; no buttons, no status column, no history | — |
+| P-07 | Accept, one declined | Receptionist: Record acceptance, untick the cleaning | Live accepted total; plan Accepted with who and when; cleaning struck as Declined and gone from the chart | PASS (browser) |
+| P-08 | Changed meanwhile | Two tabs: one revises and adds an item, the other records acceptance | "The plan was changed after it was shown…" | PASS (e2e) |
+| P-09 | Do the work | Mark the filling done, then the crown | Each tooth takes the item's "Tooth becomes" on the chart (36 → crown); after the last one the plan is Completed; history lists every step | PASS (plan completes: browser; chart change: e2e) |
+| P-10 | Bill it | Billing → new invoice for the patient → From treatments | Lines carry the plan's discounts; invoice total = estimate total | PASS (browser) |
+| P-11 | Revise | Revise an accepted plan | Back to draft, acceptance cleared, done items stay done | PASS (e2e) |
+| P-12 | Decline / cancel | Patient declined (with reason); on another, Cancel plan | Final; reason shown; open items off the chart; done items stay | PASS (e2e) |
+| P-13 | Copy | Copy a cancelled plan as new plan | New draft with the same items and discounts, opens at once | PASS (e2e) |
+| P-14 | Roles | Assistant: open a plan; receptionist: try to edit items | Assistant reads only; receptionist can only record the answer and print | PASS (e2e) |
+| P-15 | Expired | A presented plan past its valid-until day | Warning on the plan and the card; answer can still be recorded | — |
+| P-16 | Languages | Plan page, card and Treatments tab in hy / ru / en | All labels translated; Russian plurals ("2 процедуры") | PASS (browser) |
+| P-17 | Archived patient | Archive the patient | "New plan" hidden; the API refuses | PASS (e2e) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

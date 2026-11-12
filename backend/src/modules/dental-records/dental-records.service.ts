@@ -19,6 +19,12 @@ import {
 } from './dental-record.schema';
 import { TreatmentEntry, TreatmentEntryDocument, TreatmentEntryStatus } from './treatment-entry.schema';
 import {
+    TreatmentPlan,
+    TreatmentPlanAction,
+    TreatmentPlanDocument,
+    TreatmentPlanStatus,
+} from './treatment-plan.schema';
+import {
     UpdateToothDto,
     CreateTreatmentEntryDto,
     CompleteTreatmentEntryDto,
@@ -53,6 +59,7 @@ const ENTRY_POPULATE = [
     { path: 'createdBy', select: PERSON },
     { path: 'completedBy', select: PERSON },
     { path: 'voidedBy', select: PERSON },
+    { path: 'planId', select: 'title status' },
 ];
 
 const isDuplicateKey = (err: unknown) => (err as { code?: number })?.code === 11000;
@@ -110,6 +117,8 @@ export class DentalRecordsService implements OnModuleInit {
         private readonly dentalRecordModel: Model<DentalRecordDocument>,
         @InjectModel(TreatmentEntry.name)
         private readonly treatmentEntryModel: Model<TreatmentEntryDocument>,
+        @InjectModel(TreatmentPlan.name)
+        private readonly planModel: Model<TreatmentPlanDocument>,
         @InjectConnection() private readonly connection: Connection,
         private readonly clinicRefs: ClinicRefsService,
     ) {}
@@ -545,6 +554,7 @@ export class DentalRecordsService implements OnModuleInit {
             throw err;
         }
 
+        if (entry.planId) await this.settlePlan(entry.planId, userId);
         return entry.populate(ENTRY_POPULATE);
     }
 
@@ -561,15 +571,40 @@ export class DentalRecordsService implements OnModuleInit {
         userId: Types.ObjectId,
         reason: string,
     ) {
-        const entry = await this.treatmentEntryModel
-            .findOneAndUpdate(
-                { _id: entryId, clinicId, patientId, voidedAt: null, invoiceId: null },
-                { $set: { voidedAt: new Date(), voidedBy: userId, voidReason: reason } },
-                { new: true },
-            )
-            .populate(ENTRY_POPULATE);
+        const entry = await this.treatmentEntryModel.findOneAndUpdate(
+            { _id: entryId, clinicId, patientId, voidedAt: null, invoiceId: null },
+            { $set: { voidedAt: new Date(), voidedBy: userId, voidReason: reason } },
+            { new: true },
+        );
         if (!entry) throw await this.entryStateError(clinicId, patientId, entryId, 'void');
-        return entry;
+        if (entry.planId) await this.settlePlan(entry.planId, userId);
+        return entry.populate(ENTRY_POPULATE);
+    }
+
+    /**
+     * An accepted plan is completed once none of its accepted items is still
+     * to do and at least one was done. Called after an item is done or voided,
+     * and after acceptance.
+     */
+    async settlePlan(planId: Types.ObjectId, userId: Types.ObjectId): Promise<void> {
+        const [open, done] = await Promise.all([
+            this.treatmentEntryModel.exists({
+                planId,
+                status: TreatmentEntryStatus.PLANNED,
+                voidedAt: null,
+                planAccepted: { $ne: false },
+            }),
+            this.treatmentEntryModel.exists({ planId, status: TreatmentEntryStatus.DONE, voidedAt: null }),
+        ]);
+        if (open || !done) return;
+        const now = new Date();
+        await this.planModel.updateOne(
+            { _id: planId, status: TreatmentPlanStatus.ACCEPTED },
+            {
+                $set: { status: TreatmentPlanStatus.COMPLETED, closedAt: now },
+                $push: { history: { action: TreatmentPlanAction.COMPLETED, at: now, by: userId } },
+            },
+        );
     }
 
     /** Why a conditional entry update matched nothing. */

@@ -27,7 +27,7 @@ import {
     WarningAmber as WarningIcon,
 } from '@mui/icons-material';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { patientsActions } from '../../store/patients';
@@ -49,6 +49,7 @@ import PatientAppointmentsTab from './PatientAppointmentsTab';
 import PatientChartTab from './PatientChartTab';
 import PatientTreatmentsTab from './PatientTreatmentsTab';
 import PatientBillingTab from './PatientBillingTab';
+import PatientPlansTab from './PatientPlansTab';
 import PatientStatusDialog from './PatientStatusDialog';
 import { ChartType, PATIENT_STATUSES, PatientStatus } from '../../types';
 
@@ -58,7 +59,8 @@ interface TabPanelProps {
     value: number;
 }
 
-const TABS = { profile: 0, chart: 1, treatments: 2, appointments: 3, billing: 4 } as const;
+const TABS = { profile: 0, chart: 1, treatments: 2, plans: 3, appointments: 4, billing: 5 } as const;
+type TabName = keyof typeof TABS;
 
 const TabPanel: React.FC<TabPanelProps> = ({ children, value, index }) => {
     if (value !== index) return null;
@@ -98,7 +100,13 @@ const PatientDetailPage: React.FC = () => {
         state.http.loading.includes('UPDATE_PATIENT_STATUS'),
     );
 
-    const [tabValue, setTabValue] = useState(0);
+    // `?tab=plans` opens a tab directly (e.g. coming back from a plan).
+    const [searchParams, setSearchParams] = useSearchParams();
+    const tabValue = TABS[searchParams.get('tab') as TabName] ?? TABS.profile;
+    const setTabValue = (index: number) => {
+        const name = (Object.keys(TABS) as TabName[]).find((key) => TABS[key] === index) ?? 'profile';
+        setSearchParams(name === 'profile' ? {} : { tab: name }, { replace: true });
+    };
     const [pendingStatus, setPendingStatus] = useState<PatientStatus | null>(null);
     const can = usePermission();
 
@@ -299,6 +307,7 @@ const PatientDetailPage: React.FC = () => {
                     <Tab label={t('patients.patientProfile')} />
                     <Tab label={t('dental.odontogram')} />
                     <Tab label={t('dental.treatmentsTab')} />
+                    <Tab label={t('plans.tab')} />
                     <Tab label={t('patients.appointmentHistory')} />
                     {can('viewBilling') && <Tab label={t('patients.billingHistory')} />}
                 </Tabs>
@@ -315,6 +324,10 @@ const PatientDetailPage: React.FC = () => {
 
             <TabPanel value={tabValue} index={TABS.treatments}>
                 <PatientTreatmentsTab patientId={patient._id} />
+            </TabPanel>
+
+            <TabPanel value={tabValue} index={TABS.plans}>
+                <PatientPlansTab patientId={patient._id} closed={['archived', 'deceased'].includes(currentStatus)} />
             </TabPanel>
 
             {/* Appointments Tab */}
