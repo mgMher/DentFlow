@@ -20,6 +20,8 @@ import TreatmentsPage from '../pages/treatments/TreatmentsPage';
 import BillingListPage from '../pages/billing/BillingListPage';
 import InvoiceDetailPage from '../pages/billing/InvoiceDetailPage';
 import InvoiceEditorPage from '../pages/billing/InvoiceEditorPage';
+import CashReportPage from '../pages/billing/CashReportPage';
+import DebtorsPage from '../pages/billing/DebtorsPage';
 import TreatmentPlanPage from '../pages/plans/TreatmentPlanPage';
 import StaffListPage from '../pages/staff/StaffListPage';
 import StaffDetailPage from '../pages/staff/StaffDetailPage';
@@ -63,6 +65,8 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     <Route element={<RequirePermission permission="manageBilling" />}>
                         <Route path="/billing/new" element={<InvoiceEditorPage />} />
                         <Route path="/billing/:id/edit" element={<InvoiceEditorPage />} />
+                        <Route path="/billing/cash" element={<CashReportPage />} />
+                        <Route path="/billing/debtors" element={<DebtorsPage />} />
                     </Route>
 
                     <Route path="/staff" element={<StaffListPage />} />

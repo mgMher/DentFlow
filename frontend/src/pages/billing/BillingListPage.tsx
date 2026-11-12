@@ -21,6 +21,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import { billingActions, InvoiceStatusFilter } from '../../store/billing';
 import { PageHeader, EmptyState, LoadingSpinner } from '../../components/ui';
+import BillingNav from '../../components/billing/BillingNav';
 import InvoiceStatusChip from '../../components/billing/InvoiceStatusChip';
 import { usePermission } from '../../hooks';
 import { formatDate, formatCurrency } from '../../utils/formatters';
@@ -80,6 +81,7 @@ const BillingListPage: React.FC = () => {
                 actionLabel={canCreate ? t('billing.createInvoice') : undefined}
                 onAction={canCreate ? () => navigate('/billing/new') : undefined}
             />
+            <BillingNav />
 
             <Paper sx={{ mb: 2 }}>
                 <Tabs

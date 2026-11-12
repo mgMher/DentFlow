@@ -499,7 +499,12 @@
       "mistake": "Entered by mistake"
     },
     "billed": "Billed",
-    "notFound": "Invoice not found"
+    "notFound": "Invoice not found",
+    "sections": {
+      "invoices": "Invoices",
+      "cash": "Day report",
+      "debtors": "Debtors"
+    }
   },
   "staff": {
     "title": "Staff",
@@ -954,7 +959,10 @@
     "creditInsufficient": "That is more than the patient's credit.",
     "creditChanged": "The patient's credit changed meanwhile. Reload and try again.",
     "allocationExceedsPayment": "The parts add up to more than the payment.",
-    "creditApplied": "This money is already on an invoice; void it there."
+    "creditApplied": "This money is already on an invoice; void it there.",
+    "dayInFuture": "A day can be closed only once it has started.",
+    "dayAlreadyClosed": "This day is already closed.",
+    "dayNotClosed": "This day is not closed."
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1178,5 +1186,63 @@
     "refundMessage": "Give {{amount}} back to the patient? It leaves their account.",
     "applyCredit": "Apply credit ({{amount}})",
     "creditApplied": "{{amount}} paid from credit"
+  },
+  "cash": {
+    "title": "Day report",
+    "time": "Time",
+    "patient": "Patient",
+    "refundedBy": "Given back by",
+    "cashier": "Cashier",
+    "onAccount": "On account",
+    "refundedLater": "refunded",
+    "print": "Print",
+    "received": "Received",
+    "refunded": "Refunded",
+    "net": "Net",
+    "expectedCash": "Cash in the drawer",
+    "byMethod": "By payment method",
+    "byCashier": "By cashier",
+    "cashNet": "Cash (net)",
+    "nothing": "Nothing on this day",
+    "closeTitle": "Close the day",
+    "changedSinceClosing": "Payments or refunds on this day changed after it was closed.",
+    "counted": "Cash counted",
+    "expectedAtClosing": "Expected at closing",
+    "difference": "Difference",
+    "closedBy": "Closed by {{name}}, {{date}}",
+    "reopen": "Reopen the day",
+    "countHint": "Count the cash in the drawer",
+    "note": "Note",
+    "closeDay": "Close the day",
+    "payments": "Payments received",
+    "refunds": "Refunds",
+    "closed": "Day closed",
+    "reopened": "Day reopened"
+  },
+  "debtors": {
+    "overdueOnly": "Overdue only",
+    "minAmount": "At least",
+    "sort": "Sort by",
+    "sortAmount": "Largest debt first",
+    "sortAge": "Oldest debt first",
+    "totalOwed": "Owed to the clinic",
+    "patients_one": "{{count}} patient",
+    "patients_other": "{{count}} patients",
+    "afterCredit": "after {{amount}} credit",
+    "byAge": "Age of debt",
+    "age": {
+      "0_30": "Up to 30 days",
+      "31_60": "31–60 days",
+      "61_90": "61–90 days",
+      "90_plus": "Over 90 days"
+    },
+    "ageHint": "Counted from the due date, or the issue date when there is none.",
+    "none": "Nobody owes the clinic money",
+    "owes": "Owes",
+    "oldest": "Oldest debt",
+    "lastPayment": "Last payment",
+    "ofWhichCredit": "{{owed}} − {{credit}} credit",
+    "days_one": "{{count}} day",
+    "days_other": "{{count}} days"
   }
 }

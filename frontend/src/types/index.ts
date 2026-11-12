@@ -567,6 +567,62 @@ export interface StatementLine {
     balance: number;
 }
 
+// Day report and debtors (F5) — amounts in major units
+export interface CashReportLine {
+    _id: string;
+    at: string;
+    patient?: PersonRef & { patronymic?: string };
+    invoiceId: string | null;
+    invoiceNumber: string | null;
+    method: PaymentMethod;
+    amount: number;
+    by: string;
+    /** A payment that was later given back. */
+    refunded: boolean;
+}
+
+export interface CashReport {
+    date: string;
+    currency: Currency;
+    totals: { received: number; refunded: number; net: number; count: number; onAccount: number };
+    expectedCash: number;
+    byMethod: { method: PaymentMethod; received: number; refunded: number; net: number; count: number }[];
+    byCashier: { name: string; received: number; refunded: number; cash: number; count: number }[];
+    payments: CashReportLine[];
+    refunds: CashReportLine[];
+    closure: null | {
+        countedCash: number;
+        expectedCash: number;
+        difference: number;
+        note?: string;
+        closedBy?: PersonRef;
+        closedAt: string;
+        /** Something on this day changed after it was closed. */
+        changed: boolean;
+    };
+}
+
+export type DebtAgeBucket = '0_30' | '31_60' | '61_90' | '90_plus';
+
+export interface Debtor {
+    patient: { _id: string; firstName: string; lastName: string; patronymic?: string; phone?: string; status: PatientStatus };
+    owed: number;
+    credit: number;
+    net: number;
+    invoices: number;
+    oldestDate: string;
+    daysOld: number;
+    overdue: boolean;
+    lastPayment: string | null;
+    byAge: Record<DebtAgeBucket, number>;
+}
+
+export interface DebtorsReport {
+    currency: Currency;
+    totals: { patients: number; owed: number; credit: number; net: number; byAge: Record<DebtAgeBucket, number> };
+    debtors: Debtor[];
+}
+
 // Appointment reminders (F3)
 export type SmsProviderName = 'off' | 'twilio' | 'log';
 export type ReminderRule = 'day_before' | 'hours_before';

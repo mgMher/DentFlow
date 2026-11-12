@@ -4,6 +4,9 @@ import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
 import { AccountController } from './account.controller';
 import { AccountService } from './account.service';
+import { CashController } from './cash.controller';
+import { CashService } from './cash.service';
+import { CashClosure, CashClosureSchema } from './cash-closure.schema';
 import { Invoice, InvoiceSchema } from './invoice.schema';
 import { Payment, PaymentSchema } from './payment.schema';
 import { Patient, PatientSchema } from 'src/modules/patients/patient.schema';
@@ -15,13 +18,14 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
         MongooseModule.forFeature([
             { name: Invoice.name, schema: InvoiceSchema },
             { name: Payment.name, schema: PaymentSchema },
+            { name: CashClosure.name, schema: CashClosureSchema },
             { name: Patient.name, schema: PatientSchema },
             { name: TreatmentEntry.name, schema: TreatmentEntrySchema },
         ]),
         NotificationsModule,
     ],
-    controllers: [BillingController, AccountController],
-    providers: [BillingService, AccountService],
+    controllers: [BillingController, AccountController, CashController],
+    providers: [BillingService, AccountService, CashService],
     exports: [BillingService],
 })
 export class BillingModule {}

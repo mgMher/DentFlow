@@ -259,7 +259,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F2 | ✅ Week / day calendar per dentist or chair, drag-to-reschedule, slot picker from availability — built 2026-11-12, see below | Reception works in day view |
 | F3 | ✅ Appointment reminders (SMS / Telegram) using existing templates — built 2026-11-12, see below | #1 no-show reducer |
 | F4 | ✅ Patient account: running balance, prepayment, one payment across invoices — built 2026-11-12, see below | Real clinics take deposits |
-| F5 | Daily cash report (Z-report) by method and cashier; debtors list | End-of-day routine |
+| F5 | ✅ Daily cash report (Z-report) by method and cashier; debtors list — built 2026-11-12, see below | End-of-day routine |
 | F6 | X-rays / documents per patient and per tooth (file store, not base64) | Every clinic needs it |
 | F7 | Audit log: who changed what (patient data, chart, payments, settings) | Medical + money data |
 | F8 | Guardian / family links for children | Pediatric patients |
@@ -321,6 +321,17 @@ Decisions (made while you were away — please check): money on account is a pay
 - [x] **Fixed on the way.** A payment dated today was stored at midnight and showed before the invoices it paid; today's payments now carry the actual time, and same-moment lines list the charge first
 - [x] Tests: `test/e2e/account.e2e-spec.ts` (19) — allocation, validation, advance payments, applying / splitting / returning / refunding credit, statement, reports adding up, two cashiers at once, credit spent twice at once, roles, tenancy; all 181 e2e and 22 unit tests pass; browser (take payment over two invoices with the rest to credit, apply credit from the invoice page, statement; hy)
 - [ ] Not built: printed receipt for a multi-invoice payment; automatic use of credit when an invoice is issued; credit in another currency; interest / late fees; patient-facing statement print
+
+### F5 — Day report and debtors — ✅ built 2026-11-12, branch `feat/f5-cash-report` (stacked on F4)
+
+Decisions (mine — please check): a day is the clinic's calendar day. Money received that day counts on it, except payments later voided as mistakes (they never happened); refunds count on the day the money went back, under whoever gave it back. Whoever takes payments may close the day; an admin may reopen it. Debtors are open invoices minus credit; age is counted from the due date, or the issue date when there is none, while "overdue" stays as on the invoice list (a due date that has passed).
+
+- [x] **Day report.** `GET /billing/cash-report?date=`: received, refunded, net, payment count, the part on account; per method (cash / card / transfer) and per cashier; the cash that should be in the drawer (cash in − cash refunded); every payment and refund of the day (payments later refunded are marked)
+- [x] **Closing the day.** `POST /billing/cash-report/close` with the cash counted: stores a snapshot (expected, counted, difference, received, refunded, count, note, who) — one per clinic day; the report flags anything dated that day that changes afterwards. `DELETE /billing/cash-report/:date/close` reopens (admins). A day cannot be closed before it starts
+- [x] **Debtors.** `GET /billing/debtors?overdueOnly&minAmount&sort=amount|age`: each patient's owed, credit, net, invoice count, oldest debt and its age in calendar days, overdue flag, last payment; totals by age (≤30, 31–60, 61–90, >90 days)
+- [x] **UI.** Billing gets Invoices · Day report · Debtors tabs (for those who take payments). Day report: day picker, four totals, by method, by cashier, close with counted cash (difference shown live) or the closing with reopen for admins, payments and refunds lists, print. Debtors: filters, total owed and age groups, table linking to each patient's billing
+- [x] Tests: `test/e2e/cash-report.e2e-spec.ts` (14); all 195 e2e and 22 unit tests pass; browser (day of cash / card / transfer / advance / refund; close 500 short; debtors with an old overdue invoice; hy)
+- [ ] Not built: per-cashier shifts / opening float; blocking payments dated into a closed day (they are flagged instead); CSV / Excel export (F11); reminders to debtors (could reuse F3)
 
 ---
 

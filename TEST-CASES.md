@@ -654,6 +654,26 @@ Receptionist; one patient with two issued invoices (e.g. 20 000 and 15 000 ֏).
 | A-11 | Notifications / dashboard | Admin after an advance payment | "Payment on account" notification and activity open the patient's billing | — |
 | A-12 | Languages | hy / ru / en | All account texts translated | PASS (browser hy, audit) |
 
+
+## 27. F5 — day report and debtors
+
+Receptionist and admin; a day with cash, card and transfer payments, an advance payment and a refund.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| Z-01 | Tabs | Billing as receptionist; as dentist | Invoices · Day report · Debtors; a dentist sees invoices only, the API refuses the others | PASS (browser + e2e) |
+| Z-02 | Totals | Day report for today | Received, refunded, net, payment count, part on account | PASS (browser + e2e) |
+| Z-03 | Method and cashier | Same | Per method; per cashier, with refunds under who gave the money back | PASS (browser + e2e) |
+| Z-04 | Mistakes | Void a payment as a mistake | It leaves the day's received money | PASS (e2e) |
+| Z-05 | Other days | Pick yesterday; pick a future day | Yesterday's own figures; the day picker stops at today | PASS (e2e) |
+| Z-06 | Close | Count the drawer short by 500; close | Difference −500 shown before and after closing, with who and when | PASS (browser) |
+| Z-07 | After closing | Take a payment on the closed day | "Changed after it was closed" warning; figures at closing kept | PASS (e2e) |
+| Z-08 | Reopen | Admin: Reopen; receptionist | Admin reopens and can close again; receptionist has no button | PASS (e2e) |
+| Z-09 | Print | Print | Report with the date, no buttons | — |
+| Z-10 | Debtors | Billing → Debtors | Who owes, net of credit, largest first; fully paid and credit-only patients absent; age groups add up | PASS (browser + e2e) |
+| Z-11 | Filters | Overdue only; minimum amount; oldest first | Lists narrow / reorder accordingly | PASS (e2e) |
+| Z-12 | Languages | hy / ru / en | All texts translated | PASS (browser hy, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
