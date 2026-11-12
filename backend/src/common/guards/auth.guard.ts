@@ -45,7 +45,7 @@ export class AuthGuard implements CanActivate {
         // A token from before per-device sessions has no `sid`; it fails here
         // and the client signs in again once.
         const [user, sessionLive] = await Promise.all([
-            this.userModel.findById(payload.userId).select('isActive role clinicId').lean(),
+            this.userModel.findById(payload.userId).select('isActive role clinicId firstName lastName').lean(),
             payload.sid ? this.sessions.isActive(payload.sid) : Promise.resolve(false),
         ]);
 
@@ -65,6 +65,8 @@ export class AuthGuard implements CanActivate {
             email: payload.email,
             role: payload.role,
             sessionId: payload.sid,
+            // For the audit log: the name at the time of the action.
+            name: [user.firstName, user.lastName].filter(Boolean).join(' '),
         };
 
         return true;

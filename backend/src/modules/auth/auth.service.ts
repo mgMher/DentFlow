@@ -20,6 +20,7 @@ import { UserProfile, UserProfileDocument } from '../users/user.schema';
 import { TreatmentsService } from '../treatments/treatments.service';
 import { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
 import { SessionMeta, SessionsService } from './sessions.service';
+import { AuditService } from '../audit/audit.service';
 
 export const PASSWORD_HASH_COST = 12;
 
@@ -43,6 +44,7 @@ export class AuthService implements OnModuleInit {
         private readonly sessions: SessionsService,
         private readonly treatmentsService: TreatmentsService,
         @InjectConnection() private readonly connection: Connection,
+        private readonly audit: AuditService,
     ) {}
 
     /**
@@ -130,6 +132,7 @@ export class AuthService implements OnModuleInit {
         }
 
         const tokens = await this.sessions.start(user, meta);
+        await this.auditSignIn('auth.register', user, meta);
         return { ...tokens, user: this.sanitizeUser(user) };
     }
 
@@ -137,6 +140,7 @@ export class AuthService implements OnModuleInit {
         const user = await this.userModel.findOne({ email: dto.email.toLowerCase() });
 
         if (user?.lockedUntil && user.lockedUntil > new Date()) {
+            await this.auditSignIn('auth.loginFailed', user, meta, { reason: 'locked' });
             throw this.lockedError(user.lockedUntil);
         }
 
@@ -146,11 +150,16 @@ export class AuthService implements OnModuleInit {
         const isPasswordValid = !!user?.password && (await bcrypt.compare(dto.password, user.password));
 
         if (!user || !isPasswordValid) {
-            if (user) await this.recordFailedLogin(user._id);
+            // An unknown email belongs to no clinic, so there is no clinic log to put it in.
+            if (user) {
+                await this.recordFailedLogin(user._id);
+                await this.auditSignIn('auth.loginFailed', user, meta, { reason: 'wrongPassword' });
+            }
             throw new UnauthorizedException(errorBody('invalidCredentials', 'Invalid email or password'));
         }
 
         if (!user.isActive) {
+            await this.auditSignIn('auth.loginFailed', user, meta, { reason: 'deactivated' });
             throw new UnauthorizedException(errorBody('accountDeactivated', 'Account is deactivated'));
         }
 
@@ -160,7 +169,21 @@ export class AuthService implements OnModuleInit {
         );
 
         const tokens = await this.sessions.start(user, meta);
+        await this.auditSignIn('auth.login', user, meta);
         return { ...tokens, user: this.sanitizeUser(user) };
+    }
+
+    /** Sign-ins happen before there is a signed-in user, so they are logged here rather than by the audit interceptor. */
+    private auditSignIn(event: string, user: UserDocument, meta: SessionMeta, details?: Record<string, unknown>) {
+        if (!user.clinicId) return Promise.resolve();
+        return this.audit.record({
+            clinicId: user.clinicId,
+            actor: { kind: 'staff', userId: user._id, name: [user.firstName, user.lastName].filter(Boolean).join(' '), role: user.role },
+            event,
+            details: { email: user.email, ...details },
+            ip: meta.ip,
+            userAgent: meta.userAgent,
+        });
     }
 
     /** Rotate the refresh token; role and active status are re-read from the account. */

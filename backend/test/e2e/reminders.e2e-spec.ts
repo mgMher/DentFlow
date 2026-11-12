@@ -146,6 +146,11 @@ describe('Reminders (e2e)', () => {
             const stored = await settingsModel.findOne({}).lean();
             expect(stored!.telegramBotTokenSealed).toBeDefined();
             expect(stored!.telegramBotTokenSealed).not.toContain(GOOD_TOKEN);
+            // F7: the audit log says the token changed, never what it is.
+            const log = (await t.api.get('/audit?area=reminders&limit=1', C.token)).data.items[0];
+            expect(log.event).toBe('reminders.updateSettings');
+            expect(log.changes).toEqual(expect.arrayContaining([{ field: 'telegramBotToken', masked: true }]));
+            expect(JSON.stringify(log)).not.toContain(GOOD_TOKEN);
         });
 
         it('Twilio credentials: the auth token is kept sealed; night-time sending is refused', async () => {
@@ -320,7 +325,14 @@ describe('Reminders (e2e)', () => {
             await settle();
             expect((await t.api.get(`/appointments/${a._id}`, C.token)).data.status).toBe('confirmed');
             const calls = fake.calls.slice(before).map((c) => c.method);
-            expect(calls).toEqual(expect.arrayContaining(['answerCallbackQuery', 'editMessageText']));
+            expect(calls).toEqual(expect.arrayContaining(['answerCallbackQuery', 'editMessageText']));            // F7: logged as the patient's own action.
+            const log = (await t.api.get(`/patients/${patient._id}/history?limit=1`, C.token)).data.items[0];
+            expect(log).toMatchObject({
+                event: 'appointments.patientConfirmed',
+                actor: { kind: 'patient' },
+                targetId: a._id,
+                changes: [{ field: 'status', from: 'scheduled', to: 'confirmed' }],
+            });
         });
 
         it('"I can\'t come" cancels with the reason and tells the front desk', async () => {
@@ -332,7 +344,8 @@ describe('Reminders (e2e)', () => {
             expect(after.cancelReason).toBe('patient_request');
             expect(after.cancelNote).toBe('Telegram');
             const note = (await t.api.get('/notifications?limit=1', recep.token)).data.data[0];
-            expect(note).toMatchObject({ type: 'appointment_cancelled', relatedId: a._id });
+            expect(note).toMatchObject({ type: 'appointment_cancelled', relatedId: a._id });            const log = (await t.api.get(`/patients/${patient._id}/history?limit=1`, C.token)).data.items[0];
+            expect(log).toMatchObject({ event: 'appointments.patientCancelled', actor: { kind: 'patient' }, targetId: a._id });
         });
 
         it("another patient's chat cannot answer; nor after the visit is closed", async () => {

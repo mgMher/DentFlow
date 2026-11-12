@@ -21,6 +21,7 @@ import {ReportsModule} from './modules/reports/reports.module';
 import {SettingsModule} from './modules/settings/settings.module';
 import {RemindersModule} from './modules/reminders/reminders.module';
 import {DocumentsModule} from './modules/documents/documents.module';
+import {AuditModule} from './modules/audit/audit.module';
 
 @Module({
     imports: [
@@ -29,6 +30,7 @@ import {DocumentsModule} from './modules/documents/documents.module';
         MongooseModule.forRootAsync({useFactory: getDatabaseConfig}),
         MigrationsModule,
         ClinicRefsModule,
+        AuditModule,
         // Applied per route (auth endpoints), not globally.
         ThrottlerModule.forRoot({ttl: 60, limit: 100}),
         AuthModule,

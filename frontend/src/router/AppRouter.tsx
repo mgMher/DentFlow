@@ -29,6 +29,7 @@ import ReportsPage from '../pages/reports/ReportsPage';
 import SettingsPage from '../pages/settings/SettingsPage';
 import SchedulePage from '../pages/schedule/SchedulePage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
+import AuditLogPage from '../pages/audit/AuditLogPage';
 
 interface AppRouterProps {
     themeMode: 'light' | 'dark';
@@ -79,6 +80,9 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     <Route path="/notifications" element={<NotificationsPage />} />
                     <Route element={<RequirePermission permission="manageClinic" />}>
                         <Route path="/settings" element={<SettingsPage />} />
+                    </Route>
+                    <Route element={<RequirePermission permission="viewAuditLog" />}>
+                        <Route path="/audit" element={<AuditLogPage />} />
                     </Route>
 
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />

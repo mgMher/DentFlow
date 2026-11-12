@@ -16,6 +16,7 @@ import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagg
 import { Types } from 'mongoose';
 import { CurrentUser, Role, Roles } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
+import { AuditView } from '../audit/audit.decorators';
 import { DocumentsService, UploadedFile } from './documents.service';
 import { maxUploadBytes } from './file-types';
 import { QueryDocumentsDto, RemoveDocumentDto, UpdateDocumentDto, UploadDocumentDto } from './dto/documents.dto';
@@ -63,6 +64,7 @@ export class DocumentsController {
     }
 
     @Get('documents/:id/file')
+    @AuditView()
     @ApiOperation({ summary: 'The file itself; only through the API, never a public link' })
     async file(@CurrentUser('clinicId') clinicId: string, @Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
         const f = await this.documents.file(oid(clinicId), id);

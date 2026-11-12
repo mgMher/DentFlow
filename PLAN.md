@@ -261,7 +261,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F4 | ✅ Patient account: running balance, prepayment, one payment across invoices — built 2026-11-12, see below | Real clinics take deposits |
 | F5 | ✅ Daily cash report (Z-report) by method and cashier; debtors list — built 2026-11-12, see below | End-of-day routine |
 | F6 | ✅ X-rays / documents per patient and per tooth (file store, not base64) — built 2026-11-12, see below | Every clinic needs it |
-| F7 | Audit log: who changed what (patient data, chart, payments, settings) | Medical + money data |
+| F7 | ✅ Audit log: who changed what (patient data, chart, payments, settings) — built 2026-11-12, see below | Medical + money data |
 | F8 | Guardian / family links for children | Pediatric patients |
 | F9 | Password reset by email, 2FA for admins, "log out everywhere" | Security basics |
 | F10 | e-HDM fiscal receipt (Armenia) | Legal requirement for cash |
@@ -347,6 +347,21 @@ Decisions (agreed 2026-11-12): files go to local disk under `UPLOAD_DIR` behind 
 - [x] **Fixed on the way.** The API client sends JSON by default, which turned the upload form into JSON; uploads now go as multipart
 - [ ] Not built: DICOM viewing in the browser; server-side thumbnails (large X-rays load in full for the grid); S3 / object storage; virus scanning; a per-clinic storage quota; patient photos still base64 on the patient (could move to this store); including documents in an export
 - [ ] Deploy: put `UPLOAD_DIR` on a persistent, backed-up volume (outside the container); without it, files are lost on redeploy
+
+### F7 — Audit log — ✅ built 2026-11-12, branch `feat/f7-audit-log` (stacked on F6)
+
+Decisions (agreed 2026-11-12): every write is logged, with old → new values for the important records; sign-ins (and failed ones) and opening patient documents are logged too, but not ordinary page views; admins see the whole clinic's log, dentists a patient's history, reception and assistants neither; entries are kept forever and cannot be edited or deleted.
+
+- [x] **Capture.** A global interceptor logs every successful write by a signed-in user as `area.action` (e.g. `patients.update`, `billing.voidPayment`; 76 actions over 13 areas): who (account, name and role at the time), when, IP and browser, the record, the patient it belongs to, and a few identifying values (invoice number, amount and currency, reason, title…). Failed requests change nothing and are not logged. Every controller must be given an area or marked "not logged" — a unit test fails otherwise
+- [x] **Old → new.** For patient details and medical history (one level into objects: `medicalHistory.allergies`), patient status, the chart (per tooth: status, surfaces, notes), appointments (time, dentist, room, status), invoices (status, total, paid — in normal units, not cents), documents, staff (role, active, hours), clinic details / hours / settings, catalogue prices, rooms, message templates and reminder settings: the record is read before and after the change and each changed field kept. Photos and secrets (bot / Twilio tokens, passwords) only say "changed"; long values are cut
+- [x] **Explicit events.** Sign-in, failed sign-in (wrong password / locked / deactivated; an unknown email belongs to no clinic and is not logged), registration — logged by the auth service. A patient's "I will come" / "I can't come" in Telegram is logged with the patient as the actor. Opening a document's file is logged (`@AuditView`)
+- [x] **Not logged.** Reads, token refresh, my own notifications, the Telegram webhook itself, background reminder sends (they have their own delivery log)
+- [x] **Append-only.** No API to change or delete entries; the model refuses updates and deletes
+- [x] **API.** `GET /audit?from&to&userId&area&patientId&before&limit` (admins; clinic days; newest first; `before` pages); `GET /patients/:id/history` (admins and dentists)
+- [x] **UI.** "Audit log" in the menu for admins: filters (dates, who, area, patient), entries grouped by day with the action, the person and role, the patient (link), details and each change as old → new in the user's language (statuses, roles, tooth states, surfaces, payment methods translated), "show older". Patient → "History" tab for admins and dentists
+- [x] Tests: `test/e2e/audit.e2e-spec.ts` (14) and audit checks in the reminders tests (masked token, Telegram answers); `audit.config.spec.ts` (6 unit); all 216 e2e and 28 unit tests pass; every patient-related action in the test suite is linked to its patient; browser (receptionist / dentist / admin, filters, paging, hy / ru / en, phone width)
+- [ ] Not built: export of the log (CSV, F11); the dashboard's recent activity still rebuilds from records (could read the log now); logging page views of patient records; a retention period (kept forever by decision); platform-wide log across clinics (F13); undo from the log
+- [ ] Note: the log only covers changes made through the API from now on — nothing before this release, and not direct database edits or migrations
 
 ---
 

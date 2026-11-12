@@ -567,6 +567,35 @@ export interface StatementLine {
     balance: number;
 }
 
+// Audit log (F7)
+export interface AuditChange {
+    field: string;
+    from?: unknown;
+    to?: unknown;
+    /** A secret or picture: only the fact that it changed. */
+    masked?: boolean;
+}
+
+export interface AuditEntry {
+    _id: string;
+    at: string;
+    event: string;
+    area: string;
+    method?: string;
+    targetId?: string;
+    patientId?: { _id: string; firstName: string; lastName: string; patronymic?: string } | null;
+    actor: { kind: 'staff' | 'patient' | 'system'; userId?: string; name?: string; role?: UserRole };
+    changes?: AuditChange[];
+    details?: Record<string, string | number | boolean>;
+    ip?: string;
+    userAgent?: string;
+}
+
+export interface AuditPage {
+    items: AuditEntry[];
+    next: string | null;
+}
+
 // Patient documents and X-rays (F6)
 export type DocumentKind = 'xray' | 'photo' | 'consent' | 'referral' | 'lab' | 'other';
 

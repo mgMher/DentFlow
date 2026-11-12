@@ -16,6 +16,7 @@ import {
     Settings as SettingsIcon,
     Schedule as ScheduleIcon,
     Notifications as NotificationsIcon,
+    ManageSearch as AuditIcon,
     ChevronLeft as CollapseIcon,
     ChevronRight as ExpandIcon,
 } from '@mui/icons-material';
@@ -42,6 +43,7 @@ const navItems: NavItem[] = [
     { path: '/reports', labelKey: 'nav.reports', icon: <ReportsIcon />, permission: 'viewReports' },
     { path: '/notifications', labelKey: 'nav.notifications', icon: <NotificationsIcon /> },
     { path: '/settings', labelKey: 'nav.settings', icon: <SettingsIcon />, permission: 'manageClinic' },
+    { path: '/audit', labelKey: 'nav.audit', icon: <AuditIcon />, permission: 'viewAuditLog' },
 ];
 
 interface SidebarProps {

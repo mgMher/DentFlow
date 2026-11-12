@@ -696,6 +696,29 @@ Receptionist, assistant, dentist; one patient; an X-ray (PNG or JPEG), a PDF and
 | D-14 | Phone | 375 px | Grid two across; viewer full screen | PASS (browser) |
 | D-15 | Languages | hy / ru / en | All texts translated | PASS (browser, audit) |
 
+## 29. F7 — audit log
+
+Admin, dentist, receptionist; one patient.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| L-01 | Who sees what | Menu and patient tabs as admin, dentist, receptionist; open `/audit` directly | Admin: "Audit log" in the menu and a History tab; dentist: History tab only; receptionist: neither, `/audit` goes to the dashboard; the API refuses the same | PASS (browser + e2e) |
+| L-02 | Patient change | Receptionist changes a phone and the city | Entry with name, role, time, IP; Phone and Address · City old → new | PASS (browser + e2e) |
+| L-03 | Medical history, photo | Admin adds an allergy and a photo | `Medical history · Allergies` — → latex; Photo "changed", no picture stored | PASS (e2e) |
+| L-04 | Chart | Dentist marks 36 decayed with an occlusal surface | Tooth 36 · Status Healthy → Decayed, Surfaces, Notes; translated | PASS (browser + e2e) |
+| L-05 | Money | Invoice, payment, void as a mistake; a USD clinic | Invoice number, amount with currency, paid 0 → 5 000, status Issued → Partial, void with its reason; USD amounts not in cents | PASS (e2e) |
+| L-06 | Settings | Clinic language, a staff role, a catalogue price, a reschedule | Each old → new | PASS (e2e) |
+| L-07 | Secrets | Save a Telegram bot token | "changed", the token nowhere in the log | PASS (e2e) |
+| L-08 | Sign-ins | Sign in; wrong password; unknown email | Sign-in and failed sign-in with the reason; nothing for an unknown email; no password stored | PASS (browser + e2e) |
+| L-09 | Telegram answers | Patient confirms / cancels in Telegram | Logged as the patient, status old → new | PASS (e2e) |
+| L-10 | Documents | Open a patient's X-ray | "Opened a document" with its title, on the patient's history | PASS (e2e) |
+| L-11 | Not logged | Browse, refresh the session, a refused or invalid change, mark notifications read | No entries | PASS (e2e) |
+| L-12 | Filters | Dates, who, area, patient; Clear | List narrows; the request carries the filter | PASS (browser + e2e) |
+| L-13 | Paging | More than 50 entries | 50 shown, "Show older" adds the rest, then "That's everything" | PASS (browser + e2e) |
+| L-14 | Cannot change | Try PATCH / DELETE on an entry; update through the model | 404; refused | PASS (e2e) |
+| L-15 | Other clinic | Another clinic's admin | Sees only its own entries; the patient's history is 404 | PASS (e2e) |
+| L-16 | Languages, phone | hy / ru / en; 375 px | All texts translated, day headers with lower-case months; no sideways scroll | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
@@ -703,7 +726,7 @@ Receptionist, assistant, dentist; one patient; an X-ray (PNG or JPEG), a PDF and
 | Area | Note |
 |---|---|
 | Platform admin | `Role.SUPER_ADMIN` is declared but unused — no way to list clinics or support a customer |
-| Patient audit | Only **status** changes are audited. Edits to name, phone, medical history are not |
+| Audit log | Every change through the app is logged since F7, with old → new values for key records. Changes before F7, or made directly in the database, are not |
 | Photos | Profile photos are still base64 on the patient document (192px, ~8KB). The F6 file store could take them if they get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |
 | JWT secrets | `backend/.env` has dev placeholders. Production startup refuses missing, short (<32) or identical secrets when `MODE=PROD` |

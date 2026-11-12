@@ -40,6 +40,7 @@ import {
 import { ChannelError, maskPhone, SmsSender, TelegramBot, TelegramButton, TwilioSms } from './channels';
 import { displayDate, fill, Lang, langOf, message, REMINDER_PLACEHOLDERS } from './messages';
 import { PatientRemindersDto, TestReminderDto, UpdateReminderSettingsDto } from './dto/reminders.dto';
+import { AuditService } from '../audit/audit.service';
 
 const oid = (id: string | Types.ObjectId) => new Types.ObjectId(id.toString());
 const BOT_TOKEN = 'telegram-bot-token';
@@ -82,6 +83,7 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         private readonly appointments: AppointmentsService,
         private readonly notifications: NotificationsService,
         private readonly clinicRefs: ClinicRefsService,
+        private readonly audit: AuditService,
     ) {}
 
     // ── Settings ─────────────────────────────────────────────────────────────
@@ -504,9 +506,20 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         }
 
         let reply: string;
+        const auditAnswer = (event: string, to: AppointmentStatus) =>
+            this.audit.record({
+                clinicId: clinic._id,
+                actor: { kind: 'patient', name: [patient.firstName, patient.lastName].filter(Boolean).join(' ') },
+                event,
+                targetId: appointment._id,
+                patientId: patient._id,
+                changes: [{ field: 'status', from: appointment.status, to }],
+                details: { channel: 'telegram', startTime: appointment.startTime.toISOString() },
+            });
         if (action === 'c') {
             if (appointment.status === AppointmentStatus.SCHEDULED) {
                 await this.appointments.updateStatus(clinic._id.toString(), appointment._id, AppointmentStatus.CONFIRMED);
+                await auditAnswer('appointments.patientConfirmed', AppointmentStatus.CONFIRMED);
             }
             reply = message('confirmed', lang, vars);
         } else {
@@ -514,6 +527,7 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
                 reason: CancelReason.PATIENT_REQUEST,
                 note: 'Telegram',
             });
+            await auditAnswer('appointments.patientCancelled', AppointmentStatus.CANCELLED);
             await this.notifications.notify({
                 clinicId: clinic._id,
                 recipients: await this.notifications.staffWithRoles(clinic._id, [Role.CLINIC_ADMIN, Role.RECEPTIONIST]),
