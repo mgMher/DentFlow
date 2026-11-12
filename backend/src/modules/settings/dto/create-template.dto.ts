@@ -26,7 +26,7 @@ export class CreateTemplateDto {
 
     @ApiProperty({
         example: 'Dear {{patientName}}, your appointment is on {{date}} at {{time}} with Dr. {{dentistName}}.',
-        description: 'Template body with placeholders: {{patientName}}, {{date}}, {{time}}, {{dentistName}}',
+        description: 'Template body. Reminders fill {{patient}}, {{date}}, {{time}}, {{dentist}}, {{clinic}}, {{address}}, {{phone}} ({{patientName}} and {{dentistName}} also work)',
     })
     @IsNotEmpty()
     @IsString()

@@ -49,6 +49,7 @@ import { DAYS_OF_WEEK, LANGUAGES, CURRENCY_SYMBOLS } from '../../utils/constants
 import { Currency, WorkingHour, TreatmentRoom } from '../../types';
 import { useHttpState } from '../../hooks';
 import { isArmenianPhone } from '../../utils/validators';
+import RemindersTab from './RemindersTab';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -311,6 +312,7 @@ const SettingsPage: React.FC = () => {
                     <Tab label={t('settings.rooms')} />
                     <Tab label={t('settings.notifications')} />
                     <Tab label={t('settings.regional')} />
+                    <Tab label={t('reminders.title')} />
                 </Tabs>
             </Paper>
 
@@ -802,6 +804,10 @@ const SettingsPage: React.FC = () => {
                         </Button>
                     </Box>
                 </Paper>
+            </TabPanel>
+            {/* ── Reminders Tab ── */}
+            <TabPanel value={activeTab} index={5}>
+                <RemindersTab />
             </TabPanel>
         </Box>
     );

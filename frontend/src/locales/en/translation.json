@@ -936,7 +936,13 @@
     "planNothingAccepted": "Nothing would be accepted. Use \"Patient declined\" instead.",
     "planItemNotFound": "That treatment is no longer on the plan. Reload the page.",
     "planItemDone": "This treatment is already done",
-    "planValidUntilPast": "The estimate cannot expire in the past"
+    "planValidUntilPast": "The estimate cannot expire in the past",
+    "telegramTokenInvalid": "Telegram did not accept this bot token. Copy it again from @BotFather.",
+    "reminderTimeAtNight": "Choose a time between 08:00 and 20:00",
+    "telegramNotConnected": "Connect a Telegram bot in Settings → Reminders first",
+    "smsNotConfigured": "SMS is not set up (Settings → Reminders)",
+    "reminderSendFailed": "The message could not be sent",
+    "reminderNoChannel": "This patient cannot be reached through that channel"
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1020,5 +1026,109 @@
     "declinedCount_one": "{{count}} treatment declined",
     "declinedCount_other": "{{count}} treatments declined",
     "fromPlan": "Plan: {{title}}"
+  },
+  "reminders": {
+    "title": "Reminders",
+    "noneYet": "No reminders yet",
+    "patient": {
+      "title": "Appointment reminders",
+      "off": "Off",
+      "noChannel": "No channel",
+      "clinicOff": "Reminders are switched off for the clinic (Settings → Reminders).",
+      "channel": "Reminders go by",
+      "linkedOn": "Telegram linked {{date}}",
+      "receive": "Send this patient reminders",
+      "linkTelegram": "Link Telegram",
+      "unlink": "Unlink Telegram",
+      "noBot": "Telegram reminders need a bot (Settings → Reminders).",
+      "linkTitle": "Patient's Telegram link",
+      "linkHelp": "The patient opens this link on their phone and presses Start. The link works once, for 30 days.",
+      "copy": "Copy link",
+      "copied": "Link copied",
+      "sendBySms": "Send by SMS",
+      "smsSent": "Link sent to {{to}}"
+    },
+    "reasons": {
+      "optedOut": "The patient opted out",
+      "noChannel": "No Telegram and no SMS for this patient",
+      "patientMissing": "Patient not found"
+    },
+    "statuses": {
+      "pending": "Sending",
+      "sent": "Sent",
+      "failed": "Failed",
+      "skipped": "Not sent"
+    },
+    "channels": {
+      "telegram": "Telegram",
+      "sms": "SMS",
+      "log": "Log only"
+    },
+    "answers": {
+      "confirmed": "The patient confirmed in Telegram",
+      "cancelled": "The patient cancelled in Telegram"
+    },
+    "rules": {
+      "day_before": "Day before",
+      "hours_before": "Hours before"
+    },
+    "settings": {
+      "intro": "Patients get a message before their visit: in Telegram if they linked it, otherwise by SMS. In Telegram they can confirm or cancel.",
+      "enabled": "Send reminders",
+      "dayBefore": "The day before",
+      "sendAt": "Send at",
+      "sendAtHint": "Clinic time, 08:00–20:00",
+      "hoursBefore": "Also shortly before the visit",
+      "hours": "How long before",
+      "hoursN_one": "{{count}} hour before",
+      "hoursN_other": "{{count}} hours before",
+      "rulesHint": "Nothing is sent at night (21:00–08:00), nor for visits booked after the reminder would have gone out. Each reminder goes once."
+    },
+    "sms": {
+      "title": "SMS",
+      "provider": "SMS provider",
+      "off": "Off",
+      "log": "Log only (testing)",
+      "tokenSaved": "saved — leave empty to keep",
+      "tokenKeep": "A token is saved; type a new one to replace it.",
+      "from": "Sender",
+      "fromHint": "A Twilio number (+1…) or a registered sender name",
+      "logHint": "Messages are written to the delivery log below instead of being sent. Useful to try reminders before signing up with a provider."
+    },
+    "telegram": {
+      "connected": "Telegram bot connected",
+      "connectedAs": "Connected: {{bot}}",
+      "disconnect": "Disconnect",
+      "notReceiving": "The bot can send reminders, but patients' replies and link codes will not reach DentFlow until the server's PUBLIC_API_URL is set.",
+      "polling": "Development mode: the server fetches Telegram messages every few seconds.",
+      "linkHint": "Link a patient from their profile: Profile → Appointment reminders → Link Telegram.",
+      "howTo": "In Telegram, open @BotFather, send /newbot, choose a name, and paste the token it gives you here.",
+      "token": "Bot token",
+      "connect": "Connect"
+    },
+    "text": {
+      "title": "Reminder text",
+      "help": "Leave empty to use the standard text ({{language}}, the clinic language).",
+      "placeholders": "Placeholders",
+      "useDefault": "Use the standard text"
+    },
+    "languages": {
+      "hy": "Armenian",
+      "ru": "Russian",
+      "en": "English"
+    },
+    "test": {
+      "title": "Send a test",
+      "channel": "Channel",
+      "send": "Send test",
+      "sent": "Test message sent"
+    },
+    "log": {
+      "title": "Recent reminders",
+      "when": "Sent",
+      "patient": "Patient",
+      "appointment": "Appointment",
+      "rule": "Reminder"
+    }
   }
 }

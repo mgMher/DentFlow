@@ -51,6 +51,7 @@ import {
     statusKey,
 } from '../../utils/appointments';
 import { AppointmentStatus, Patient, Treatment } from '../../types';
+import AppointmentReminders from '../../components/reminders/AppointmentReminders';
 
 const STATUS_ICONS: Partial<Record<AppointmentStatus, React.ReactNode>> = {
     scheduled: <RebookIcon />,
@@ -251,6 +252,7 @@ const AppointmentDetailPage: React.FC = () => {
                                 )}
                             </Stack>
                         )}
+                        <AppointmentReminders appointmentId={appointment._id} />
                         <Divider sx={{ my: 2 }} />
                         <Typography variant="caption" color="text.secondary">
                             {t('appointments.createdAt')}: {formatDateTime(appointment.createdAt)}

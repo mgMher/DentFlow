@@ -257,7 +257,7 @@ built from treatment entries. Reports come after billing because they read billi
 |---|---|---|
 | F1 | ✅ Treatment plan (planned → accepted → done) with printable estimate — built 2026-11-12, see below | Core dental workflow; drives billing |
 | F2 | ✅ Week / day calendar per dentist or chair, drag-to-reschedule, slot picker from availability — built 2026-11-12, see below | Reception works in day view |
-| F3 | Appointment reminders (SMS / Telegram) using existing templates | #1 no-show reducer |
+| F3 | ✅ Appointment reminders (SMS / Telegram) using existing templates — built 2026-11-12, see below | #1 no-show reducer |
 | F4 | Patient account: running balance, prepayment, one payment across invoices | Real clinics take deposits |
 | F5 | Daily cash report (Z-report) by method and cashier; debtors list | End-of-day routine |
 | F6 | X-rays / documents per patient and per tooth (file store, not base64) | Every clinic needs it |
@@ -292,6 +292,21 @@ Decisions (agreed 2026-11-12): day view has a column per dentist or per room (sw
 - [x] **Fixes on the way.** A rescheduled appointment can now be taken out of its room (`treatmentRoomId: null`; the form used to keep the old room when "None" was chosen); the calendar API filters by room
 - [x] Tests: `test/e2e/schedule-slots.e2e-spec.ts` (10); all 146 e2e and 22 unit tests pass; browser (day by dentist and by room, week by room, drag with confirm, refused drag into a blocked hour, book from a click with the slot picker, hy / ru / en, phone width)
 - [ ] Not built: touch dragging on phones/tablets (the library's drag works with a mouse; on touch, open the appointment and reschedule there), dentists' own hours shading per column (the grid shades clinic hours; the slot picker and server use each dentist's hours), recurring blocked times, a waitlist, buffer time between visits, per-clinic slot step (fixed at 15 min)
+
+### F3 — Appointment reminders — ✅ built 2026-11-12, branch `feat/f3-reminders` (stacked on F2)
+
+Decisions (agreed 2026-11-12): Telegram first, SMS as fallback; SMS through a pluggable provider with Twilio first (plus "log only" for testing); a reminder the day before at a set time and optionally N hours before; Telegram buttons let the patient confirm or cancel.
+
+- [x] **Engine.** A job every minute (`@nestjs/schedule`) finds due reminders per clinic: the day before from the set time (08:00–20:00, catching up if the server was down), and optionally N hours before. Never at night (21:00–08:00); never for visits booked after the reminder would have gone out; scheduled / confirmed visits only. Each reminder is logged *before* sending under a unique (appointment, rule) key, so it goes out once even with two servers or overlapping runs
+- [x] **Channels.** Telegram when the patient linked it, otherwise SMS, otherwise logged as "not sent" with the reason. A patient who blocked the bot is unlinked and gets the SMS instead. Twilio adapter (REST, form-encoded); "log only" provider writes to the delivery log
+- [x] **Telegram.** Each clinic connects its own bot (token checked with Telegram's getMe). Patients link once through a one-time link from their profile (copy, or send by SMS; valid 30 days); /stop unlinks. Webhook at `/api/telegram/webhook/:clinicId` with Telegram's secret header when `PUBLIC_API_URL` is set; `TELEGRAM_POLLING=1` for local development
+- [x] **Answers.** "I will come" confirms the appointment; "I can't come" cancels it (reason "patient request", note "Telegram") and notifies the dentist, admins and reception; the buttons are replaced by the outcome. Only the patient's own chat can answer, and only while the visit is open and in the future
+- [x] **Text.** The clinic's "appointment reminder" SMS template in the clinic language, edited in Settings → Reminders; the built-in hy / ru / en text otherwise. Placeholders {{patient}} {{date}} {{time}} {{dentist}} {{clinic}} {{address}} {{phone}} (the older {{patientName}} / {{dentistName}} work too)
+- [x] **Secrets.** Bot and Twilio tokens are stored AES-GCM-encrypted with `SECRETS_KEY` (required in production) and never returned by the API; phone numbers are masked in the log
+- [x] **UI.** Settings → Reminders (on/off, timing, SMS provider, Telegram bot, reminder text, test message, last 100 reminders); patient profile card (channel, opt-out, link / unlink Telegram); appointment page shows the reminders sent and the patient's answer
+- [x] Tests: `test/e2e/reminders.e2e-spec.ts` (16) against a local fake Telegram / Twilio; all 162 e2e and 22 unit tests pass; browser (settings, connect bot, real cron run sending 3 SMS through the fake Twilio, appointment history, patient card, Telegram link; hy / ru / en)
+- [ ] Not built: email reminders; SMS replies (one-way); a local Armenian SMS gateway (add as another adapter); retries for failed sends; per-patient language (uses the clinic language); confirmation / cancellation / payment-receipt messages (templates exist, nothing sends them yet); QR code for the Telegram link
+- [ ] Deploy: set `SECRETS_KEY` and `PUBLIC_API_URL`; HTTPS is required for Telegram webhooks
 
 ---
 

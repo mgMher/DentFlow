@@ -19,6 +19,7 @@ import {ScheduleModule} from './modules/schedule/schedule.module';
 import {NotificationsModule} from './modules/notifications/notifications.module';
 import {ReportsModule} from './modules/reports/reports.module';
 import {SettingsModule} from './modules/settings/settings.module';
+import {RemindersModule} from './modules/reminders/reminders.module';
 
 @Module({
     imports: [
@@ -41,6 +42,7 @@ import {SettingsModule} from './modules/settings/settings.module';
         NotificationsModule,
         ReportsModule,
         SettingsModule,
+        RemindersModule,
     ],
     providers: [
         {provide: APP_GUARD, useClass: AuthGuard},

@@ -522,7 +522,8 @@ export class AppointmentsService implements OnModuleInit {
         clinicId: string,
         appointmentId: Id,
         dto: CancelAppointmentDto,
-        userId: string,
+        /** Absent when the patient cancelled themself (Telegram reminder). */
+        userId?: string,
     ): Promise<AppointmentDocument & { cancelledCount?: number }> {
         const appointment = await this.findById(clinicId, appointmentId);
 
@@ -548,7 +549,7 @@ export class AppointmentsService implements OnModuleInit {
                 cancelReason: dto.reason,
                 cancelNote: dto.note?.trim() || undefined,
                 cancelledAt: new Date(),
-                cancelledBy: oid(userId),
+                ...(userId ? { cancelledBy: oid(userId) } : {}),
             },
         });
 

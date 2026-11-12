@@ -74,6 +74,7 @@ export async function startApp({ throttle = false } = {}) {
         get: <T = any>(path: string, token?: string) => call<T>('GET', path, { token }),
         post: <T = any>(path: string, token?: string, body?: Body) => call<T>('POST', path, { token, body }),
         patch: <T = any>(path: string, token?: string, body?: Body) => call<T>('PATCH', path, { token, body }),
+        put: <T = any>(path: string, token?: string, body?: Body) => call<T>('PUT', path, { token, body }),
         del: <T = any>(path: string, token?: string) => call<T>('DELETE', path, { token }),
     };
 

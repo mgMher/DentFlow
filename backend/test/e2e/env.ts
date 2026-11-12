@@ -20,3 +20,7 @@ process.env.JWT_REFRESH_SECRET = 'e2e-refresh-secret';
 process.env.JWT_ACCESS_EXPIRATION = '15m';
 process.env.JWT_REFRESH_EXPIRATION = '7d';
 delete process.env.TRUST_PROXY;
+// Reminders run only when a test calls tick(); no real Telegram / SMS.
+process.env.REMINDERS_CRON = 'off';
+delete process.env.TELEGRAM_POLLING;
+delete process.env.PUBLIC_API_URL;

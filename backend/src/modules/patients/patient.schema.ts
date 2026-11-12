@@ -183,11 +183,31 @@ export class Patient {
 
     @Prop()
     lastVisit: Date;
+
+    /** Appointment reminders (F3): no reminders at all when true. */
+    @Prop({ default: false })
+    remindersOptOut: boolean;
+
+    /** Telegram chat that gets this patient's reminders (set when they open the link). */
+    @Prop()
+    telegramChatId: string;
+
+    @Prop()
+    telegramLinkedAt: Date;
+
+    /** One-time code in the patient's Telegram link; never sent to the client. */
+    @Prop({ select: false })
+    telegramLinkCode: string;
+
+    @Prop({ select: false })
+    telegramLinkCodeAt: Date;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);
 
 PatientSchema.index({ clinicId: 1, lastName: 1, firstName: 1 });
+PatientSchema.index({ telegramLinkCode: 1 }, { sparse: true });
+PatientSchema.index({ clinicId: 1, telegramChatId: 1 }, { sparse: true });
 
 // Email is deliberately not unique (D4): a parent registers several children
 // under one address. The create form warns about matches instead.

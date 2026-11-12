@@ -24,6 +24,7 @@ npm run test:e2e -- appointments      # one file
 | `payments.e2e-spec.ts` | parallel payments never overpay, parallel voids, pay vs void, pay vs cancel, edit vs issue, invoice status lifecycle, roles, unique invoice numbers |
 | `appointments.e2e-spec.ts` | dentist / room / patient clashes, blocked time, hours, booking and move races, series, status lifecycle and its races |
 | `patients.e2e-spec.ts` | shared family email, archive with cancel, status race, 404 for unknown patients |
+| `reminders.e2e-spec.ts` | settings and secrets, Telegram linking and /stop, the day-before and hours-before runs (channels, opt-out, blocked bot, failures, never twice, never at night or for late bookings), the clinic template, Telegram confirm / cancel buttons, tenancy, test messages — against a local fake Telegram / Twilio |
 | `schedule-slots.e2e-spec.ts` | free start times (hours, blocked time, dentist / room / patient bookings, own time when moving, day off, no hours, past times), validation, tenancy, moving between rooms and clearing the room, calendar by room |
 | `treatment-plans.e2e-spec.ts` | roles, draft items and totals, present → accept (per item) → done → completed, invoice = estimate, stale acceptance, accept race, revise, decline, cancel, duplicate, tenancy |
 

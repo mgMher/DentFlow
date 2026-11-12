@@ -532,6 +532,52 @@ export interface BlockedTime {
     isRecurring: boolean;
 }
 
+// Appointment reminders (F3)
+export type SmsProviderName = 'off' | 'twilio' | 'log';
+export type ReminderRule = 'day_before' | 'hours_before';
+export type ReminderStatus = 'pending' | 'sent' | 'failed' | 'skipped';
+export type ReminderChannel = 'telegram' | 'sms' | 'log';
+
+export interface ReminderSettings {
+    enabled: boolean;
+    dayBeforeEnabled: boolean;
+    dayBeforeTime: string;
+    hoursBeforeEnabled: boolean;
+    hoursBefore: number;
+    telegram: {
+        connected: boolean;
+        botUsername: string | null;
+        /** How patients' messages and answers reach the server. */
+        mode: 'none' | 'webhook' | 'polling' | 'not_receiving';
+    };
+    sms: { provider: SmsProviderName; twilioAccountSid: string; twilioFrom: string; hasAuthToken: boolean };
+}
+
+export interface ReminderLogEntry {
+    _id: string;
+    appointmentId: string | { _id: string; startTime: string; status: AppointmentStatus };
+    patientId: string | { _id: string; firstName: string; lastName: string };
+    rule: ReminderRule;
+    status: ReminderStatus;
+    channel?: ReminderChannel;
+    to?: string;
+    text?: string;
+    /** A code (optedOut, noChannel, patientMissing) or the provider's message. */
+    reason?: string;
+    answer?: 'confirmed' | 'cancelled';
+    answeredAt?: string;
+    createdAt: string;
+}
+
+export interface PatientReminderStatus {
+    enabled: boolean;
+    optOut: boolean;
+    telegramAvailable: boolean;
+    telegramLinked: boolean;
+    telegramLinkedAt: string | null;
+    smsAvailable: boolean;
+}
+
 // Notification types
 export type NotificationType =
     | 'appointment_created'

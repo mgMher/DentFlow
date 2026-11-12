@@ -17,6 +17,7 @@ import { StatusChip } from '../../components/ui';
 import { formatDate, formatDateTime, getFullName } from '../../utils/formatters';
 import { formatArmenianPhone } from '../../utils/validators';
 import { Patient } from '../../types';
+import PatientRemindersCard from '../../components/reminders/PatientRemindersCard';
 
 const entryDentistName = (dentist?: string | { firstName?: string; lastName?: string }): string => {
     if (!dentist || typeof dentist === 'string') return '';
@@ -492,6 +493,10 @@ const PatientProfileTab: React.FC<{ patient: Patient }> = ({ patient }) => {
                     </Card>
                 </Grid>
             )}
+
+            <Grid item xs={12} md={6}>
+                <PatientRemindersCard patientId={patient._id} />
+            </Grid>
 
             {/* Internal notes */}
             {patient.notes && (

@@ -611,6 +611,29 @@ Log in as a receptionist. Have three dentists, two rooms, a few appointments tod
 | S-14 | Languages | hy / ru / en | Weekday names, titles, toggles and dialogs translated | PASS (browser) |
 | S-15 | Phone | 375 px | Columns scroll inside the grid; page does not scroll sideways (dragging needs a mouse) | PASS (browser) |
 
+
+## 25. F3 — appointment reminders
+
+Needs a real Telegram bot (from @BotFather) and, for SMS, a Twilio trial account — or the "Log only" provider. For patients to answer, the API must be reachable at `PUBLIC_API_URL` over HTTPS (or run with `TELEGRAM_POLLING=1` locally).
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| R-01 | Settings | Admin: Settings → Reminders; receptionist: try the API | Admin sees and changes them; others get 403; tokens never shown back | PASS (e2e + browser) |
+| R-02 | Connect bot | Paste a wrong token, then the right one | Wrong: "Telegram did not accept this bot token"; right: "Connected: @yourbot" | PASS (e2e; browser with a fake Telegram) |
+| R-03 | Link a patient | Patient → Profile → Link Telegram; open the link on a phone, press Start | Bot greets the patient by name; the card shows Telegram; the link does not work a second time | PASS (e2e) — real phone: — |
+| R-04 | Send by SMS | In the link dialog, Send by SMS | The patient gets the link by SMS | — |
+| R-05 | Day-before reminder | Book a visit for tomorrow; set the time to now | Within a minute: Telegram message with two buttons (linked patients) or SMS; Appointment page → Reminders shows it | PASS (browser: 3 SMS via fake Twilio) — real Telegram: — |
+| R-06 | Not twice | Wait another few minutes; restart the API | No second reminder | PASS (e2e) |
+| R-07 | Not at night / not if booked late | Book for tomorrow after the send time | No reminder for that visit | PASS (e2e + browser) |
+| R-08 | Hours before | Turn on "2 hours before"; book for 3 hours from now | A reminder about 2 hours before | PASS (e2e) |
+| R-09 | Confirm | Press "I will come" | Appointment Confirmed; the buttons are replaced by "Thank you…" | PASS (e2e) — real Telegram: — |
+| R-10 | Cancel | Press "I can't come" | Appointment cancelled (patient request, note Telegram); dentist, admins and reception notified | PASS (e2e) — real Telegram: — |
+| R-11 | Blocked bot | The patient blocks the bot; next reminder | Sent by SMS instead; the patient is unlinked | PASS (e2e) |
+| R-12 | Opt out | Untick "Send this patient reminders" | Logged as "Not sent — the patient opted out" | PASS (e2e) |
+| R-13 | Own text | Settings → Reminders → Reminder text, save; next reminder | Uses the text with placeholders filled; empty = standard text | PASS (e2e) |
+| R-14 | Test message | Settings → Send a test to a patient by SMS / Telegram | Arrives, or a clear reason (no linked chat) | PASS (e2e) |
+| R-15 | Languages | hy / ru / en | All reminder screens translated; message text follows the clinic language | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
