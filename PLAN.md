@@ -256,7 +256,7 @@ built from treatment entries. Reports come after billing because they read billi
 | # | Feature | Why |
 |---|---|---|
 | F1 | ✅ Treatment plan (planned → accepted → done) with printable estimate — built 2026-11-12, see below | Core dental workflow; drives billing |
-| F2 | Week / day calendar per dentist or chair, drag-to-reschedule, slot picker from availability | Reception works in day view |
+| F2 | ✅ Week / day calendar per dentist or chair, drag-to-reschedule, slot picker from availability — built 2026-11-12, see below | Reception works in day view |
 | F3 | Appointment reminders (SMS / Telegram) using existing templates | #1 no-show reducer |
 | F4 | Patient account: running balance, prepayment, one payment across invoices | Real clinics take deposits |
 | F5 | Daily cash report (Z-report) by method and cashier; debtors list | End-of-day routine |
@@ -280,6 +280,18 @@ Decisions (agreed 2026-11-12): several plans per patient (options); optional sta
 - [x] **UI.** Patient → "Treatment plans" tab (cards: status, total, discount, progress, validity; `?tab=plans` links back to it); plan page with stage groups and subtotals, add / edit / remove items (catalogue pick fills name, price and result), present, record acceptance with per-item ticks and a live total, decline / cancel with reason, revise, copy, mark done, history; printable estimate (clinic letterhead, patient, dentist, validity, items by stage, totals, notes, disclaimer, signature lines). Treatments tab links each plan item to its plan
 - [x] Tests: `test/e2e/treatment-plans.e2e-spec.ts` (15); all 136 e2e and 22 unit tests pass; browser in en / hy / ru (create → items → present → accept with one declined → done → completed; invoice from the done items = estimate total; phone width)
 - [ ] Not built: treatment-plan PDF (print-to-PDF works), patient e-signature, per-plan discount ("apply 10% to all"), notifications when a plan is accepted, plans in reports (acceptance rate, planned vs done revenue), adding existing loose planned entries to a plan
+
+### F2 — Day / week schedule — ✅ built 2026-11-12, branch `feat/f2-schedule-views` (stacked on F1)
+
+Decisions (agreed 2026-11-12): day view has a column per dentist or per room (switch); week view shows one dentist or room; drags are confirmed before saving; the booking form offers free start times for the visit length.
+
+- [x] **Views.** Appointments page: Day / Week / Month / List (remembered per browser; Day by default). Day and week are a time grid (react-big-calendar, already a dependency, now used) in the clinic's hours ±1 h, 15-minute rows; closed hours and days shaded; the dentist's blocked time shown as hatched blocks; a current-time line; colours by status; click an appointment to open it. Week starts Monday; dates and weekdays in hy / ru / en
+- [x] **Drag to reschedule.** Scheduled and confirmed appointments can be dragged to another time, another dentist's or room's column (including "No room") or resized; a dialog shows old → new time, dentist and room and asks first. The server's checks apply as usual (clash, blocked time, hours — with "Move anyway" for hours); the dentists are notified (Phase 7)
+- [x] **Book from the grid.** Click (30 min) or drag over free time to open the booking form with date, start, length, dentist or room filled in
+- [x] **Slot picker.** `GET /schedule/slots?dentistId&date&duration[&treatmentRoomId&patientId&excludeAppointmentId&step]` returns the start times where the visit fits: dentist's hours (clinic hours as fallback; 08:00–20:00 when none are set), outside blocked time, clear of the dentist's, the room's and the patient's bookings, not in the past. The booking / reschedule form shows them as chips (the chosen one highlighted); the time fields stay editable
+- [x] **Fixes on the way.** A rescheduled appointment can now be taken out of its room (`treatmentRoomId: null`; the form used to keep the old room when "None" was chosen); the calendar API filters by room
+- [x] Tests: `test/e2e/schedule-slots.e2e-spec.ts` (10); all 146 e2e and 22 unit tests pass; browser (day by dentist and by room, week by room, drag with confirm, refused drag into a blocked hour, book from a click with the slot picker, hy / ru / en, phone width)
+- [ ] Not built: touch dragging on phones/tablets (the library's drag works with a mouse; on touch, open the appointment and reschedule there), dentists' own hours shading per column (the grid shades clinic hours; the slot picker and server use each dentist's hours), recurring blocked times, a waitlist, buffer time between visits, per-clinic slot step (fixed at 15 min)
 
 ---
 

@@ -15,7 +15,7 @@ import { BlockedTime, BlockedTimeDocument } from './blocked-time.schema';
 import { Appointment, AppointmentDocument, AppointmentStatus } from '../appointments/appointment.schema';
 import { UserProfile, UserProfileDocument } from '../users/user.schema';
 import { Clinic, ClinicDocument } from '../clinics/clinic.schema';
-import { CreateRoomDto, UpdateRoomDto, CreateBlockedTimeDto } from './dto';
+import { CreateRoomDto, UpdateRoomDto, CreateBlockedTimeDto, QuerySlotsDto } from './dto';
 
 export interface TimeSlot {
     start: string;
@@ -38,6 +38,9 @@ const oid = (id: Id) => new Types.ObjectId(id.toString());
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Appointments that occupy their slot. Cancelled and no-show ones free it. */
+/** The day the slot list covers when neither the dentist nor the clinic has hours set. */
+const DEFAULT_DAY = { start: '08:00', end: '20:00' };
+
 export const SLOT_HOLDING_STATUSES = [
     AppointmentStatus.SCHEDULED,
     AppointmentStatus.CONFIRMED,
@@ -327,6 +330,63 @@ export class ScheduleService {
         }
         if (cursor < window.end) free.push({ start: cursor.toISOString(), end: window.end.toISOString() });
         return free;
+    }
+
+    /**
+     * Start times where a visit of `duration` minutes fits on clinic day
+     * `date`: inside the dentist's working hours, outside their blocked
+     * time, and clear of the dentist's, the chair's and the patient's other
+     * bookings. Steps of `step` minutes from the start of the working day;
+     * times already past are left out. With no hours configured anywhere the
+     * day runs 08:00–20:00 (booking itself has no limit then).
+     */
+    async getSlots(clinicId: string, query: QuerySlotsDto) {
+        const dentist = await this.findDentistProfile(clinicId, query.dentistId);
+        const dentistRefId = dentist.authId || dentist._id;
+        const tz = await this.clinicRefs.timezoneOf(clinicId);
+        const step = (query.step ?? 15) * 60_000;
+        const length = query.duration * 60_000;
+
+        const working = await this.workingWindow(clinicId, dentistRefId, query.date);
+        if (working === 'off') return { date: query.date, off: true, hoursConfigured: true, window: null, slots: [] };
+        const window = working ?? {
+            start: clinicTimeToUtc(query.date, DEFAULT_DAY.start, tz),
+            end: clinicTimeToUtc(query.date, DEFAULT_DAY.end, tz),
+        };
+
+        const overlapping = { startTime: { $lt: window.end }, endTime: { $gt: window.start } };
+        const who: FilterQuery<AppointmentDocument>[] = [{ dentistId: oid(dentistRefId) }];
+        if (query.treatmentRoomId) who.push({ treatmentRoomId: oid(query.treatmentRoomId) });
+        if (query.patientId) who.push({ patientId: oid(query.patientId) });
+        const [blocked, booked] = await Promise.all([
+            this.blockedTimeModel.find({ clinicId: oid(clinicId), dentistId: dentistRefId, ...overlapping }).select('startTime endTime').lean(),
+            this.appointmentModel
+                .find({
+                    clinicId: oid(clinicId),
+                    status: { $in: SLOT_HOLDING_STATUSES },
+                    $or: who,
+                    ...(query.excludeAppointmentId ? { _id: { $ne: oid(query.excludeAppointmentId) } } : {}),
+                    ...overlapping,
+                })
+                .select('startTime endTime')
+                .lean(),
+        ]);
+        const busy = [...blocked, ...booked].map((b) => [b.startTime.getTime(), b.endTime.getTime()]);
+
+        const now = Date.now();
+        const slots: string[] = [];
+        for (let t = window.start.getTime(); t + length <= window.end.getTime(); t += step) {
+            if (t < now) continue;
+            if (busy.some(([s, e]) => s < t + length && e > t)) continue;
+            slots.push(new Date(t).toISOString());
+        }
+        return {
+            date: query.date,
+            off: false,
+            hoursConfigured: working !== null,
+            window: { start: window.start.toISOString(), end: window.end.toISOString() },
+            slots,
+        };
     }
 
     /** `dentistId` may be the auth User id (as stored on appointments) or, for older links, the profile id. */

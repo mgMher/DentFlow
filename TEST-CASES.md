@@ -588,6 +588,29 @@ Log in as a dentist; for the acceptance steps also try a receptionist. Use a pat
 | P-16 | Languages | Plan page, card and Treatments tab in hy / ru / en | All labels translated; Russian plurals ("2 процедуры") | PASS (browser) |
 | P-17 | Archived patient | Archive the patient | "New plan" hidden; the API refuses | PASS (e2e) |
 
+
+## 24. F2 — day / week schedule
+
+Log in as a receptionist. Have three dentists, two rooms, a few appointments today and a blocked hour for one dentist.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| S-01 | Day view | Appointments → Day | One column per dentist; appointments at the right height; lunch block hatched; closed hours grey; red line at the current time | PASS (browser) |
+| S-02 | Rooms | Switch Dentists → Rooms | One column per room plus "No room" | PASS (browser) |
+| S-03 | Week view | Week, pick a dentist or room | Mon–Sun for that one; Saturday's shorter hours and Sunday shaded; title "9 Nov – 15 Nov 2026" | PASS (browser) |
+| S-04 | Remembered | Reload | Same view and columns | PASS (browser) |
+| S-05 | Drag | Drag an appointment to another dentist and time | Dialog with old → new time and dentist; Move saves it; the dentists get a notification | PASS (move: browser; notification: smoke 07) |
+| S-06 | Refused drag | Drag into another dentist's blocked hour | Dialog shows "The dentist is unavailable then"; nothing moves | PASS (browser) |
+| S-07 | Outside hours | Drag past closing time | Warning with "Move anyway" | — |
+| S-08 | Resize | Drag an appointment's bottom edge | Dialog shows the new end time | — |
+| S-09 | Room move | In Rooms, drag to "No room" | The appointment leaves its room | PASS (e2e: room cleared) |
+| S-10 | Not draggable | Completed / in-progress appointments; an assistant | Cannot be dragged; clicking opens the appointment | — |
+| S-11 | Book from grid | Click free time in a dentist's column | Booking form with that dentist, date, time and 30 min | PASS (browser) |
+| S-12 | Slot picker | In the form choose dentist, date, length; then a room; then a patient | Chips show only times where all are free, nothing in the past; clicking one sets the time | PASS (browser + e2e) |
+| S-13 | Reschedule | Open an appointment → Reschedule | Its own time is offered; choosing "None" for the room removes it | PASS (e2e) |
+| S-14 | Languages | hy / ru / en | Weekday names, titles, toggles and dialogs translated | PASS (browser) |
+| S-15 | Phone | 375 px | Columns scroll inside the grid; page does not scroll sideways (dragging needs a mouse) | PASS (browser) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

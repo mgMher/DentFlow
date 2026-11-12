@@ -2,7 +2,7 @@ import { format, parseISO, Locale } from 'date-fns';
 import { hy, ru, enUS } from 'date-fns/locale';
 import { CURRENCY_SYMBOLS } from './constants';
 
-const localeMap: Record<string, Locale> = {
+export const localeMap: Record<string, Locale> = {
     hy,
     ru,
     en: enUS,

@@ -344,10 +344,14 @@ export class AppointmentsService implements OnModuleInit {
             dto.startTime ?? existing.startTime.toISOString(),
             dto.endTime ?? existing.endTime.toISOString(),
         );
-        await this.assertRefs(clinicId, dto);
+        await this.assertRefs(clinicId, { ...dto, treatmentRoomId: dto.treatmentRoomId ?? undefined });
 
         const dentistId = dto.dentistId ?? refId(existing.dentistId);
-        const treatmentRoomId = dto.treatmentRoomId ?? (existing.treatmentRoomId ? refId(existing.treatmentRoomId) : undefined);
+        // `null` clears the chair; absent keeps it.
+        const treatmentRoomId =
+            dto.treatmentRoomId === null
+                ? undefined
+                : dto.treatmentRoomId ?? (existing.treatmentRoomId ? refId(existing.treatmentRoomId) : undefined);
         const moved =
             startTime.getTime() !== existing.startTime.getTime() ||
             endTime.getTime() !== existing.endTime.getTime() ||
@@ -747,6 +751,7 @@ export class AppointmentsService implements OnModuleInit {
         if (query.endDate) filter.startTime = { $lt: new Date(query.endDate) };
         if (query.dentistId) filter.dentistId = oid(query.dentistId);
         if (query.patientId) filter.patientId = oid(query.patientId);
+        if (query.treatmentRoomId) filter.treatmentRoomId = oid(query.treatmentRoomId);
         if (query.status) filter.status = query.status;
         return filter;
     }

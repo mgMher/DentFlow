@@ -55,9 +55,20 @@ interface AppointmentFormDialogProps {
     /** Prefill for a new booking (e.g. the day clicked in the calendar, or the patient page). */
     defaultDate?: string;
     defaultPatientId?: string;
+    /** From a slot picked on the day / week calendar. */
+    defaultStartTime?: string;
+    defaultDuration?: number;
+    defaultDentistId?: string;
+    defaultRoomId?: string;
 }
 
 const DURATIONS = [15, 20, 30, 45, 60, 75, 90, 120, 150, 180, 240];
+
+interface SlotsResponse {
+    off: boolean;
+    hoursConfigured: boolean;
+    slots: string[];
+}
 const ref = (value: unknown) => (value && typeof value === 'object' ? (value as { _id: string })._id : (value as string) || '');
 
 /**
@@ -75,6 +86,10 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
     appointment,
     defaultDate,
     defaultPatientId,
+    defaultStartTime,
+    defaultDuration,
+    defaultDentistId,
+    defaultRoomId,
 }) => {
     const { t } = useTranslation();
     const dispatch = useDispatch();
@@ -91,7 +106,7 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
     const errorCode = single.errorCode || recurring.errorCode;
 
     const [treatments, setTreatments] = useState<Treatment[]>([]);
-    const [freeSlots, setFreeSlots] = useState<{ start: string; end: string }[] | null>(null);
+    const [slots, setSlots] = useState<SlotsResponse | null>(null);
     const [durationTouched, setDurationTouched] = useState(false);
 
     const defaults = useMemo<FormValues>(() => {
@@ -112,17 +127,17 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
         }
         return {
             patientId: defaultPatientId || '',
-            dentistId: '',
-            treatmentRoomId: '',
+            dentistId: defaultDentistId || '',
+            treatmentRoomId: defaultRoomId || '',
             date: defaultDate || toLocalDateString(),
-            startTime: '09:00',
-            duration: 30,
+            startTime: defaultStartTime || '09:00',
+            duration: defaultDuration || 30,
             treatmentIds: [],
             notes: '',
             repeat: 'none',
             repeatUntil: '',
         };
-    }, [appointment, defaultDate, defaultPatientId]);
+    }, [appointment, defaultDate, defaultPatientId, defaultStartTime, defaultDuration, defaultDentistId, defaultRoomId]);
 
     const {
         control,
@@ -137,7 +152,8 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
     useEffect(() => {
         if (!open) return;
         reset(defaults);
-        setDurationTouched(isReschedule);
+        // A slot picked on the calendar fixes the length, like a reschedule.
+        setDurationTouched(isReschedule || !!defaultDuration);
         single.clearError();
         recurring.clearError();
         dispatch(staffActions.getDentists());
@@ -155,21 +171,35 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
     const date = watch('date');
     const repeat = watch('repeat');
     const selectedTreatments = watch('treatmentIds');
+    const duration = watch('duration');
+    const roomId = watch('treatmentRoomId');
+    const patientId = watch('patientId');
+    const startTime = watch('startTime');
 
-    // Free time for the chosen dentist and day.
+    // Start times where this visit fits: the dentist's hours and blocked time,
+    // and the dentist's, chair's and patient's other bookings.
     useEffect(() => {
-        if (!open || !dentistId || !date) {
-            setFreeSlots(null);
+        if (!open || !dentistId || !date || !duration) {
+            setSlots(null);
             return;
         }
         let cancelled = false;
-        api.get(`/schedule/availability/${dentistId}`, { params: { date } })
-            .then((res) => !cancelled && setFreeSlots(res.data?.data ?? []))
-            .catch(() => !cancelled && setFreeSlots(null));
+        api.get('/schedule/slots', {
+            params: {
+                dentistId,
+                date,
+                duration,
+                ...(roomId ? { treatmentRoomId: roomId } : {}),
+                ...(patientId ? { patientId } : {}),
+                ...(appointment ? { excludeAppointmentId: appointment._id } : {}),
+            },
+        })
+            .then((res) => !cancelled && setSlots(res.data?.data ?? null))
+            .catch(() => !cancelled && setSlots(null));
         return () => {
             cancelled = true;
         };
-    }, [open, dentistId, date]);
+    }, [open, dentistId, date, duration, roomId, patientId, appointment]);
 
     // The planned treatments set the length, until the user picks one by hand.
     useEffect(() => {
@@ -201,7 +231,8 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
         const end = new Date(start.getTime() + values.duration * 60000);
         const base = {
             dentistId: values.dentistId,
-            treatmentRoomId: values.treatmentRoomId || undefined,
+            // Rescheduling to "no chair" has to say so; a new booking just leaves it out.
+            treatmentRoomId: values.treatmentRoomId || (isReschedule ? null : undefined),
             startTime: start.toISOString(),
             endTime: end.toISOString(),
             treatmentIds: values.treatmentIds,
@@ -400,21 +431,29 @@ const AppointmentFormDialog: React.FC<AppointmentFormDialogProps> = ({
                             />
                         </Grid>
 
-                        {freeSlots && (
+                        {slots && (
                             <Grid item xs={12}>
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                                    {freeSlots.length ? t('appointments.freeTime') : t('appointments.noFreeTime')}
+                                    {slots.off
+                                        ? t('appointments.dayOff')
+                                        : slots.slots.length
+                                          ? t('appointments.freeStarts', { count: duration })
+                                          : t('appointments.noFreeTime')}
                                 </Typography>
-                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                                    {freeSlots.map((slot) => (
-                                        <Chip
-                                            key={slot.start}
-                                            size="small"
-                                            variant="outlined"
-                                            label={`${formatTime(slot.start)} – ${formatTime(slot.end)}`}
-                                            onClick={() => setValue('startTime', format(new Date(slot.start), 'HH:mm'))}
-                                        />
-                                    ))}
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, maxHeight: 132, overflowY: 'auto' }}>
+                                    {slots.slots.map((slot) => {
+                                        const time = formatTime(slot);
+                                        return (
+                                            <Chip
+                                                key={slot}
+                                                size="small"
+                                                label={time}
+                                                color={time === startTime ? 'primary' : 'default'}
+                                                variant={time === startTime ? 'filled' : 'outlined'}
+                                                onClick={() => setValue('startTime', format(new Date(slot), 'HH:mm'))}
+                                            />
+                                        );
+                                    })}
                                 </Box>
                             </Grid>
                         )}

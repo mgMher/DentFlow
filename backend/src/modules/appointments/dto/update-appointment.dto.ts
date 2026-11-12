@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional, OmitType, PartialType } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsEnum, IsIn, IsMongoId, IsNotEmpty, IsOptional, IsString, MaxLength, ValidateIf } from 'class-validator';
 import { AppointmentStatus, CancelReason } from '../appointment.schema';
 import { CreateAppointmentDto } from './create-appointment.dto';
 
@@ -7,7 +7,13 @@ import { CreateAppointmentDto } from './create-appointment.dto';
  * Reschedule or edit details. The patient is fixed: booking someone else
  * means a new appointment. Status has its own endpoint.
  */
-export class UpdateAppointmentDto extends PartialType(OmitType(CreateAppointmentDto, ['patientId'] as const)) {}
+export class UpdateAppointmentDto extends PartialType(OmitType(CreateAppointmentDto, ['patientId', 'treatmentRoomId'] as const)) {
+    @ApiPropertyOptional({ nullable: true, description: '`null` takes the appointment out of its chair' })
+    @ValidateIf((_, value) => value !== null)
+    @IsOptional()
+    @IsMongoId()
+    treatmentRoomId?: string | null;
+}
 
 export class UpdateAppointmentStatusDto {
     @ApiProperty({ enum: AppointmentStatus })

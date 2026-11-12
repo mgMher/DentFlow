@@ -30,6 +30,11 @@ export class AppointmentFilterDto {
     @IsMongoId()
     patientId?: string;
 
+    @ApiPropertyOptional({ description: 'Treatment room (chair)' })
+    @IsOptional()
+    @IsMongoId()
+    treatmentRoomId?: string;
+
     @ApiPropertyOptional({ enum: AppointmentStatus })
     @IsOptional()
     @IsEnum(AppointmentStatus)

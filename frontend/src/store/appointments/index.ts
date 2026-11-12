@@ -28,6 +28,7 @@ export interface AppointmentFilters {
     endDate?: string;
     dentistId?: string;
     patientId?: string;
+    treatmentRoomId?: string;
     status?: AppointmentStatus;
 }
 
@@ -40,7 +41,8 @@ export interface AppointmentListQuery extends AppointmentFilters {
 export interface AppointmentPayload {
     patientId?: string;
     dentistId: string;
-    treatmentRoomId?: string;
+    /** `null` takes a rescheduled appointment out of its chair. */
+    treatmentRoomId?: string | null;
     startTime: string;
     endTime: string;
     treatmentIds?: string[];

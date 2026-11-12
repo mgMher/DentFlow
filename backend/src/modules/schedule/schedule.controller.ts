@@ -13,7 +13,7 @@ import { CurrentUser, Roles, Role } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { Types } from 'mongoose';
 import { ScheduleService } from './schedule.service';
-import { CreateRoomDto, UpdateRoomDto, CreateBlockedTimeDto } from './dto';
+import { CreateRoomDto, UpdateRoomDto, CreateBlockedTimeDto, QuerySlotsDto } from './dto';
 
 @ApiTags('Schedule')
 @ApiBearerAuth()
@@ -104,6 +104,12 @@ export class ScheduleController {
     }
 
     // ─── Availability ─────────────────────────────────────────────────
+
+    @Get('slots')
+    @ApiOperation({ summary: 'Free start times for a visit: dentist hours, blocked time, and dentist, chair and patient bookings' })
+    getSlots(@CurrentUser('clinicId') clinicId: string, @Query() query: QuerySlotsDto) {
+        return this.scheduleService.getSlots(clinicId, query);
+    }
 
     @Get('availability/:dentistId')
     @ApiOperation({ summary: 'Get available time slots for a dentist on a given date' })
