@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { BillingController } from './billing.controller';
 import { BillingService } from './billing.service';
+import { AccountController } from './account.controller';
+import { AccountService } from './account.service';
 import { Invoice, InvoiceSchema } from './invoice.schema';
 import { Payment, PaymentSchema } from './payment.schema';
 import { Patient, PatientSchema } from 'src/modules/patients/patient.schema';
@@ -18,8 +20,8 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
         ]),
         NotificationsModule,
     ],
-    controllers: [BillingController],
-    providers: [BillingService],
+    controllers: [BillingController, AccountController],
+    providers: [BillingService, AccountService],
     exports: [BillingService],
 })
 export class BillingModule {}

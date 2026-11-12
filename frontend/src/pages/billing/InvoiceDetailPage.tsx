@@ -47,6 +47,9 @@ import { patientEmail, patientName, patientPhone, staffName } from '../../utils/
 import { PAYMENT_METHODS, fitsCurrency, minorDigits, paymentMethodKey } from '../../utils/billing';
 import { toLocalDateString } from '../../utils/dates';
 import { Payment, PaymentMethod, PaymentVoidType } from '../../types';
+import api from '../../api/axios';
+import { toast } from 'react-toastify';
+import { apiErrorMessage } from '../../utils/apiError';
 
 const SummaryRow: React.FC<{ label: string; value: string; strong?: boolean; color?: string }> = ({
     label,
@@ -100,6 +103,39 @@ const InvoiceDetailPage: React.FC = () => {
     useEffect(() => {
         if (id) dispatch(billingActions.getInvoice(id));
     }, [dispatch, id]);
+
+    // The patient's credit (F4), offered on an open invoice.
+    const [credit, setCredit] = useState(0);
+    const [applying, setApplying] = useState(false);
+    const invoicePatient = invoice && typeof invoice.patientId === 'object' ? (invoice.patientId as { _id: string })._id : invoice?.patientId;
+    const openForCredit = !!invoice && ['issued', 'partial'].includes(invoice.status) && can('manageBilling');
+    useEffect(() => {
+        if (!openForCredit || !invoicePatient) {
+            setCredit(0);
+            return;
+        }
+        let cancelled = false;
+        api.get(`/billing/patients/${invoicePatient}/account`)
+            .then((res) => !cancelled && setCredit((res.data?.data ?? res.data)?.credit ?? 0))
+            .catch(() => !cancelled && setCredit(0));
+        return () => {
+            cancelled = true;
+        };
+    }, [openForCredit, invoicePatient, invoice?.paidAmount]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    const applyCredit = async () => {
+        if (!invoice) return;
+        setApplying(true);
+        try {
+            const res = await api.post(`/billing/invoices/${invoice._id}/apply-credit`, {});
+            toast.success(t('account.creditApplied', { amount: formatCurrency((res.data?.data ?? res.data).applied, invoice.currency) }));
+            dispatch(billingActions.getInvoice(invoice._id));
+        } catch (err) {
+            toast.error(apiErrorMessage(err));
+        } finally {
+            setApplying(false);
+        }
+    };
 
     // Dialogs close only once the server has accepted.
     useEffect(() => {
@@ -204,6 +240,11 @@ const InvoiceDetailPage: React.FC = () => {
                     {isOpen && editor && (
                         <Button variant="contained" startIcon={<PaymentIcon />} onClick={openPayment}>
                             {t('billing.addPayment')}
+                        </Button>
+                    )}
+                    {isOpen && editor && credit > 0 && (
+                        <Button variant="outlined" color="success" disabled={applying} onClick={applyCredit}>
+                            {t('account.applyCredit', { amount: money(Math.min(credit, invoice.balance ?? credit)) })}
                         </Button>
                     )}
                     {canCancel && (

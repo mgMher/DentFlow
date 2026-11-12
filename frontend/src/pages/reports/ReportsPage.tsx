@@ -157,7 +157,7 @@ const ReportsPage: React.FC = () => {
     type Card = { key: string; title: string; value: string | number; icon: React.ReactNode; color: string; caption?: string; captionColor?: string };
     const cards: Card[] = withMoney
         ? [
-              { key: 'collected', title: t('reports.collected'), value: rev ? money(rev.collected) : '—', icon: <RevenueIcon />, color: '#38A169', caption: rev ? t('reports.paymentsCount', { count: rev.paymentCount }) : undefined },
+              { key: 'collected', title: t('reports.collected'), value: rev ? money(rev.collected) : '—', icon: <RevenueIcon />, color: '#38A169', caption: rev ? [t('reports.paymentsCount', { count: rev.paymentCount }), rev.onAccount ? t('reports.onAccount', { amount: money(rev.onAccount) }) : ''].filter(Boolean).join(' · ') : undefined },
               { key: 'invoiced', title: t('reports.invoiced'), value: rev ? money(rev.invoiced) : '—', icon: <InvoicedIcon />, color: '#3182CE', caption: rev ? t('reports.invoicesCount', { count: rev.invoiceCount }) : undefined },
               {
                   key: 'outstanding',

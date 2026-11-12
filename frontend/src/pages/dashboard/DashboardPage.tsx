@@ -56,6 +56,8 @@ const activityLink = (item: ActivityItem): string => {
             return `/patients/${item.id}`;
         case 'appointment':
             return `/appointments/${item.id}`;
+        case 'payment':
+            return item.onAccount ? `/patients/${item.id}?tab=billing` : `/billing/${item.id}`;
         default:
             return `/billing/${item.id}`;
     }

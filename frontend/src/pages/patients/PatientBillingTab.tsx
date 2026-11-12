@@ -6,9 +6,6 @@ import {
     Alert,
     Box,
     Button,
-    Card,
-    CardContent,
-    Grid,
     Paper,
     Table,
     TableBody,
@@ -17,13 +14,13 @@ import {
     TableHead,
     TablePagination,
     TableRow,
-    Typography,
 } from '@mui/material';
 import { Add as AddIcon } from '@mui/icons-material';
 import { RootState } from '../../store';
 import { billingActions } from '../../store/billing';
 import { EmptyState, LoadingSpinner } from '../../components/ui';
 import InvoiceStatusChip from '../../components/billing/InvoiceStatusChip';
+import PatientAccountPanel from '../../components/billing/PatientAccountPanel';
 import { usePermission } from '../../hooks';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 
@@ -57,38 +54,13 @@ const PatientBillingTab: React.FC<{ patientId: string; billable: boolean }> = ({
 
     return (
         <Box>
-            {summary && (
-                <Grid container spacing={2} sx={{ mb: 2 }}>
-                    {summary.byCurrency.map((s) => (
-                        <Grid item xs={12} md={6} key={s.currency}>
-                            <Card>
-                                <CardContent sx={{ display: 'flex', gap: 3, flexWrap: 'wrap' }}>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">{t('billing.billed')}</Typography>
-                                        <Typography fontWeight={600}>{formatCurrency(s.billed, s.currency)}</Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">{t('billing.paidAmount')}</Typography>
-                                        <Typography fontWeight={600} color="success.main">{formatCurrency(s.paid, s.currency)}</Typography>
-                                    </Box>
-                                    <Box>
-                                        <Typography variant="caption" color="text.secondary">{t('billing.balance')}</Typography>
-                                        <Typography fontWeight={700} color={s.balance > 0 ? 'error.main' : 'text.primary'}>
-                                            {formatCurrency(s.balance, s.currency)}
-                                        </Typography>
-                                    </Box>
-                                    {s.overdue > 0 && (
-                                        <Box>
-                                            <Typography variant="caption" color="text.secondary">{t('billing.overdue')}</Typography>
-                                            <Typography fontWeight={600} color="error.main">{s.overdue}</Typography>
-                                        </Box>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </Grid>
-                    ))}
-                </Grid>
-            )}
+            <PatientAccountPanel
+                patientId={patientId}
+                onChange={() => {
+                    dispatch(billingActions.getPatientInvoices({ patientId, page: page + 1, limit: PAGE_SIZE }));
+                    dispatch(billingActions.getPatientSummary(patientId));
+                }}
+            />
 
             {(canCreate || (summary?.unbilledTreatments ?? 0) > 0) && (
                 <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', mb: 2 }}>

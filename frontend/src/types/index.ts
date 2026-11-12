@@ -532,6 +532,41 @@ export interface BlockedTime {
     isRecurring: boolean;
 }
 
+// Patient account (F4) — amounts in major units
+export interface PatientAccount {
+    currency: Currency;
+    outstanding: number;
+    credit: number;
+    /** Positive: the patient owes; negative: the clinic holds their money. */
+    balance: number;
+    openInvoices: {
+        _id: string;
+        invoiceNumber: string;
+        issuedAt?: string;
+        dueDate?: string;
+        status: InvoiceStatus;
+        total: number;
+        paid: number;
+        balance: number;
+    }[];
+    credits: { _id: string; amount: number; date: string; method: PaymentMethod; reference?: string; receivedBy?: PersonRef }[];
+}
+
+export interface StatementLine {
+    date: string;
+    type: 'invoice' | 'invoice_cancelled' | 'payment' | 'payment_voided';
+    invoiceId?: string;
+    invoiceNumber?: string;
+    paymentId?: string;
+    method?: PaymentMethod;
+    onAccount?: boolean;
+    fromCredit?: boolean;
+    reason?: string;
+    charge: number;
+    payment: number;
+    balance: number;
+}
+
 // Appointment reminders (F3)
 export type SmsProviderName = 'off' | 'twilio' | 'log';
 export type ReminderRule = 'day_before' | 'hours_before';
@@ -653,6 +688,8 @@ export interface ActivityItem {
     invoiceNumber?: string;
     amount?: number;
     currency?: Currency;
+    /** A payment kept on the patient's account (no invoice): `id` is the patient. */
+    onAccount?: boolean;
 }
 
 export type ReportGroupBy = 'day' | 'week' | 'month';
@@ -668,6 +705,8 @@ export interface RevenueReport extends ReportRange {
     groupBy: ReportGroupBy;
     currency: Currency;
     collected: number;
+    /** Part of `collected` paid in advance and not yet applied to an invoice (F4). */
+    onAccount?: number;
     paymentCount: number;
     invoiced: number;
     invoiceCount: number;

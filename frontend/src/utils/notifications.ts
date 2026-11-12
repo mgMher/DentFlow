@@ -38,7 +38,7 @@ export const notificationText = (n: Notification, t: TFunction, language: string
             case 'dentist_appointments_cancelled':
                 return 'dentistAppointmentsCancelled';
             case 'payment_received':
-                return 'paymentReceived';
+                return d.invoiceNumber ? 'paymentReceived' : 'paymentOnAccount';
             case 'payment_refunded':
                 return 'paymentRefunded';
             default:
@@ -62,7 +62,8 @@ export const notificationLink = (n: Notification): string | null => {
         case 'invoice':
             return `/billing/${n.relatedId}`;
         case 'patient':
-            return `/patients/${n.relatedId}`;
+            // A payment taken on the patient's account (F4) opens their billing.
+            return n.type === 'payment_received' ? `/patients/${n.relatedId}?tab=billing` : `/patients/${n.relatedId}`;
         case 'staff':
             return `/staff/${n.relatedId}`;
         default:

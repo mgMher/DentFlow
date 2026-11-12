@@ -593,7 +593,8 @@
     "unassigned": "Lines without a dentist",
     "timesDone": "Times done",
     "otherLines": "Other",
-    "collectedHint": "Collected = payments received in the period, refunds excluded. A payment is split over the lines of its invoice."
+    "collectedHint": "Collected = payments received in the period, refunds excluded. A payment is split over the lines of its invoice.",
+    "onAccount": "of which on account {{amount}}"
   },
   "settings": {
     "title": "Settings",
@@ -750,6 +751,10 @@
       "paymentRefunded": {
         "title": "Payment refunded",
         "message": "{{amount}} from {{patient}}, invoice {{number}} — {{reason}}"
+      },
+      "paymentOnAccount": {
+        "title": "Payment on account",
+        "message": "{{amount}} from {{patient}}"
       }
     }
   },
@@ -942,7 +947,14 @@
     "telegramNotConnected": "Connect a Telegram bot in Settings → Reminders first",
     "smsNotConfigured": "SMS is not set up (Settings → Reminders)",
     "reminderSendFailed": "The message could not be sent",
-    "reminderNoChannel": "This patient cannot be reached through that channel"
+    "reminderNoChannel": "This patient cannot be reached through that channel",
+    "invoiceBalanceChanged": "An invoice changed while the payment was being recorded. Check the amounts and try again.",
+    "invoiceNotOpen": "Only issued, unpaid invoices can be paid.",
+    "noCredit": "The patient has no credit.",
+    "creditInsufficient": "That is more than the patient's credit.",
+    "creditChanged": "The patient's credit changed meanwhile. Reload and try again.",
+    "allocationExceedsPayment": "The parts add up to more than the payment.",
+    "creditApplied": "This money is already on an invoice; void it there."
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1130,5 +1142,41 @@
       "appointment": "Appointment",
       "rule": "Reminder"
     }
+  },
+  "account": {
+    "takePayment": "Take payment",
+    "advancePayment": "Advance payment",
+    "spreadOver": "Spread over open invoices (oldest first)",
+    "pay": "Pay now",
+    "noOpenInvoices": "No open invoices: the whole amount goes to the patient's credit.",
+    "onInvoices_one": "On {{count}} invoice",
+    "onInvoices_other": "On {{count}} invoices",
+    "toCredit": "To credit",
+    "partsTooHigh": "The parts add up to more than the amount.",
+    "record": "Record payment",
+    "outstanding": "Owed on invoices",
+    "credit": "Credit",
+    "inCredit": "In credit",
+    "owes": "Balance due",
+    "creditsTitle": "Money on account",
+    "refund": "Refund",
+    "creditHint": "Credit is applied from an invoice (\"Apply credit\") or when taking the next payment.",
+    "statement": "Statement",
+    "description": "Description",
+    "charge": "Charge",
+    "paymentCol": "Payment",
+    "lines": {
+      "invoice": "Invoice {{number}}",
+      "invoiceCancelled": "Invoice {{number}} cancelled",
+      "onAccount": "Paid on account ({{method}})",
+      "fromCredit": "Invoice {{number}} paid from credit",
+      "payment": "Payment for invoice {{number}} ({{method}})",
+      "voided": "Payment voided ({{number}})"
+    },
+    "creditShort": "credit",
+    "refundTitle": "Refund credit",
+    "refundMessage": "Give {{amount}} back to the patient? It leaves their account.",
+    "applyCredit": "Apply credit ({{amount}})",
+    "creditApplied": "{{amount}} paid from credit"
   }
 }

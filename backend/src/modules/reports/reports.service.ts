@@ -143,8 +143,13 @@ export class ReportsService {
         ]);
         if (!perInvoice.length) return [];
 
+        const lines: CollectedLine[] = [];
+        // Money on account (F4) is collected but belongs to no line until applied to an invoice.
+        const onAccount = perInvoice.find((p) => !p._id);
+        if (onAccount) lines.push({ description: '', amount: onAccount.paid });
+
         const invoices = await this.invoiceModel
-            .find({ _id: { $in: perInvoice.map((p) => p._id) }, clinicId })
+            .find({ _id: { $in: perInvoice.filter((p) => p._id).map((p) => p._id) }, clinicId })
             .select('items appointmentId')
             .lean();
         const entryIds = invoices.flatMap((i) => (i.items ?? []).map((it) => it.treatmentEntryId).filter(Boolean));
@@ -157,7 +162,6 @@ export class ReportsService {
         const dentistOfAppointment = new Map(appointments.map((a) => [String(a._id), idOf(a.dentistId)]));
         const paidOf = new Map(perInvoice.map((p) => [String(p._id), p.paid]));
 
-        const lines: CollectedLine[] = [];
         for (const invoice of invoices) {
             const paid = paidOf.get(String(invoice._id)) ?? 0;
             const invoiceDentist = invoice.appointmentId
@@ -193,7 +197,7 @@ export class ReportsService {
         const balance = { $subtract: ['$totalAmount', '$paidAmount'] };
         const isOverdue = { $lt: [{ $ifNull: ['$dueDate', todayStart] }, todayStart] };
 
-        const [byPeriod, byMethod, otherCurrencies, invoiced, open] = await Promise.all([
+        const [byPeriod, byMethod, otherCurrencies, invoiced, open, onAccount] = await Promise.all([
             this.paymentModel.aggregate([
                 { $match: collected },
                 {
@@ -250,6 +254,11 @@ export class ReportsService {
                     },
                 },
             ]),
+            // Collected in the period and still on account (not yet applied to an invoice).
+            this.paymentModel.aggregate([
+                { $match: { ...collected, invoiceId: null } },
+                { $group: { _id: null, total: { $sum: '$amount' } } },
+            ]),
         ]);
 
         const periodTotals = new Map<string, { total: number; count: number }>(
@@ -262,6 +271,8 @@ export class ReportsService {
             groupBy: r.groupBy,
             currency: r.currency,
             collected: major(totalMinor),
+            /** Part of `collected` paid in advance and not yet applied to an invoice. */
+            onAccount: major(onAccount[0]?.total ?? 0),
             paymentCount: byPeriod.reduce((sum, p) => sum + p.count, 0),
             invoiced: major(invoiced[0]?.total ?? 0),
             invoiceCount: invoiced[0]?.count ?? 0,
@@ -684,7 +695,9 @@ export class ReportsService {
             })),
             ...payments.map((p: any) => ({
                 type: 'payment' as const,
-                id: String(p.invoiceId),
+                // Money on account has no invoice: link to the patient.
+                id: p.invoiceId ? String(p.invoiceId) : String(p.patientId?._id ?? p.patientId),
+                onAccount: !p.invoiceId,
                 at: at(p.createdAt),
                 patient: p.patientId,
                 amount: toMajor(p.amount, p.currency ?? currency),

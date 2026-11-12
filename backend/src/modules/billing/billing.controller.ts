@@ -14,11 +14,11 @@ import {
 } from './dto';
 
 /** Role matrix (D5): dentists view billing, assistants have none. */
-const BILLING_VIEWERS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST];
+export const BILLING_VIEWERS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST, Role.DENTIST];
 /** Create, edit, issue, take payments, cancel drafts. */
-const BILLING_EDITORS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST];
+export const BILLING_EDITORS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN, Role.RECEPTIONIST];
 /** Refunds (cancelling an issued invoice is checked in the service). Revenue lives in /reports/revenue. */
-const BILLING_ADMINS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN];
+export const BILLING_ADMINS = [Role.SUPER_ADMIN, Role.CLINIC_ADMIN];
 
 type AuthUser = { userId: string; clinicId: string; role: Role };
 

@@ -10,7 +10,7 @@ import {
 import { InjectConnection, InjectModel } from '@nestjs/mongoose';
 import { AnyBulkWriteOperation, Connection, FilterQuery, Model, PipelineStage, Types } from 'mongoose';
 import { Invoice, InvoiceDocument, InvoiceStatus, OPEN_STATUSES } from './invoice.schema';
-import { Payment, PaymentDocument } from './payment.schema';
+import { Payment, PaymentDocument, PaymentVoidType } from './payment.schema';
 import { Patient, PatientDocument } from 'src/modules/patients/patient.schema';
 import { patientSearchClauses } from 'src/modules/patients/patient-search';
 import {
@@ -66,7 +66,7 @@ const INVOICE_MONEY = ['subtotal', 'discountTotal', 'taxAmount', 'totalAmount', 
  * Recomputes the status from the amounts, inside an update pipeline, so a
  * payment or refund and its status change are one atomic write.
  */
-const STATUS_FROM_AMOUNTS: PipelineStage.Set = {
+export const STATUS_FROM_AMOUNTS: PipelineStage.Set = {
     $set: {
         status: {
             $switch: {
@@ -714,6 +714,11 @@ export class BillingService implements OnModuleInit {
         userId: Types.ObjectId,
         dto: VoidPaymentDto,
     ) {
+        // Credit applied by mistake goes back to the patient's credit instead of being voided.
+        if (dto.type === PaymentVoidType.MISTAKE) {
+            const returned = await this.returnToCredit(clinicId, invoiceId, paymentId);
+            if (returned) return returned;
+        }
         const payment = await this.paymentModel.findOneAndUpdate(
             { _id: paymentId, invoiceId, clinicId, voidedAt: null },
             { $set: { voidedAt: new Date(), voidedBy: userId, voidType: dto.type, voidReason: dto.reason } },
@@ -743,6 +748,30 @@ export class BillingService implements OnModuleInit {
         // The cashier who took it should know it was given back.
         await this.notifyPayment(clinicId, NotificationType.PAYMENT_REFUNDED, [receivedBy], userId, result.invoice, result.payment);
         return result;
+    }
+
+    /** Undo applying credit: the money leaves the invoice and is the patient's credit again. Null when not applied credit. */
+    private async returnToCredit(clinicId: Types.ObjectId, invoiceId: Types.ObjectId, paymentId: Types.ObjectId) {
+        const payment = await this.paymentModel.findOneAndUpdate(
+            { _id: paymentId, invoiceId, clinicId, voidedAt: null, appliedAt: { $ne: null } },
+            { $unset: { invoiceId: '', appliedAt: '', appliedBy: '' } },
+            { new: true },
+        );
+        if (!payment) return null;
+        const res = await this.invoiceModel.updateOne(
+            { _id: invoiceId, clinicId, paidAmount: { $gte: payment.amount } },
+            [{ $set: { paidAmount: { $subtract: ['$paidAmount', payment.amount] } } }, STATUS_FROM_AMOUNTS],
+        );
+        if (!res.modifiedCount) {
+            await this.paymentModel.updateOne({ _id: paymentId }, { $set: { invoiceId, appliedAt: new Date() } });
+            throw await this.invoiceStateError(clinicId, invoiceId);
+        }
+        await payment.populate(PAYMENT_POPULATE);
+        return {
+            payment: this.serializePayment(payment),
+            invoice: await this.findInvoiceById(clinicId, invoiceId),
+            returnedToCredit: true,
+        };
     }
 
     async getPaymentsByInvoice(clinicId: Types.ObjectId, invoiceId: Types.ObjectId) {

@@ -607,7 +607,8 @@
     "unassigned": "Строки без врача",
     "timesDone": "Выполнено",
     "otherLines": "Прочее",
-    "collectedHint": "Получено = платежи за период без возвратов. Платёж делится между строками своего счёта."
+    "collectedHint": "Получено = платежи за период без возвратов. Платёж делится между строками своего счёта.",
+    "onAccount": "из них на счетах пациентов {{amount}}"
   },
   "settings": {
     "title": "Настройки",
@@ -766,6 +767,10 @@
       "paymentRefunded": {
         "title": "Оплата возвращена",
         "message": "{{amount}} от {{patient}}, счёт {{number}} — {{reason}}"
+      },
+      "paymentOnAccount": {
+        "title": "Оплата на счёт пациента",
+        "message": "{{amount}} от {{patient}}"
       }
     }
   },
@@ -958,7 +963,14 @@
     "telegramNotConnected": "Сначала подключите бота Telegram: Настройки → Напоминания",
     "smsNotConfigured": "SMS не настроены (Настройки → Напоминания)",
     "reminderSendFailed": "Не удалось отправить сообщение",
-    "reminderNoChannel": "С этим пациентом нельзя связаться через этот канал"
+    "reminderNoChannel": "С этим пациентом нельзя связаться через этот канал",
+    "invoiceBalanceChanged": "Пока записывалась оплата, счёт изменился. Проверьте суммы и попробуйте снова.",
+    "invoiceNotOpen": "Оплатить можно только выставленные неоплаченные счета.",
+    "noCredit": "У пациента нет аванса.",
+    "creditInsufficient": "Это больше, чем аванс пациента.",
+    "creditChanged": "Аванс пациента изменился. Обновите страницу и попробуйте снова.",
+    "allocationExceedsPayment": "Сумма частей больше суммы оплаты.",
+    "creditApplied": "Эти деньги уже зачтены в счёт; аннулируйте оплату там."
   },
   "plans": {
     "tab": "Планы лечения",
@@ -1152,5 +1164,43 @@
       "appointment": "Приём",
       "rule": "Напоминание"
     }
+  },
+  "account": {
+    "takePayment": "Принять оплату",
+    "advancePayment": "Аванс",
+    "spreadOver": "Распределить по открытым счетам (сначала самые старые)",
+    "pay": "Оплатить",
+    "noOpenInvoices": "Открытых счетов нет: вся сумма пойдёт в аванс пациента.",
+    "onInvoices_one": "На {{count}} счёт",
+    "onInvoices_few": "На {{count}} счёта",
+    "onInvoices_many": "На {{count}} счетов",
+    "onInvoices_other": "На {{count}} счёта",
+    "toCredit": "В аванс",
+    "partsTooHigh": "Сумма частей больше общей суммы.",
+    "record": "Записать оплату",
+    "outstanding": "Долг по счетам",
+    "credit": "Аванс",
+    "inCredit": "Переплата",
+    "owes": "К оплате",
+    "creditsTitle": "Деньги на счёте пациента",
+    "refund": "Вернуть",
+    "creditHint": "Аванс зачитывается из счёта («Зачесть аванс») или при приёме следующей оплаты.",
+    "statement": "Выписка",
+    "description": "Описание",
+    "charge": "Начислено",
+    "paymentCol": "Оплачено",
+    "lines": {
+      "invoice": "Счёт {{number}}",
+      "invoiceCancelled": "Счёт {{number}} отменён",
+      "onAccount": "Оплата на счёт пациента ({{method}})",
+      "fromCredit": "Счёт {{number}} оплачен из аванса",
+      "payment": "Оплата счёта {{number}} ({{method}})",
+      "voided": "Оплата аннулирована ({{number}})"
+    },
+    "creditShort": "аванс",
+    "refundTitle": "Вернуть аванс",
+    "refundMessage": "Вернуть пациенту {{amount}}? Сумма спишется с его счёта.",
+    "applyCredit": "Зачесть аванс ({{amount}})",
+    "creditApplied": "{{amount}} оплачено из аванса"
   }
 }

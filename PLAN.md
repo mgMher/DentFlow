@@ -258,7 +258,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F1 | ✅ Treatment plan (planned → accepted → done) with printable estimate — built 2026-11-12, see below | Core dental workflow; drives billing |
 | F2 | ✅ Week / day calendar per dentist or chair, drag-to-reschedule, slot picker from availability — built 2026-11-12, see below | Reception works in day view |
 | F3 | ✅ Appointment reminders (SMS / Telegram) using existing templates — built 2026-11-12, see below | #1 no-show reducer |
-| F4 | Patient account: running balance, prepayment, one payment across invoices | Real clinics take deposits |
+| F4 | ✅ Patient account: running balance, prepayment, one payment across invoices — built 2026-11-12, see below | Real clinics take deposits |
 | F5 | Daily cash report (Z-report) by method and cashier; debtors list | End-of-day routine |
 | F6 | X-rays / documents per patient and per tooth (file store, not base64) | Every clinic needs it |
 | F7 | Audit log: who changed what (patient data, chart, payments, settings) | Medical + money data |
@@ -307,6 +307,20 @@ Decisions (agreed 2026-11-12): Telegram first, SMS as fallback; SMS through a pl
 - [x] Tests: `test/e2e/reminders.e2e-spec.ts` (16) against a local fake Telegram / Twilio; all 162 e2e and 22 unit tests pass; browser (settings, connect bot, real cron run sending 3 SMS through the fake Twilio, appointment history, patient card, Telegram link; hy / ru / en)
 - [ ] Not built: email reminders; SMS replies (one-way); a local Armenian SMS gateway (add as another adapter); retries for failed sends; per-patient language (uses the clinic language); confirmation / cancellation / payment-receipt messages (templates exist, nothing sends them yet); QR code for the Telegram link
 - [ ] Deploy: set `SECRETS_KEY` and `PUBLIC_API_URL`; HTTPS is required for Telegram webhooks
+
+### F4 — Patient account — ✅ built 2026-11-12, branch `feat/f4-patient-account` (stacked on F3)
+
+Decisions (made while you were away — please check): money on account is a payment with no invoice (the patient's credit), counted as collected the day it arrives; applying it to an invoice later is not new income. One payment fills open invoices oldest first by default, amounts changeable per invoice, the rest to credit. Credit is applied on purpose ("Apply credit"), not automatically. Voiding applied credit "as a mistake" returns it to credit; refunding credit is admin only.
+
+- [x] **Account.** `GET /billing/patients/:id/account`: owed on open invoices, credit, balance (owed − credit), open invoices oldest first, unused credit. Clinic currency only (D3)
+- [x] **One payment, several invoices.** `POST /billing/patients/:id/payments` with an amount and optional per-invoice parts (`[]` = all on account). Each invoice is paid with the same conditional update as a single payment; if any part fails (balance changed meanwhile) the parts already applied are taken back and nothing is recorded (`409 invoiceBalanceChanged`). Parts share a `receiptId`; admins are notified once
+- [x] **Credit.** `POST /billing/invoices/:id/apply-credit` pays an open invoice from credit, oldest first, splitting a credit when only part is used (claim from credit, then add to invoice — both conditional, undone if the invoice refuses). Voiding applied credit as a mistake returns it to credit; `PATCH /billing/patients/:id/credits/:paymentId/void` refunds unused credit (admins)
+- [x] **Statement.** `GET /billing/patients/:id/statement`: invoices issued and cancelled, payments (to an invoice, on account, from credit) and voids, oldest first with a running balance that ends at the account balance
+- [x] **Reports.** Money on account counts as collected; the revenue report shows how much of it is still on account; dentist performance puts it in "unassigned" so the parts still add up; dashboard and notifications link it to the patient's billing
+- [x] **UI.** Patient → Billing: account card (owed / credit / balance), money on account with Refund (admins), "Take payment" / "Advance payment" dialog with an oldest-first split you can change and the part going to credit shown live, collapsible statement. Invoice page: "Apply credit (amount)"
+- [x] **Fixed on the way.** A payment dated today was stored at midnight and showed before the invoices it paid; today's payments now carry the actual time, and same-moment lines list the charge first
+- [x] Tests: `test/e2e/account.e2e-spec.ts` (19) — allocation, validation, advance payments, applying / splitting / returning / refunding credit, statement, reports adding up, two cashiers at once, credit spent twice at once, roles, tenancy; all 181 e2e and 22 unit tests pass; browser (take payment over two invoices with the rest to credit, apply credit from the invoice page, statement; hy)
+- [ ] Not built: printed receipt for a multi-invoice payment; automatic use of credit when an invoice is issued; credit in another currency; interest / late fees; patient-facing statement print
 
 ---
 

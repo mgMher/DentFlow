@@ -634,6 +634,26 @@ Needs a real Telegram bot (from @BotFather) and, for SMS, a Twilio trial account
 | R-14 | Test message | Settings → Send a test to a patient by SMS / Telegram | Arrives, or a clear reason (no linked chat) | PASS (e2e) |
 | R-15 | Languages | hy / ru / en | All reminder screens translated; message text follows the clinic language | PASS (browser, audit) |
 
+
+## 26. F4 — patient account
+
+Receptionist; one patient with two issued invoices (e.g. 20 000 and 15 000 ֏).
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| A-01 | Account card | Patient → Billing | Owed on invoices, Credit, Balance due | PASS (browser) |
+| A-02 | Pay several | Take payment 50 000 | Parts fill the oldest invoices first; "To credit 15 000" shown live; both invoices Paid; credit 15 000 | PASS (browser + e2e) |
+| A-03 | Change the split | Take payment, edit an invoice's part | Rest moves to credit; more than an invoice's balance or more than the amount is refused | PASS (e2e) |
+| A-04 | Advance payment | Patient with no open invoices → Advance payment | All on account | PASS (e2e) |
+| A-05 | Apply credit | New invoice → "Apply credit (…)" | Paid from credit; credit goes down; toast | PASS (browser) |
+| A-06 | Undo applied credit | On that invoice, void the payment as a mistake | Money back to credit; invoice open again | PASS (e2e) |
+| A-07 | Refund credit | Admin: Money on account → Refund with a reason | Credit gone; receptionist has no Refund button | PASS (e2e) |
+| A-08 | Statement | Billing → Statement | Every invoice, payment, void with a running balance ending at the account balance; today's payment listed after its invoice | PASS (browser + e2e) |
+| A-09 | Two cashiers | Both take a payment for the same patient at once | Never overpaid; one may get "An invoice changed… try again" | PASS (e2e) |
+| A-10 | Reports | Reports → Revenue for today | Collected includes money on account; caption "of which on account …"; dentist report adds up with it in "unassigned" | PASS (e2e) |
+| A-11 | Notifications / dashboard | Admin after an advance payment | "Payment on account" notification and activity open the patient's billing | — |
+| A-12 | Languages | hy / ru / en | All account texts translated | PASS (browser hy, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
