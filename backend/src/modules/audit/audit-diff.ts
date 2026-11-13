@@ -89,7 +89,7 @@ export function diffFields(before: Record<string, unknown> | null, after: Record
  * secrets. Not the record's status from the response: it is usually unchanged
  * noise, and a status that did change is in the changes.
  */
-const BODY_DETAILS = ['reason', 'note', 'voidReason', 'cancelReason', 'status', 'kind', 'toothNumber', 'role', 'email', 'method', 'amount', 'date'];
+const BODY_DETAILS = ['relationship', 'reason', 'note', 'voidReason', 'cancelReason', 'status', 'kind', 'toothNumber', 'role', 'email', 'method', 'amount', 'date'];
 const RESPONSE_DETAILS = [
     'invoiceNumber',
     'amount',

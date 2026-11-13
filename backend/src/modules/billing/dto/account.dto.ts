@@ -3,6 +3,7 @@ import { Type } from 'class-transformer';
 import {
     ArrayMaxSize,
     IsArray,
+    IsBoolean,
     IsDateString,
     IsEnum,
     IsMongoId,
@@ -44,6 +45,13 @@ export class TakePaymentDto {
     @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) reference?: string;
 
     @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+
+    @ApiPropertyOptional({
+        description: "F8: also pay the open invoices of the patients this one is the guardian of; each invoice is paid on the child's account, the rest is the payer's credit",
+    })
+    @IsOptional()
+    @IsBoolean()
+    family?: boolean;
 
     @ApiPropertyOptional({ type: [AllocationDto] })
     @IsOptional()

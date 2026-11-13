@@ -381,4 +381,83 @@ describe('Reminders (e2e)', () => {
             expect(tg.body.code).toBe('reminderNoChannel');
         });
     });
+    describe('children (F8): reminders go to the main guardian while under 18', () => {
+        let mother: any, child: any, withContact: any, grownUp: any;
+        let aChild: any, aContact: any, aGrownUp: any;
+        const next = at(9, 8).slice(0, 10);
+
+        beforeAll(async () => {
+            mother = await t.addPatient(C.token, 'Mother');
+            await linkPatient(mother, '777');
+            child = await t.addPatient(C.token, 'Kid');
+            withContact = await t.addPatient(C.token, 'Kid2');
+            grownUp = await t.addPatient(C.token, 'Grown');
+            await t.api.patch(`/patients/${child._id}`, C.token, { dateOfBirth: '2016-04-01' });
+            await t.api.patch(`/patients/${withContact._id}`, C.token, { dateOfBirth: '2014-09-15' });
+            // Over 18 with a guardian still on file: their own phone.
+            await t.api.post(`/patients/${grownUp._id}/guardians`, recep.token, { patientId: mother._id, relationship: 'mother' });
+            await t.api.post(`/patients/${child._id}/guardians`, recep.token, { patientId: mother._id, relationship: 'mother' });
+            await t.api.post(`/patients/${withContact._id}/guardians`, recep.token, { name: 'Aram Kid2', phone: '+37491222333', relationship: 'father' });
+            aChild = await book(child, '09:00', next);
+            aContact = await book(withContact, '09:30', next);
+            aGrownUp = await book(grownUp, '10:00', next);
+        });
+
+        it("a linked guardian's Telegram, a contact's phone, an adult's own phone; the text names the child", async () => {
+            const before = fake.calls.length;
+            await reminders.tick(local(dayBefore(next), '10:05'));
+            const calls = fake.calls.slice(before);
+
+            const tg = calls.find((c) => c.method === 'sendMessage' && c.body.chat_id === '777')!;
+            expect(tg.body.text).toContain('Kid');
+            expect(tg.body.reply_markup.inline_keyboard[0][0].callback_data).toBe(`c:${aChild._id}`);
+            expect((await logFor(aChild._id))[0]).toMatchObject({
+                status: 'sent',
+                channel: 'telegram',
+                guardian: { name: `Mother ${mother.lastName}`, relationship: 'mother' },
+            });
+
+            const sms = calls.find((c) => c.service === 'twilio' && c.body.To === '+37491222333')!;
+            expect(sms.body.Body).toContain('Kid2');
+            expect((await logFor(aContact._id))[0]).toMatchObject({ channel: 'sms', guardian: { name: 'Aram Kid2', relationship: 'father' } });
+
+            // The profile card says where they go.
+            expect((await t.api.get(`/reminders/patients/${child._id}`, recep.token)).data.guardian).toEqual({
+                name: `Mother ${mother.lastName}`,
+                relationship: 'mother',
+                channel: 'telegram',
+            });
+            expect((await t.api.get(`/reminders/patients/${withContact._id}`, recep.token)).data.guardian).toMatchObject({ channel: 'sms' });
+            expect((await t.api.get(`/reminders/patients/${grownUp._id}`, recep.token)).data.guardian).toBeNull();
+
+            const own = calls.find((c) => c.service === 'twilio' && c.body.To === grownUp.phone);
+            expect(own).toBeDefined();
+            expect((await logFor(aGrownUp._id))[0].guardian).toBeUndefined();
+        });
+
+        it("the guardian answers for the child from their own Telegram; it is logged as them", async () => {
+            await webhook({
+                update_id: 77,
+                callback_query: { id: 'cq77', from: { id: 777 }, data: `c:${aChild._id}`, message: { message_id: 5, chat: { id: '777' }, text: 'Reminder' } },
+            });
+            await settle();
+            expect((await t.api.get(`/appointments/${aChild._id}`, C.token)).data.status).toBe('confirmed');
+            const log = (await t.api.get(`/patients/${child._id}/history?limit=1`, C.token)).data.items[0];
+            expect(log).toMatchObject({
+                event: 'appointments.patientConfirmed',
+                actor: { kind: 'patient', name: `Mother ${mother.lastName}` },
+                details: { guardian: 'mother' },
+            });
+        });
+
+        it("someone else's chat still cannot answer", async () => {
+            const a = await book(child, '15:00', next);
+            await webhook({
+                update_id: 78,
+                callback_query: { id: 'cq78', from: { id: 222 }, data: `x:${a._id}`, message: { message_id: 6, chat: { id: '222' }, text: 'Reminder' } },
+            });
+            await settle();
+            expect((await t.api.get(`/appointments/${a._id}`, C.token)).data.status).toBe('scheduled');
+        });
+    });
 });

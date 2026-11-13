@@ -8,6 +8,7 @@ import { Currency, toMajor } from 'src/common/utils';
  */
 export const AUDIT_AREAS: Record<string, string | null> = {
     PatientsController: 'patients',
+    FamilyController: 'patients',
     DentalRecordsController: 'chart',
     TreatmentPlansController: 'plans',
     AppointmentsController: 'appointments',
@@ -79,6 +80,17 @@ const invoice = (doc: Record<string, any> | null) =>
           }
         : null;
 
+/** Guardians as `guardian.<id>`: "mother, main" plus who (a linked patient's id or the contact's name and phone). */
+const guardians = (doc: Record<string, any> | null) => {
+    const out: Record<string, unknown> = {};
+    for (const g of doc?.guardians ?? []) {
+        out[`guardians.${g._id}`] = [g.relationship, g.isPrimary ? 'primary' : null, g.patientId ? `patient:${g.patientId}` : `${g.name} ${g.phone}`]
+            .filter(Boolean)
+            .join(' · ');
+    }
+    return out;
+};
+
 /** Staff availability lives under `schedule` on the profile. */
 const staffProfile = (doc: Record<string, any> | null) =>
     doc ? { ...doc, defaultAvailability: doc.schedule?.defaultAvailability } : null;
@@ -86,6 +98,9 @@ const staffProfile = (doc: Record<string, any> | null) =>
 export const DIFF_RULES: Record<string, DiffRule> = {
     'patients.update': { model: 'Patient', filter: byId() },
     'patients.updateStatus': { model: 'Patient', filter: byId(), fields: only('status') },
+    'patients.addGuardian': { model: 'Patient', filter: byId(), pick: guardians, fields: allKeys },
+    'patients.updateGuardian': { model: 'Patient', filter: byId(), pick: guardians, fields: allKeys },
+    'patients.removeGuardian': { model: 'Patient', filter: byId(), pick: guardians, fields: allKeys },
     'reminders.setOptOut': { model: 'Patient', filter: (r) => byId('patientId')(r), fields: only('remindersOptOut') },
 
     'chart.setChartType': { model: 'DentalRecord', filter: byPatient, fields: only('chartType') },

@@ -985,7 +985,13 @@
     "unsupportedFileType": "Можно загружать только файлы JPEG, PNG, WebP, PDF и DICOM.",
     "documentEditForbidden": "Изменить может только тот, кто загрузил, или стоматолог.",
     "documentNotFound": "Документ не найден.",
-    "documentFileMissing": "Файл отсутствует в хранилище."
+    "documentFileMissing": "Файл отсутствует в хранилище.",
+    "tooManyGuardians": "У пациента может быть не больше 4 родителей или опекунов.",
+    "guardianIsSelf": "Пациент не может быть своим опекуном.",
+    "guardianAlreadyLinked": "Этот человек уже указан как опекун пациента.",
+    "guardianCycle": "Пациент уже является опекуном этого человека.",
+    "guardianIsPatient": "Этот опекун — пациент: измените имя и телефон в его собственной карте.",
+    "guardianNotFound": "Опекун не найден."
   },
   "plans": {
     "tab": "Планы лечения",
@@ -1416,7 +1422,10 @@
       "patients": {
         "create": "Добавил(а) пациента",
         "update": "Изменил(а) данные пациента",
-        "updateStatus": "Изменил(а) статус пациента"
+        "updateStatus": "Изменил(а) статус пациента",
+        "addGuardian": "Добавил(а) родителя или опекуна",
+        "updateGuardian": "Изменил(а) данные родителя или опекуна",
+        "removeGuardian": "Удалил(а) родителя или опекуна"
       },
       "reminders": {
         "updateSettings": "Изменил(а) настройки напоминаний",
@@ -1555,12 +1564,60 @@
       "note": "Примечание",
       "counted": "Посчитано",
       "difference": "Разница",
-      "count": "Количество"
+      "count": "Количество",
+      "guardian": "Родитель или опекун"
     },
     "reasons": {
       "wrongPassword": "Неверный пароль",
       "locked": "Учётная запись заблокирована",
       "deactivated": "Учётная запись деактивирована"
     }
+  },
+  "family": {
+    "title": "Семья",
+    "minor": "Несовершеннолетний ({{age}})",
+    "noGuardianWarning": "Младше 18 лет, родитель или опекун не указан.",
+    "guardians": "Родители и опекуны",
+    "guardiansTitle": "Родители и опекуны",
+    "noGuardians": "Не указаны",
+    "main": "Основной контакт",
+    "hasTelegram": "Telegram подключён",
+    "contactOnly": "не пациент",
+    "addGuardian": "Добавить родителя или опекуна",
+    "editGuardian": "Родитель или опекун",
+    "remove": "Удалить",
+    "removed": "Опекун удалён",
+    "removeTitle": "Удалить опекуна?",
+    "removeMessage": "{{name}} больше не будет связан(а) с этим пациентом. Собственная карта не меняется.",
+    "children": "Дети",
+    "siblings": "Братья и сёстры",
+    "isPatient": "Пациент клиники",
+    "isContact": "Другой контакт",
+    "guardian": "Родитель или опекун",
+    "findPatient": "Найти пациента",
+    "name": "Имя и фамилия",
+    "contactPhoneHint": "Пока ребёнку нет 18, напоминания приходят на этот номер",
+    "relationship": "Кем приходится",
+    "makeMain": "Основной контакт: получает напоминания, пока пациенту нет 18",
+    "minorHint": "Младше 18: добавьте родителя или опекуна. Сохранить можно и без него.",
+    "optionalHint": "Необязательно",
+    "useGuardianPhone": "Взять номер опекуна",
+    "remindersToGuardian": "До 18 лет напоминания получает {{name}} ({{relationship}}).",
+    "sentToGuardian": "Получатель: {{name}} ({{relationship}})",
+    "billingTitle": "Семья",
+    "owesTotal": "Долг семьи",
+    "takePayment": "Принять оплату за семью",
+    "relationships": {
+      "mother": "Мать",
+      "father": "Отец",
+      "grandparent": "Бабушка / дедушка",
+      "sibling": "Брат / сестра",
+      "guardian": "Опекун",
+      "other": "Другое"
+    },
+    "age_one": "{{count}} год",
+    "age_few": "{{count}} года",
+    "age_many": "{{count}} лет",
+    "age_other": "{{count}} года"
   }
 }

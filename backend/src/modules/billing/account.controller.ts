@@ -24,6 +24,13 @@ export class AccountController {
         return this.account.getAccount(oid(clinicId), patientId);
     }
 
+    @Get('patients/:patientId/family-account')
+    @Roles(...BILLING_VIEWERS)
+    @ApiOperation({ summary: 'The patient and the children they are the guardian of: accounts and totals (F8)' })
+    familyAccount(@CurrentUser('clinicId') clinicId: string, @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId) {
+        return this.account.getFamilyAccount(oid(clinicId), patientId);
+    }
+
     @Get('patients/:patientId/statement')
     @Roles(...BILLING_VIEWERS)
     @ApiOperation({ summary: 'Invoices, payments and refunds, oldest first, with a running balance' })

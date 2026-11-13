@@ -7,6 +7,7 @@ import { Patient, PatientSchema } from '../patients/patient.schema';
 import { Clinic, ClinicSchema } from '../clinics/clinic.schema';
 import { NotificationTemplate, NotificationTemplateSchema } from '../settings/notification-template.schema';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { PatientsModule } from '../patients/patients.module';
 import { ReminderLog, ReminderLogSchema, ReminderSettings, ReminderSettingsSchema } from './reminder.schemas';
 import { RemindersService } from './reminders.service';
 import { RemindersController, TelegramWebhookController } from './reminders.controller';
@@ -26,6 +27,7 @@ import { RemindersController, TelegramWebhookController } from './reminders.cont
         ]),
         AppointmentsModule,
         NotificationsModule,
+        PatientsModule,
     ],
     controllers: [RemindersController, TelegramWebhookController],
     providers: [RemindersService],

@@ -37,6 +37,8 @@ const fieldName = (t: TFunction, key: string) => t(`audit.fields.${key}`, { defa
 export const fieldLabel = (t: TFunction, field: string) => {
     const [head, ...rest] = field.split('.');
     if (/^\d{2}$/.test(head)) return `${t('dental.tooth')} ${head} · ${fieldName(t, rest.join('.'))}`;
+    // One guardian (F8), keyed by its id.
+    if (head === 'guardians') return fieldName(t, 'guardian');
     return [head, ...rest].map((k) => fieldName(t, k)).join(' · ');
 };
 
@@ -56,6 +58,7 @@ const enumValue = (t: TFunction, area: string, field: string, v: string) => {
     if (last === 'role') return t(`staff.${roleTranslationKey(v)}`);
     if (last === 'method') return t(paymentMethodKey(v as PaymentMethod));
     if (last === 'kind') return first(t, [`documents.kinds.${v}`], v);
+    if (last === 'relationship') return first(t, [`family.relationships.${v}`], v);
     if (last === 'language') return first(t, [`reminders.languages.${v}`], v);
     if (last === 'gender') return first(t, [`patients.${v}`], v);
     if (last === 'status' || last === 'reason') {
@@ -79,6 +82,21 @@ export const formatValue = (t: TFunction, entry: Pick<AuditEntry, 'area'>, field
     if (typeof value === 'boolean') return t(value ? 'common.yes' : 'common.no');
     if (typeof value === 'number') return value.toLocaleString(i18n.language);
     if (typeof value === 'string') {
+        // A guardian (F8): "mother · primary · patient:<id>" or "… · Name +374…".
+        if (field.startsWith('guardians.')) {
+            return value
+                .split(' · ')
+                .map((part) =>
+                    part === 'primary'
+                        ? String(t('family.main'))
+                        : part.startsWith('patient:')
+                          ? String(t('family.isPatient'))
+                          : i18n.exists(`family.relationships.${part}`)
+                            ? String(t(`family.relationships.${part}`))
+                            : part,
+                )
+                .join(' · ');
+        }
         if (ISO.test(value)) {
             return value.endsWith('T00:00:00.000Z') ? formatDate(value, 'dd.MM.yyyy', i18n.language) : formatDateTime(value, i18n.language);
         }
@@ -92,7 +110,7 @@ export const formatValue = (t: TFunction, entry: Pick<AuditEntry, 'area'>, field
 };
 
 /** The identifying values worth showing next to the action, in a fixed order. */
-const DETAIL_ORDER = ['invoiceNumber', 'title', 'firstName', 'lastName', 'email', 'amount', 'totalAmount', 'method', 'status', 'kind', 'startTime', 'reason', 'note', 'counted', 'difference', 'count'];
+const DETAIL_ORDER = ['relationship', 'invoiceNumber', 'title', 'firstName', 'lastName', 'email', 'amount', 'totalAmount', 'method', 'status', 'kind', 'startTime', 'reason', 'note', 'counted', 'difference', 'count'];
 
 export const detailItems = (t: TFunction, entry: AuditEntry): string[] => {
     const d = entry.details ?? {};

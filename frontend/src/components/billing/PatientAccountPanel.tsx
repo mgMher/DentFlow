@@ -29,6 +29,7 @@ import { apiErrorMessage } from '../../utils/apiError';
 import { paymentMethodKey } from '../../utils/billing';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import TakePaymentDialog from './TakePaymentDialog';
+import FamilyAccountCard from './FamilyAccountCard';
 
 const unwrap = (res: { data: any }) => res.data?.data ?? res.data;
 
@@ -48,6 +49,8 @@ const PatientAccountPanel: React.FC<{ patientId: string; onChange?: () => void }
     const [refund, setRefund] = useState<PatientAccount['credits'][number] | null>(null);
     const [reason, setReason] = useState('');
     const [error, setError] = useState<string | null>(null);
+    // Bumped after any change here, so the family card (F8) reloads too.
+    const [version, setVersion] = useState(0);
 
     const load = useCallback(async () => {
         try {
@@ -57,6 +60,7 @@ const PatientAccountPanel: React.FC<{ patientId: string; onChange?: () => void }
             ]);
             setAccount(unwrap(a));
             setStatement(unwrap(s).lines);
+            setVersion((v) => v + 1);
         } catch (err) {
             setError(apiErrorMessage(err));
         }
@@ -93,148 +97,151 @@ const PatientAccountPanel: React.FC<{ patientId: string; onChange?: () => void }
     };
 
     return (
-        <Card sx={{ mb: 2 }}>
-            <CardContent>
-                {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
-                <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
-                    <Box>
-                        <Typography variant="caption" color="text.secondary">{t('account.outstanding')}</Typography>
-                        <Typography fontWeight={600}>{money(account.outstanding)}</Typography>
+        <>
+            <Card sx={{ mb: 2 }}>
+                <CardContent>
+                    {error && <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>{error}</Alert>}
+                    <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">{t('account.outstanding')}</Typography>
+                            <Typography fontWeight={600}>{money(account.outstanding)}</Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">{t('account.credit')}</Typography>
+                            <Typography fontWeight={600} color={account.credit > 0 ? 'success.main' : undefined}>{money(account.credit)}</Typography>
+                        </Box>
+                        <Box>
+                            <Typography variant="caption" color="text.secondary">
+                                {account.balance < 0 ? t('account.inCredit') : t('account.owes')}
+                            </Typography>
+                            <Typography fontWeight={700} color={account.balance > 0 ? 'error.main' : 'success.main'}>
+                                {money(Math.abs(account.balance))}
+                            </Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }} />
+                        {can('manageBilling') && (
+                            <Button variant="contained" startIcon={<PaymentIcon />} onClick={() => setPaying(true)}>
+                                {account.openInvoices.length ? t('account.takePayment') : t('account.advancePayment')}
+                            </Button>
+                        )}
                     </Box>
-                    <Box>
-                        <Typography variant="caption" color="text.secondary">{t('account.credit')}</Typography>
-                        <Typography fontWeight={600} color={account.credit > 0 ? 'success.main' : undefined}>{money(account.credit)}</Typography>
-                    </Box>
-                    <Box>
-                        <Typography variant="caption" color="text.secondary">
-                            {account.balance < 0 ? t('account.inCredit') : t('account.owes')}
-                        </Typography>
-                        <Typography fontWeight={700} color={account.balance > 0 ? 'error.main' : 'success.main'}>
-                            {money(Math.abs(account.balance))}
-                        </Typography>
-                    </Box>
-                    <Box sx={{ flex: 1 }} />
-                    {can('manageBilling') && (
-                        <Button variant="contained" startIcon={<PaymentIcon />} onClick={() => setPaying(true)}>
-                            {account.openInvoices.length ? t('account.takePayment') : t('account.advancePayment')}
-                        </Button>
+
+                    {account.credits.length > 0 && (
+                        <>
+                            <Divider sx={{ my: 2 }} />
+                            <Typography variant="subtitle2" gutterBottom>{t('account.creditsTitle')}</Typography>
+                            {account.credits.map((c) => (
+                                <Box key={c._id} sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 0.5, flexWrap: 'wrap' }}>
+                                    <Typography variant="body2" sx={{ minWidth: 90 }}>{formatDate(c.date, 'dd.MM.yyyy', i18n.language)}</Typography>
+                                    <Typography variant="body2" fontWeight={600} sx={{ minWidth: 100 }}>{money(c.amount)}</Typography>
+                                    <Typography variant="body2" color="text.secondary">{t(paymentMethodKey(c.method))}</Typography>
+                                    <Box sx={{ flex: 1 }} />
+                                    {can('billingAdmin') && (
+                                        <Button size="small" color="error" onClick={() => { setReason(''); setRefund(c); }}>
+                                            {t('account.refund')}
+                                        </Button>
+                                    )}
+                                </Box>
+                            ))}
+                            <Typography variant="caption" color="text.secondary">{t('account.creditHint')}</Typography>
+                        </>
                     )}
-                </Box>
 
-                {account.credits.length > 0 && (
-                    <>
-                        <Divider sx={{ my: 2 }} />
-                        <Typography variant="subtitle2" gutterBottom>{t('account.creditsTitle')}</Typography>
-                        {account.credits.map((c) => (
-                            <Box key={c._id} sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 0.5, flexWrap: 'wrap' }}>
-                                <Typography variant="body2" sx={{ minWidth: 90 }}>{formatDate(c.date, 'dd.MM.yyyy', i18n.language)}</Typography>
-                                <Typography variant="body2" fontWeight={600} sx={{ minWidth: 100 }}>{money(c.amount)}</Typography>
-                                <Typography variant="body2" color="text.secondary">{t(paymentMethodKey(c.method))}</Typography>
-                                <Box sx={{ flex: 1 }} />
-                                {can('billingAdmin') && (
-                                    <Button size="small" color="error" onClick={() => { setReason(''); setRefund(c); }}>
-                                        {t('account.refund')}
-                                    </Button>
-                                )}
-                            </Box>
-                        ))}
-                        <Typography variant="caption" color="text.secondary">{t('account.creditHint')}</Typography>
-                    </>
-                )}
-
-                {statement && statement.length > 0 && (
-                    <>
-                        <Divider sx={{ my: 2 }} />
-                        <Button size="small" onClick={() => setShowStatement((v) => !v)} endIcon={showStatement ? <LessIcon /> : <MoreIcon />}>
-                            {t('account.statement')}
-                        </Button>
-                        <Collapse in={showStatement}>
-                            <TableContainer sx={{ overflowX: 'auto', mt: 1 }}>
-                                <Table size="small">
-                                    <TableHead>
-                                        <TableRow>
-                                            <TableCell>{t('common.date')}</TableCell>
-                                            <TableCell>{t('account.description')}</TableCell>
-                                            <TableCell align="right">{t('account.charge')}</TableCell>
-                                            <TableCell align="right">{t('account.paymentCol')}</TableCell>
-                                            <TableCell align="right">{t('billing.balance')}</TableCell>
-                                        </TableRow>
-                                    </TableHead>
-                                    <TableBody>
-                                        {statement.map((l, index) => (
-                                            <TableRow key={index}>
-                                                <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(l.date, 'dd.MM.yyyy', i18n.language)}</TableCell>
-                                                <TableCell>
-                                                    {l.invoiceId ? (
-                                                        <Link component="button" variant="body2" onClick={() => navigate(`/billing/${l.invoiceId}`)}>
-                                                            {lineLabel(l)}
-                                                        </Link>
-                                                    ) : (
-                                                        lineLabel(l)
-                                                    )}
-                                                    {l.reason && (
-                                                        <Typography variant="caption" color="text.secondary" component="div">{l.reason}</Typography>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{l.charge ? money(l.charge) : ''}</TableCell>
-                                                <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{l.payment ? money(l.payment) : ''}</TableCell>
-                                                <TableCell align="right" sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{money(l.balance)}</TableCell>
+                    {statement && statement.length > 0 && (
+                        <>
+                            <Divider sx={{ my: 2 }} />
+                            <Button size="small" onClick={() => setShowStatement((v) => !v)} endIcon={showStatement ? <LessIcon /> : <MoreIcon />}>
+                                {t('account.statement')}
+                            </Button>
+                            <Collapse in={showStatement}>
+                                <TableContainer sx={{ overflowX: 'auto', mt: 1 }}>
+                                    <Table size="small">
+                                        <TableHead>
+                                            <TableRow>
+                                                <TableCell>{t('common.date')}</TableCell>
+                                                <TableCell>{t('account.description')}</TableCell>
+                                                <TableCell align="right">{t('account.charge')}</TableCell>
+                                                <TableCell align="right">{t('account.paymentCol')}</TableCell>
+                                                <TableCell align="right">{t('billing.balance')}</TableCell>
                                             </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </TableContainer>
-                        </Collapse>
-                    </>
-                )}
-            </CardContent>
+                                        </TableHead>
+                                        <TableBody>
+                                            {statement.map((l, index) => (
+                                                <TableRow key={index}>
+                                                    <TableCell sx={{ whiteSpace: 'nowrap' }}>{formatDate(l.date, 'dd.MM.yyyy', i18n.language)}</TableCell>
+                                                    <TableCell>
+                                                        {l.invoiceId ? (
+                                                            <Link component="button" variant="body2" onClick={() => navigate(`/billing/${l.invoiceId}`)}>
+                                                                {lineLabel(l)}
+                                                            </Link>
+                                                        ) : (
+                                                            lineLabel(l)
+                                                        )}
+                                                        {l.reason && (
+                                                            <Typography variant="caption" color="text.secondary" component="div">{l.reason}</Typography>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{l.charge ? money(l.charge) : ''}</TableCell>
+                                                    <TableCell align="right" sx={{ whiteSpace: 'nowrap' }}>{l.payment ? money(l.payment) : ''}</TableCell>
+                                                    <TableCell align="right" sx={{ whiteSpace: 'nowrap', fontWeight: 600 }}>{money(l.balance)}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </TableContainer>
+                            </Collapse>
+                        </>
+                    )}
+                </CardContent>
 
-            <TakePaymentDialog
-                open={paying}
-                patientId={patientId}
-                account={account}
-                onClose={() => setPaying(false)}
-                onDone={() => {
-                    setPaying(false);
-                    toast.success(t('toast.saveSuccess'));
-                    changed();
-                }}
-            />
-
-            <ConfirmDialog
-                open={!!refund}
-                title={t('account.refundTitle')}
-                message={refund ? t('account.refundMessage', { amount: money(refund.amount) }) : ''}
-                variant="danger"
-                confirmLabel={t('account.refund')}
-                confirmDisabled={reason.trim().length < 3}
-                onConfirm={async () => {
-                    if (!refund) return;
-                    try {
-                        await api.patch(`/billing/patients/${patientId}/credits/${refund._id}/void`, { type: 'refund', reason: reason.trim() });
-                        toast.success(t('toast.updateSuccess'));
-                        setRefund(null);
+                <TakePaymentDialog
+                    open={paying}
+                    patientId={patientId}
+                    account={account}
+                    onClose={() => setPaying(false)}
+                    onDone={() => {
+                        setPaying(false);
+                        toast.success(t('toast.saveSuccess'));
                         changed();
-                    } catch (err) {
-                        setError(apiErrorMessage(err));
-                        setRefund(null);
-                    }
-                }}
-                onCancel={() => setRefund(null)}
-            >
-                <TextField
-                    autoFocus
-                    fullWidth
-                    required
-                    size="small"
-                    label={t('plans.reason')}
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    inputProps={{ maxLength: 500 }}
-                    sx={{ mt: 2 }}
+                    }}
                 />
-            </ConfirmDialog>
-        </Card>
+
+                <ConfirmDialog
+                    open={!!refund}
+                    title={t('account.refundTitle')}
+                    message={refund ? t('account.refundMessage', { amount: money(refund.amount) }) : ''}
+                    variant="danger"
+                    confirmLabel={t('account.refund')}
+                    confirmDisabled={reason.trim().length < 3}
+                    onConfirm={async () => {
+                        if (!refund) return;
+                        try {
+                            await api.patch(`/billing/patients/${patientId}/credits/${refund._id}/void`, { type: 'refund', reason: reason.trim() });
+                            toast.success(t('toast.updateSuccess'));
+                            setRefund(null);
+                            changed();
+                        } catch (err) {
+                            setError(apiErrorMessage(err));
+                            setRefund(null);
+                        }
+                    }}
+                    onCancel={() => setRefund(null)}
+                >
+                    <TextField
+                        autoFocus
+                        fullWidth
+                        required
+                        size="small"
+                        label={t('plans.reason')}
+                        value={reason}
+                        onChange={(e) => setReason(e.target.value)}
+                        inputProps={{ maxLength: 500 }}
+                        sx={{ mt: 2 }}
+                    />
+                </ConfirmDialog>
+            </Card>
+            <FamilyAccountCard patientId={patientId} version={version} onChange={() => { load(); onChange?.(); }} />
+        </>
     );
 };
 

@@ -182,6 +182,8 @@ export interface Patient {
     photo?: string | null;
     address?: Address;
     emergencyContact?: EmergencyContact;
+    /** Parents and guardians (F8). */
+    guardians?: Guardian[];
     medicalHistory?: MedicalHistory;
     insurance?: Insurance;
     notes?: string;
@@ -567,6 +569,48 @@ export interface StatementLine {
     balance: number;
 }
 
+// Family links (F8)
+export type GuardianRelationship = 'mother' | 'father' | 'grandparent' | 'sibling' | 'guardian' | 'other';
+
+/** A guardian is another patient (`patientId`) or a contact (`name` + `phone`). */
+export interface Guardian {
+    _id: string;
+    patientId?: string;
+    name?: string;
+    phone?: string;
+    relationship: GuardianRelationship;
+    isPrimary: boolean;
+}
+
+export interface FamilyPerson {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    patronymic?: string;
+    phone: string;
+    dateOfBirth: string;
+    status: PatientStatus;
+    age: number | null;
+    telegram: boolean;
+}
+
+export interface PatientFamily {
+    age: number | null;
+    minor: boolean;
+    guardians: (Omit<Guardian, 'patientId'> & { patient?: FamilyPerson | null })[];
+    children: (FamilyPerson & { relationship: GuardianRelationship; isPrimary: boolean })[];
+    siblings: FamilyPerson[];
+}
+
+export interface FamilyAccount {
+    currency: Currency;
+    members: { patient: { _id: string; firstName: string; lastName: string; patronymic?: string }; self: boolean; outstanding: number; credit: number; balance: number }[];
+    outstanding: number;
+    credit: number;
+    balance: number;
+    openInvoices: (PatientAccount['openInvoices'][number] & { patientId: string })[];
+}
+
 // Audit log (F7)
 export interface AuditChange {
     field: string;
@@ -697,6 +741,8 @@ export interface ReminderLogEntry {
     status: ReminderStatus;
     channel?: ReminderChannel;
     to?: string;
+    /** Sent to the child's main guardian (F8). */
+    guardian?: { name: string; relationship: GuardianRelationship };
     text?: string;
     /** A code (optedOut, noChannel, patientMissing) or the provider's message. */
     reason?: string;
@@ -712,6 +758,8 @@ export interface PatientReminderStatus {
     telegramLinked: boolean;
     telegramLinkedAt: string | null;
     smsAvailable: boolean;
+    /** Under 18 with a guardian (F8): reminders go to them instead. */
+    guardian: { name: string; relationship: GuardianRelationship; channel: 'telegram' | 'sms' | null } | null;
 }
 
 // Notification types

@@ -719,6 +719,29 @@ Admin, dentist, receptionist; one patient.
 | L-15 | Other clinic | Another clinic's admin | Sees only its own entries; the patient's history is 404 | PASS (e2e) |
 | L-16 | Languages, phone | hy / ru / en; 375 px | All texts translated, day headers with lower-case months; no sideways scroll | PASS (browser, audit) |
 
+## 30. F8 — family links
+
+Receptionist and admin; an adult patient (parent) and a child under 18.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| G-01 | New child | Add patient, birth date under 18 | "Parents and guardians" asks for one and warns while empty; saving without one is allowed | PASS (browser) |
+| G-02 | Guardians on create | Add the father (a patient) and the mother (a contact); "Use the guardian's phone"; save | Father is main; the phone is filled; after saving the child's page shows both | PASS (browser) |
+| G-03 | Family card | Child's profile; father's profile | Child: under 18 (age), guardians with main contact and phones, "not a patient" for the contact; father: the child under Children | PASS (browser + e2e) |
+| G-04 | Change | Edit the mother: legal guardian, main contact | Relationship and main contact move; one main only | PASS (browser + e2e) |
+| G-05 | Remove | Remove the main guardian | The next one becomes main | PASS (e2e) |
+| G-06 | Refused | Self; twice; loop; 5th guardian; contact without phone; another clinic's patient; rename a linked guardian | Each refused with a clear message | PASS (e2e) |
+| G-07 | Siblings | Two children of the same parent | Each lists the other as a sibling | PASS (e2e) |
+| G-08 | Reminders | Child with a linked parent (Telegram), child with a contact, an adult with a guardian | Parent's Telegram, the contact's phone, the adult's own phone; text names the child; the log says which guardian | PASS (e2e) |
+| G-09 | Parent answers | Parent presses "I will come" | Appointment confirmed; audit shows the parent | PASS (e2e) |
+| G-10 | Reminder card | Child's profile | "Under 18: reminders go to <guardian>" | PASS (browser + e2e) |
+| G-11 | Family account | Father's billing | Family card: each member's balance and the total | PASS (browser + e2e) |
+| G-12 | Family payment | Take 25 000 for the family over 15 000 (child) + 8 000 (father) | Oldest first, labelled by person; child owes 0 (paid by father), father 2 000 credit | PASS (browser + e2e) |
+| G-13 | Not family | Ordinary payment pointing at a child's invoice | Refused | PASS (e2e) |
+| G-14 | Audit | Child's History | Guardian added / changed old → new in the user's language | PASS (browser + e2e) |
+| G-15 | Who may | Assistant | Sees the family; cannot change it | PASS (e2e) |
+| G-16 | Languages, phone | hy / ru / en; 375 px | All texts translated; card fits | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

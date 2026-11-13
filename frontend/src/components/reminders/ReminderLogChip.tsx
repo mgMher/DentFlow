@@ -25,6 +25,11 @@ const ReminderLogChip: React.FC<{ entry: ReminderLogEntry }> = ({ entry }) => {
                     label={`${t(`reminders.statuses.${entry.status}`)}${entry.channel ? ` · ${t(`reminders.channels.${entry.channel}`)}` : ''}`}
                 />
             </Tooltip>
+            {entry.guardian && (
+                <Typography variant="caption" color="text.secondary" component="div" sx={{ mt: 0.5 }}>
+                    {t('family.sentToGuardian', { name: entry.guardian.name, relationship: t(`family.relationships.${entry.guardian.relationship}`) })}
+                </Typography>
+            )}
             {(reason || entry.answer) && (
                 <Typography variant="caption" color={entry.status === 'failed' ? 'error' : 'text.secondary'} component="div" sx={{ mt: 0.5 }}>
                     {entry.answer ? t(`reminders.answers.${entry.answer}`) : reason}

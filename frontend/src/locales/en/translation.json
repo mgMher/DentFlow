@@ -969,7 +969,13 @@
     "unsupportedFileType": "Only JPEG, PNG, WebP, PDF and DICOM files can be uploaded.",
     "documentEditForbidden": "Only the person who uploaded it or a dentist can change it.",
     "documentNotFound": "Document not found.",
-    "documentFileMissing": "The file is missing from storage."
+    "documentFileMissing": "The file is missing from storage.",
+    "tooManyGuardians": "A patient can have at most 4 parents or guardians.",
+    "guardianIsSelf": "A patient cannot be their own guardian.",
+    "guardianAlreadyLinked": "This person is already a guardian of the patient.",
+    "guardianCycle": "The patient is already this person's guardian.",
+    "guardianIsPatient": "This guardian is a patient: change their name and phone on their own record.",
+    "guardianNotFound": "Guardian not found."
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1386,7 +1392,10 @@
       "patients": {
         "create": "Added a patient",
         "update": "Changed patient details",
-        "updateStatus": "Changed the patient's status"
+        "updateStatus": "Changed the patient's status",
+        "addGuardian": "Added a parent or guardian",
+        "updateGuardian": "Changed a parent or guardian",
+        "removeGuardian": "Removed a parent or guardian"
       },
       "reminders": {
         "updateSettings": "Changed reminder settings",
@@ -1525,12 +1534,58 @@
       "note": "Note",
       "counted": "Counted",
       "difference": "Difference",
-      "count": "Count"
+      "count": "Count",
+      "guardian": "Parent or guardian"
     },
     "reasons": {
       "wrongPassword": "Wrong password",
       "locked": "Account locked",
       "deactivated": "Account deactivated"
     }
+  },
+  "family": {
+    "title": "Family",
+    "minor": "Under 18 ({{age}})",
+    "noGuardianWarning": "Under 18 with no parent or guardian on record.",
+    "guardians": "Parents and guardians",
+    "guardiansTitle": "Parents and guardians",
+    "noGuardians": "None recorded",
+    "main": "Main contact",
+    "hasTelegram": "Telegram linked",
+    "contactOnly": "not a patient",
+    "addGuardian": "Add parent or guardian",
+    "editGuardian": "Parent or guardian",
+    "remove": "Remove",
+    "removed": "Guardian removed",
+    "removeTitle": "Remove this guardian?",
+    "removeMessage": "{{name}} will no longer be linked to this patient. Their own record does not change.",
+    "children": "Children",
+    "siblings": "Brothers and sisters",
+    "isPatient": "Patient of the clinic",
+    "isContact": "Other contact",
+    "guardian": "Parent or guardian",
+    "findPatient": "Find the patient",
+    "name": "Full name",
+    "contactPhoneHint": "A child's reminders go to this number while they are under 18",
+    "relationship": "Relationship",
+    "makeMain": "Main contact: gets the reminders while the patient is under 18",
+    "minorHint": "Under 18: add a parent or guardian. You can also save without one.",
+    "optionalHint": "Optional",
+    "useGuardianPhone": "Use the guardian's phone",
+    "remindersToGuardian": "Under 18: reminders go to {{name}} ({{relationship}}).",
+    "sentToGuardian": "To {{name}} ({{relationship}})",
+    "billingTitle": "Family",
+    "owesTotal": "Family owes",
+    "takePayment": "Take payment for the family",
+    "relationships": {
+      "mother": "Mother",
+      "father": "Father",
+      "grandparent": "Grandparent",
+      "sibling": "Brother / sister",
+      "guardian": "Legal guardian",
+      "other": "Other"
+    },
+    "age_one": "{{count}} year",
+    "age_other": "{{count}} years"
   }
 }

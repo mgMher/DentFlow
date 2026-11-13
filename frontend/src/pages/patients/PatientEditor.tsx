@@ -24,6 +24,9 @@ import { getInitials } from '../../utils/formatters';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
 import { PatientFormData, emptyPatientForm, toPatientPayload } from './patientForm';
 import { toLocalDateString } from '../../utils/dates';
+import GuardiansDraft from '../../components/family/GuardiansDraft';
+import { GuardianInput } from '../../components/family/GuardianDialog';
+import { isMinor } from '../../utils/family';
 
 export type PatientPayload = ReturnType<typeof toPatientPayload>;
 
@@ -36,6 +39,9 @@ interface PatientFormProps {
     saving: boolean;
     onSubmit: (payload: Partial<PatientPayload>) => void;
     onCancel: () => void;
+    /** New patients only (F8): guardians to add once the patient is saved. */
+    guardians?: GuardianInput[];
+    onGuardiansChange?: (guardians: GuardianInput[]) => void;
 }
 
 /**
@@ -52,6 +58,8 @@ const PatientEditor: React.FC<PatientFormProps> = ({
     saving,
     onSubmit,
     onCancel,
+    guardians,
+    onGuardiansChange,
 }) => {
     const { t } = useTranslation();
     const can = usePermission();
@@ -62,6 +70,7 @@ const PatientEditor: React.FC<PatientFormProps> = ({
         handleSubmit,
         watch,
         reset,
+        setValue,
         formState: { errors },
     } = useForm<PatientFormData>({ defaultValues });
 
@@ -290,6 +299,16 @@ const PatientEditor: React.FC<PatientFormProps> = ({
                 </Card>
 
                 {/* Address */}
+                {onGuardiansChange && (
+                    <GuardiansDraft
+                        guardians={guardians ?? []}
+                        onChange={onGuardiansChange}
+                        minor={isMinor(dateOfBirth)}
+                        phoneEmpty={!phone}
+                        onUsePhone={(value) => setValue('phone', value, { shouldValidate: true })}
+                    />
+                )}
+
                 <Card sx={{ mb: 3 }}>
                     <CardHeader
                         title={

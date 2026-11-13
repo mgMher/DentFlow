@@ -37,6 +37,43 @@ export class EmergencyContact {
 
 export const EmergencyContactSchema = SchemaFactory.createForClass(EmergencyContact);
 
+/** How a guardian is related to the patient (F8). */
+export enum GuardianRelationship {
+    MOTHER = 'mother',
+    FATHER = 'father',
+    GRANDPARENT = 'grandparent',
+    SIBLING = 'sibling',
+    GUARDIAN = 'guardian',
+    OTHER = 'other',
+}
+
+/**
+ * A parent or guardian (F8): either another patient of the clinic
+ * (`patientId`) or a contact who is not a patient (`name` + `phone`).
+ * One of a patient's guardians is the main one: under 18, reminders go to them.
+ */
+@Schema()
+export class Guardian {
+    _id: Types.ObjectId;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient' })
+    patientId?: Types.ObjectId;
+
+    @Prop({ trim: true })
+    name?: string;
+
+    @Prop({ trim: true })
+    phone?: string;
+
+    @Prop({ required: true, enum: GuardianRelationship })
+    relationship: GuardianRelationship;
+
+    @Prop({ default: false })
+    isPrimary: boolean;
+}
+
+export const GuardianSchema = SchemaFactory.createForClass(Guardian);
+
 @Schema({ _id: false })
 export class MedicalHistory {
     @Prop({ type: [String], default: [] })
@@ -184,6 +221,10 @@ export class Patient {
     @Prop()
     lastVisit: Date;
 
+    /** Parents and guardians (F8); children are the patients that list this one here. */
+    @Prop({ type: [GuardianSchema], default: [] })
+    guardians: Guardian[];
+
     /** Appointment reminders (F3): no reminders at all when true. */
     @Prop({ default: false })
     remindersOptOut: boolean;
@@ -207,6 +248,8 @@ export const PatientSchema = SchemaFactory.createForClass(Patient);
 
 PatientSchema.index({ clinicId: 1, lastName: 1, firstName: 1 });
 PatientSchema.index({ telegramLinkCode: 1 }, { sparse: true });
+// A guardian's children (F8).
+PatientSchema.index({ clinicId: 1, 'guardians.patientId': 1 });
 PatientSchema.index({ clinicId: 1, telegramChatId: 1 }, { sparse: true });
 
 // Email is deliberately not unique (D4): a parent registers several children

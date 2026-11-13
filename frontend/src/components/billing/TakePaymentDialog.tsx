@@ -26,16 +26,23 @@ import { fitsCurrency, minorDigits, PAYMENT_METHODS, paymentMethodKey } from '..
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { toLocalDateString } from '../../utils/dates';
 
+/** A patient's account, or a family's (F8): its open invoices then say whose they are. */
+type PayableAccount = Pick<PatientAccount, 'currency' | 'outstanding'> & {
+    openInvoices: (PatientAccount['openInvoices'][number] & { patientId?: string })[];
+};
+
 interface TakePaymentDialogProps {
     open: boolean;
     patientId: string;
-    account: PatientAccount;
+    account: PayableAccount;
+    /** Paying for the family (F8): the members' names by id, to label their invoices. */
+    familyNames?: Record<string, string>;
     onClose: () => void;
     onDone: () => void;
 }
 
 /** Fill the open invoices oldest first, in whole minor units. */
-const oldestFirst = (account: PatientAccount, amount: number) => {
+const oldestFirst = (account: PayableAccount, amount: number) => {
     const scale = 10 ** minorDigits(account.currency);
     let left = Math.round(amount * scale);
     const out: Record<string, string> = {};
@@ -52,7 +59,7 @@ const oldestFirst = (account: PatientAccount, amount: number) => {
  * (oldest first, changeable per invoice); what is not on an invoice becomes
  * their credit. With no open invoices it is simply an advance payment.
  */
-const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, account, onClose, onDone }) => {
+const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, account, familyNames, onClose, onDone }) => {
     const { t, i18n } = useTranslation();
     const digits = minorDigits(account.currency);
     const [amount, setAmount] = useState('');
@@ -107,6 +114,7 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
                 ...(date !== toLocalDateString() ? { date } : {}),
                 reference: reference.trim() || undefined,
                 allocations: rows.filter((r) => r.part > 0).map((r) => ({ invoiceId: r.invoice._id, amount: r.part })),
+                ...(familyNames ? { family: true } : {}),
             });
             onDone();
         } catch (err) {
@@ -118,7 +126,7 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
 
     return (
         <Dialog open={open} onClose={saving ? undefined : onClose} maxWidth="sm" fullWidth>
-            <DialogTitle>{t('account.takePayment')}</DialogTitle>
+            <DialogTitle>{t(familyNames ? 'family.takePayment' : 'account.takePayment')}</DialogTitle>
             <DialogContent>
                 {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
                 <Grid container spacing={2} sx={{ pt: 1 }}>
@@ -179,6 +187,11 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
                                     <TableRow key={invoice._id}>
                                         <TableCell>
                                             {invoice.invoiceNumber}
+                                            {familyNames && invoice.patientId && (
+                                                <Typography variant="body2" fontWeight={600} component="div">
+                                                    {familyNames[invoice.patientId]}
+                                                </Typography>
+                                            )}
                                             {invoice.issuedAt && (
                                                 <Typography variant="caption" color="text.secondary" component="div">
                                                     {formatDate(invoice.issuedAt, 'dd.MM.yyyy', i18n.language)}

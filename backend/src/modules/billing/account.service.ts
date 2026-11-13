@@ -88,6 +88,48 @@ export class AccountService {
         };
     }
 
+    /**
+     * The patient and the children they are the guardian of (F8): each one's
+     * account and the family's totals; open invoices together, oldest first,
+     * as a family payment would fill them.
+     */
+    async getFamilyAccount(clinicId: Id, patientId: Id) {
+        await this.clinicRefs.assertPatient(clinicId, patientId);
+        const { currency } = await this.clinicRefs.localeOf(clinicId);
+        const ids = await this.familyIds(clinicId, patientId, true);
+        const [people, accounts, open] = await Promise.all([
+            this.patientModel.find({ _id: { $in: ids }, clinicId }).select(`${PERSON} patronymic`).lean(),
+            Promise.all(ids.map((id) => this.getAccount(clinicId, id))),
+            this.openInvoices(clinicId, ids, currency),
+        ]);
+        const members = ids.map((id, i) => ({
+            patient: people.find((p) => p._id.equals(id)),
+            self: id.equals(patientId),
+            outstanding: accounts[i].outstanding,
+            credit: accounts[i].credit,
+            balance: accounts[i].balance,
+        }));
+        const sum = (k: 'outstanding' | 'credit' | 'balance') => members.reduce((s, m) => s + toMinor(m[k], currency), 0);
+        return {
+            currency,
+            members,
+            outstanding: toMajor(sum('outstanding'), currency),
+            credit: toMajor(sum('credit'), currency),
+            balance: toMajor(sum('balance'), currency),
+            openInvoices: open.map((i) => ({
+                _id: i._id,
+                patientId: i.patientId,
+                invoiceNumber: i.invoiceNumber,
+                issuedAt: i.issuedAt,
+                dueDate: i.dueDate,
+                status: i.status,
+                total: toMajor(i.totalAmount, currency),
+                paid: toMajor(i.paidAmount, currency),
+                balance: toMajor(i.totalAmount - i.paidAmount, currency),
+            })),
+        };
+    }
+
     /** Everything that moved the patient's balance, oldest first, in the clinic currency. */
     async getStatement(clinicId: Id, patientId: Id) {
         await this.clinicRefs.assertPatient(clinicId, patientId);
@@ -166,7 +208,9 @@ export class AccountService {
             throw new BadRequestException(errorBody('paymentInFuture', 'A payment cannot be dated in the future'));
         }
 
-        const open = await this.openInvoices(clinicId, patientId, currency);
+        // A family payment (F8) may also pay the payer's children's invoices.
+        const members = await this.familyIds(clinicId, patientId, !!dto.family);
+        const open = await this.openInvoices(clinicId, members, currency);
         const plan = this.allocate(open, total, dto, currency);
         const applied: { invoiceId: Id; amount: number }[] = [];
         const undo = () =>
@@ -184,7 +228,7 @@ export class AccountService {
                 {
                     _id: part.invoiceId,
                     clinicId,
-                    patientId,
+                    patientId: { $in: members },
                     status: { $in: OPEN_STATUSES },
                     $expr: { $lte: [{ $add: ['$paidAmount', part.amount] }, '$totalAmount'] },
                 },
@@ -215,7 +259,11 @@ export class AccountService {
         let payments: { invoiceId?: Id; amount: number }[];
         try {
             payments = await this.paymentModel.insertMany([
-                ...plan.map((p) => ({ ...base, invoiceId: p.invoiceId, amount: p.amount })),
+                ...plan.map((p) => {
+                    // Each invoice is paid on its own patient's account; a guardian paying is noted.
+                    const owner = open.find((i) => i._id.equals(p.invoiceId))!.patientId;
+                    return { ...base, patientId: owner, paidBy: owner.equals(patientId) ? undefined : patientId, invoiceId: p.invoiceId, amount: p.amount };
+                }),
                 ...(onAccount > 0 ? [{ ...base, amount: onAccount }] : []),
             ]);
         } catch (err) {
@@ -245,6 +293,7 @@ export class AccountService {
             paid: payments.filter((p) => p.invoiceId).map((p) => ({ invoiceId: p.invoiceId, amount: toMajor(p.amount, currency) })),
             credit: toMajor(onAccount, currency),
             account: await this.getAccount(clinicId, patientId),
+            ...(dto.family ? { family: await this.getFamilyAccount(clinicId, patientId) } : {}),
         };
     }
 
@@ -352,13 +401,20 @@ export class AccountService {
 
     // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /** Oldest first: that is the order money is applied in. */
-    private openInvoices(clinicId: Id, patientId: Id, currency: Currency) {
+    /** Oldest first: that is the order money is applied in. Several patients: a family (F8). */
+    private openInvoices(clinicId: Id, patientId: Id | Id[], currency: Currency) {
         return this.invoiceModel
-            .find({ clinicId, patientId, currency, status: { $in: OPEN_STATUSES } })
+            .find({ clinicId, patientId: Array.isArray(patientId) ? { $in: patientId } : patientId, currency, status: { $in: OPEN_STATUSES } })
             .sort({ issuedAt: 1, _id: 1 })
-            .select('invoiceNumber totalAmount paidAmount issuedAt dueDate status')
+            .select('patientId invoiceNumber totalAmount paidAmount issuedAt dueDate status')
             .lean();
+    }
+
+    /** The patient, and with `family` the patients they are the guardian of. */
+    private async familyIds(clinicId: Id, patientId: Id, family: boolean): Promise<Id[]> {
+        if (!family) return [patientId];
+        const children = await this.patientModel.find({ clinicId, 'guardians.patientId': patientId }).select('_id').sort({ dateOfBirth: 1 }).lean();
+        return [patientId, ...children.map((c) => c._id)];
     }
 
     private credits(clinicId: Id, patientId: Id, currency: Currency) {
@@ -394,7 +450,7 @@ export class AccountService {
         const seen = new Set<string>();
         const plan = dto.allocations.map((a) => {
             const invoice = open.find((i) => i._id.toString() === a.invoiceId);
-            if (!invoice) throw new BadRequestException(errorBody('invoiceNotOpen', 'Only issued, unpaid invoices of this patient can be paid'));
+            if (!invoice) throw new BadRequestException(errorBody('invoiceNotOpen', 'Only issued, unpaid invoices of this patient (or, for a family payment, their children) can be paid'));
             if (seen.has(a.invoiceId)) throw new BadRequestException(errorBody('validationFailed', 'An invoice appears twice'));
             seen.add(a.invoiceId);
             const amount = toMinor(a.amount, currency);

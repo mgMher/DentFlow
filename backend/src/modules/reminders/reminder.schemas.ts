@@ -110,6 +110,10 @@ export class ReminderLog {
     @Prop()
     to: string;
 
+    /** Sent to the patient's main guardian (under 18, F8): who they are. */
+    @Prop({ type: { name: String, relationship: String, _id: false } })
+    guardian?: { name: string; relationship: string };
+
     @Prop()
     text: string;
 

@@ -61,9 +61,16 @@ const PatientRemindersCard: React.FC<{ patientId: string }> = ({ patientId }) =>
 
     if (!status) return null;
 
+    const guardian = status.guardian;
     const channel = status.optOut
         ? t('reminders.patient.off')
-        : status.telegramLinked
+        : guardian
+          ? guardian.channel === 'telegram'
+              ? 'Telegram'
+              : guardian.channel === 'sms'
+                ? 'SMS'
+                : t('reminders.patient.noChannel')
+          : status.telegramLinked
           ? 'Telegram'
           : status.smsAvailable
             ? 'SMS'
@@ -84,6 +91,11 @@ const PatientRemindersCard: React.FC<{ patientId: string }> = ({ patientId }) =>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
                         {error}
+                    </Alert>
+                )}
+                {guardian && !status.optOut && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        {t('family.remindersToGuardian', { name: guardian.name, relationship: t(`family.relationships.${guardian.relationship}`) })}
                     </Alert>
                 )}
                 <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2, flexWrap: 'wrap', gap: 1 }}>

@@ -18,6 +18,7 @@ import { formatDate, formatDateTime, getFullName } from '../../utils/formatters'
 import { formatArmenianPhone } from '../../utils/validators';
 import { Patient } from '../../types';
 import PatientRemindersCard from '../../components/reminders/PatientRemindersCard';
+import FamilyCard from '../../components/family/FamilyCard';
 
 const entryDentistName = (dentist?: string | { firstName?: string; lastName?: string }): string => {
     if (!dentist || typeof dentist === 'string') return '';
@@ -493,6 +494,10 @@ const PatientProfileTab: React.FC<{ patient: Patient }> = ({ patient }) => {
                     </Card>
                 </Grid>
             )}
+
+            <Grid item xs={12} md={6}>
+                <FamilyCard patientId={patient._id} />
+            </Grid>
 
             <Grid item xs={12} md={6}>
                 <PatientRemindersCard patientId={patient._id} />

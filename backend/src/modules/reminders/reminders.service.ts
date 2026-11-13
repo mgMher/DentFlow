@@ -41,6 +41,7 @@ import { ChannelError, maskPhone, SmsSender, TelegramBot, TelegramButton, Twilio
 import { displayDate, fill, Lang, langOf, message, REMINDER_PLACEHOLDERS } from './messages';
 import { PatientRemindersDto, TestReminderDto, UpdateReminderSettingsDto } from './dto/reminders.dto';
 import { AuditService } from '../audit/audit.service';
+import { FamilyService } from '../patients/family.service';
 
 const oid = (id: string | Types.ObjectId) => new Types.ObjectId(id.toString());
 const BOT_TOKEN = 'telegram-bot-token';
@@ -52,11 +53,14 @@ const LINK_VALID_MS = 30 * 24 * 3_600_000;
 const OPEN = [AppointmentStatus.SCHEDULED, AppointmentStatus.CONFIRMED];
 const PERSON = 'firstName lastName';
 
-type PatientRef = Pick<Patient, 'firstName' | 'lastName' | 'phone' | 'telegramChatId' | 'remindersOptOut'> & {
+type PatientRef = Pick<Patient, 'firstName' | 'lastName' | 'phone' | 'telegramChatId' | 'remindersOptOut'> &
+    Partial<Pick<Patient, 'dateOfBirth' | 'guardians'>> & {
     _id: Types.ObjectId;
 };
+/** What deciding who gets a patient's messages needs (F8: age and guardians too). */
+const RECIPIENT_FIELDS = 'firstName lastName phone telegramChatId dateOfBirth guardians';
 type ClinicInfo = Pick<Clinic, 'name' | 'phone' | 'address' | 'language' | 'timezone'> & { _id: Types.ObjectId };
-type Delivery = Partial<Pick<ReminderLog, 'channel' | 'to' | 'reason' | 'providerMessageId' | 'telegramChatId' | 'telegramMessageId'>> & {
+type Delivery = Partial<Pick<ReminderLog, 'channel' | 'to' | 'reason' | 'providerMessageId' | 'telegramChatId' | 'telegramMessageId' | 'guardian'>> & {
     status: ReminderStatus;
 };
 
@@ -84,6 +88,7 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         private readonly notifications: NotificationsService,
         private readonly clinicRefs: ClinicRefsService,
         private readonly audit: AuditService,
+        private readonly family: FamilyService,
     ) {}
 
     // ── Settings ─────────────────────────────────────────────────────────────
@@ -324,7 +329,7 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         }
 
         await appointment.populate([
-            { path: 'patientId', select: 'firstName lastName phone telegramChatId remindersOptOut' },
+            { path: 'patientId', select: `${RECIPIENT_FIELDS} remindersOptOut` },
             { path: 'dentistId', select: PERSON },
         ]);
         const patient = appointment.patientId as unknown as PatientRef | null;
@@ -336,15 +341,31 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
             delivery = { status: ReminderStatus.SKIPPED, reason: 'optedOut' };
         } else {
             text = await this.reminderText(clinic, appointment, patient);
-            delivery = await this.deliver(settings, patient, text, [
+            const { target, guardian } = await this.recipient(clinic, patient);
+            delivery = await this.deliver(settings, target, text, [
                 [
                     { text: message('confirm', langOf(clinic.language)), callback_data: `c:${appointment._id}` },
                     { text: message('cancel', langOf(clinic.language)), callback_data: `x:${appointment._id}` },
                 ],
             ]);
+            if (guardian) delivery = { ...delivery, guardian };
         }
         await this.logModel.updateOne({ _id: log._id }, { $set: { ...delivery, text } });
         return delivery.status;
+    }
+
+    /**
+     * Under 18 with a guardian, messages go to the main guardian (F8): their
+     * Telegram or phone if they are a patient, the contact's phone otherwise.
+     * The text still names the child.
+     */
+    private async recipient(clinic: ClinicInfo, patient: PatientRef): Promise<{ target: PatientRef; guardian?: Delivery['guardian'] }> {
+        const to = await this.family.recipientFor(clinic._id, patient, clinic.timezone);
+        if (!to) return { target: patient };
+        return {
+            target: { ...patient, _id: to.patientId ?? patient._id, phone: to.phone ?? '', telegramChatId: to.patientId ? to.telegramChatId ?? '' : '' },
+            guardian: to.guardian,
+        };
     }
 
     /** Telegram first; SMS when there is no linked chat or Telegram refused. */
@@ -496,11 +517,14 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
             Types.ObjectId.isValid(appointmentId) && ['c', 'x'].includes(action)
                 ? await this.appointmentModel
                       .findOne({ _id: oid(appointmentId), clinicId: clinic._id })
-                      .populate({ path: 'patientId', select: 'firstName lastName telegramChatId' })
+                      .populate({ path: 'patientId', select: RECIPIENT_FIELDS })
                 : null;
         const patient = appointment?.patientId as unknown as PatientRef | undefined;
         const open = appointment && OPEN.includes(appointment.status) && appointment.startTime > new Date();
-        if (!appointment || !patient || patient.telegramChatId !== chatId || !open) {
+        // The patient's own chat, or the chat their reminders go to (a minor's main guardian).
+        const routed = patient ? await this.recipient(clinic, patient) : null;
+        const allowed = patient ? [patient.telegramChatId, routed!.target.telegramChatId] : [];
+        if (!appointment || !patient || !chatId || !allowed.includes(chatId) || !open) {
             await answer(message('tooLate', lang, vars));
             return;
         }
@@ -509,12 +533,23 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         const auditAnswer = (event: string, to: AppointmentStatus) =>
             this.audit.record({
                 clinicId: clinic._id,
-                actor: { kind: 'patient', name: [patient.firstName, patient.lastName].filter(Boolean).join(' ') },
+                // The child's own chat, or their guardian answering for them.
+                actor: {
+                    kind: 'patient',
+                    name:
+                        chatId !== patient.telegramChatId && routed?.guardian
+                            ? routed.guardian.name
+                            : [patient.firstName, patient.lastName].filter(Boolean).join(' '),
+                },
                 event,
                 targetId: appointment._id,
                 patientId: patient._id,
                 changes: [{ field: 'status', from: appointment.status, to }],
-                details: { channel: 'telegram', startTime: appointment.startTime.toISOString() },
+                details: {
+                    channel: 'telegram',
+                    startTime: appointment.startTime.toISOString(),
+                    ...(chatId !== patient.telegramChatId && routed?.guardian ? { guardian: routed.guardian.relationship } : {}),
+                },
             });
         if (action === 'c') {
             if (appointment.status === AppointmentStatus.SCHEDULED) {
@@ -597,10 +632,19 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
     async patientStatus(clinicId: string, patientId: string) {
         await this.clinicRefs.assertPatient(clinicId, patientId);
         const [patient, settings] = await Promise.all([
-            this.patientModel.findById(oid(patientId)).select('remindersOptOut telegramChatId telegramLinkedAt phone').lean(),
+            this.patientModel.findById(oid(patientId)).select('remindersOptOut telegramChatId telegramLinkedAt phone dateOfBirth guardians').lean(),
             this.settingsFor(clinicId),
         ]);
+        // F8: a minor's reminders go to their main guardian, by Telegram if they linked it, else SMS.
+        const routed = patient ? await this.recipient(await this.clinicInfo(clinicId), patient as unknown as PatientRef) : null;
+        const guardian = routed?.guardian
+            ? {
+                  ...routed.guardian,
+                  channel: settings.telegramBotTokenSealed && routed.target.telegramChatId ? 'telegram' : this.smsFor(settings) && routed.target.phone ? 'sms' : null,
+              }
+            : null;
         return {
+            guardian,
             enabled: !!settings.enabled,
             optOut: !!patient?.remindersOptOut,
             telegramAvailable: !!settings.telegramBotTokenSealed,
@@ -662,13 +706,15 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         const clinic = await this.clinicInfo(clinicId);
         const patient = (await this.patientModel
             .findById(oid(dto.patientId))
-            .select('firstName lastName phone telegramChatId remindersOptOut')
+            .select(`${RECIPIENT_FIELDS} remindersOptOut`)
             .lean()) as PatientRef | null;
-        const result = await this.deliver(settings, patient!, message('test', langOf(clinic.language), this.clinicVars(clinic)), undefined, dto.channel);
+        // A test goes where real reminders would: a minor's main guardian.
+        const { target, guardian } = await this.recipient(clinic, patient!);
+        const result = await this.deliver(settings, target, message('test', langOf(clinic.language), this.clinicVars(clinic)), undefined, dto.channel);
         if (result.status !== ReminderStatus.SENT) {
             throw new BadRequestException(errorBody(result.reason === 'noChannel' ? 'reminderNoChannel' : 'reminderSendFailed', result.reason ?? ''));
         }
-        return { sent: true, channel: result.channel, to: result.to };
+        return { sent: true, channel: result.channel, to: result.to, guardian };
     }
 
     // ── Log ──────────────────────────────────────────────────────────────────

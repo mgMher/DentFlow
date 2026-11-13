@@ -81,6 +81,10 @@ export class Payment {
     @Prop({ default: () => new Date() })
     date: Date;
 
+    /** A guardian who paid this child's invoice as part of a family payment (F8). */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Patient' })
+    paidBy?: Types.ObjectId;
+
     @Prop({ trim: true })
     reference: string;
 
