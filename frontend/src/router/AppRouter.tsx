@@ -22,6 +22,7 @@ import InvoiceDetailPage from '../pages/billing/InvoiceDetailPage';
 import InvoiceEditorPage from '../pages/billing/InvoiceEditorPage';
 import CashReportPage from '../pages/billing/CashReportPage';
 import DebtorsPage from '../pages/billing/DebtorsPage';
+import FiscalReceiptsPage from '../pages/billing/FiscalReceiptsPage';
 import TreatmentPlanPage from '../pages/plans/TreatmentPlanPage';
 import StaffListPage from '../pages/staff/StaffListPage';
 import StaffDetailPage from '../pages/staff/StaffDetailPage';
@@ -73,6 +74,7 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                         <Route path="/billing/:id/edit" element={<InvoiceEditorPage />} />
                         <Route path="/billing/cash" element={<CashReportPage />} />
                         <Route path="/billing/debtors" element={<DebtorsPage />} />
+                        <Route path="/billing/fiscal" element={<FiscalReceiptsPage />} />
                     </Route>
 
                     <Route path="/staff" element={<StaffListPage />} />

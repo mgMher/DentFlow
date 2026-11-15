@@ -264,7 +264,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F7 | ✅ Audit log: who changed what (patient data, chart, payments, settings) — built 2026-11-12, see below | Medical + money data |
 | F8 | ✅ Guardian / family links for children — built 2026-11-13, see below | Pediatric patients |
 | F9 | ✅ Password reset by email, 2FA for admins, "log out everywhere" — built 2026-11-15, see below | Security basics |
-| F10 | e-HDM fiscal receipt (Armenia) | Legal requirement for cash |
+| F10 | ✅ e-HDM fiscal receipt (Armenia) — manual recording built 2026-11-15, see below | Legal requirement for cash |
 | F11 | Export reports to Excel/CSV; dentist commission from collected revenue | Owners ask for it |
 | F12 | Periodontal chart, mixed dentition | Specialist clinics |
 | F13 | Platform super-admin (list clinics, support) | Needed to run the SaaS |
@@ -391,6 +391,21 @@ Decisions (agreed 2026-11-15): email goes out through SMTP set on the server (an
 - [x] Tests: `test/e2e/account-security.e2e-spec.ts` (15), `totp.util.spec.ts` (4); all 248 e2e and 36 unit tests pass; browser (admin forced setup with QR and first code, backup codes, sign in with a backup code and trusting the device, then no code; staff security menu; forgot → email in the log → reset → sign in; optional two-factor on / off for a receptionist; hy / ru / en; phone width)
 - [ ] Not built: email templates per clinic / HTML email; SMS or email codes as a second factor; passkeys / WebAuthn; "remember me" length per clinic; notifying the person by email when their password or two-factor changes; listing a staff member's devices for admins
 - [ ] Deploy: set SMTP, `MAIL_FROM` and `CLIENT_URL` (the https address of the web app); `SECRETS_KEY` must stay the same or two-factor secrets can't be read (everyone would need an admin reset). Locally, admins are asked to set up two-factor at their next sign-in; set `TWO_FACTOR_REQUIRED_ROLES=none` in a developer's `.env` to skip it
+
+### F10 — Fiscal receipts (manual) — ✅ built 2026-11-15, branch `feat/f10-fiscal-receipts` (stacked on F9)
+
+Decision (agreed 2026-11-15): no automatic integration for now. Clinics print fiscal receipts on their own cash register (ՀԴՄ) and staff record each receipt's number against the payment; DentFlow shows which payments still have none. Just a number field and a missing list — no "what to ring up" guidance and no return-receipt tracking.
+
+- [x] **Model.** `fiscalNumber` (+ when and by whom) on payments. One receipt covers every part of a payment spread over several invoices or put on account (same `receiptId`), so a number is set on all parts at once. Digits, letters, dashes, slashes and spaces (trimmed and collapsed), up to 40. A number already recorded on another receipt of the clinic is refused (`409 fiscalNumberUsed`)
+- [x] **API.** Optional `fiscalNumber` when recording a payment (`POST /billing/invoices/:id/payments`, `POST /billing/patients/:id/payments`); `PATCH /billing/payments/:id/fiscal` `{ fiscalNumber | null }`; `GET /billing/fiscal-receipts?status=missing|recorded|all&from&to` — receipts newest first (payments grouped as one receipt; mistakes left out, refunded ones flagged) with counts. Those who take payments only (admins, reception). Changes are in the audit log (old → new)
+- [x] **Day report.** Counts the day's receipts without a number (`totals.fiscalMissing`) and shows each payment's number
+- [x] **UI.** Payment dialogs (invoice and patient account) have an optional "Fiscal receipt number". Invoice page: a column with the number or "Add number". Billing → "Fiscal receipts" tab: without / with a number / all, date range, add or change in place. Day report: a warning with "Fill in" that opens the list for that day
+- [x] **Fixed on the way.** The invoice page's payment dialog sent today's date, so payments taken today were stored at midnight (the patient-account dialog had this fixed in F4); it now lets the server stamp the time
+- [x] Tests: `test/e2e/fiscal.e2e-spec.ts` (9); all 257 e2e and 36 unit tests pass; browser (number with a payment, add later from the invoice and from the list, duplicate refused, day report warning → fill in; hy / ru / en; phone width)
+- [ ] Not built: issuing receipts automatically. Research notes for when it is wanted (2026-11-15):
+  - **Clinic's own ՀԴՄ device**: SRC integration spec v0.7.3 — TCP to the device on the clinic network (it checks the caller's IP), 12-byte header `D5 80 D4 B4 D5 84 00 05 <op> 00 <len>`, JSON encrypted with 3DES-ECB-PKCS7 (key = first 24 bytes of SHA-256(device password), then the session key from operator login), strictly increasing `seq`; ops include login (2), print receipt (4), return (6), X/Z reports (9). A cloud server can't reach it directly: needs a small bridge at the clinic. Reference implementation: github.com/lobotomoe/hdm-am
+  - **Cloud fiscalisation**: e.g. vcr.am — REST (`X-API-Key`), `POST /api/v1/sales`, `/sales/refund`, `/prepayments`; one-time SRC certificate (CSR filed in file-online.taxservice.am); no hardware
+  - Activity code for dental services in the 875-N classifier: 86.23 (confirm with the accountant, with the clinic's tax regime — VAT / turnover tax / micro-enterprise)
 
 ---
 

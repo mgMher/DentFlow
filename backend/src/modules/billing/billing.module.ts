@@ -12,6 +12,8 @@ import { Payment, PaymentSchema } from './payment.schema';
 import { Patient, PatientSchema } from 'src/modules/patients/patient.schema';
 import { TreatmentEntry, TreatmentEntrySchema } from 'src/modules/dental-records/treatment-entry.schema';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
+import { FiscalController } from './fiscal.controller';
+import { FiscalService } from './fiscal.service';
 
 @Module({
     imports: [
@@ -24,8 +26,8 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
         ]),
         NotificationsModule,
     ],
-    controllers: [BillingController, AccountController, CashController],
-    providers: [BillingService, AccountService, CashService],
+    controllers: [BillingController, AccountController, CashController, FiscalController],
+    providers: [BillingService, AccountService, CashService, FiscalService],
     exports: [BillingService],
 })
 export class BillingModule {}

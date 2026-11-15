@@ -42,6 +42,7 @@ import {
     InvoiceItemDto,
     VoidPaymentDto,
 } from './dto';
+import { FiscalService } from './fiscal.service';
 
 const PERSON = 'firstName lastName';
 
@@ -103,6 +104,7 @@ export class BillingService implements OnModuleInit {
         @InjectConnection() private readonly connection: Connection,
         private readonly clinicRefs: ClinicRefsService,
         private readonly notifications: NotificationsService,
+        private readonly fiscal: FiscalService,
     ) {}
 
     /** Money moved on an invoice: tell the people who look after it (never the one who did it). */
@@ -643,6 +645,7 @@ export class BillingService implements OnModuleInit {
         if (dto.date && new Date(dto.date).getTime() > Date.now() + 24 * 3600 * 1000) {
             throw new BadRequestException(errorBody('paymentInFuture', 'A payment cannot be dated in the future'));
         }
+        if (dto.fiscalNumber) await this.fiscal.assertUnused(clinicId, dto.fiscalNumber);
 
         const updated = await this.invoiceModel.findOneAndUpdate(
             {
@@ -681,6 +684,7 @@ export class BillingService implements OnModuleInit {
                 reference: dto.reference,
                 notes: dto.notes,
                 receivedBy: userId,
+                ...this.fiscal.stamp(dto.fiscalNumber, userId),
             });
         } catch (err) {
             await this.invoiceModel.updateOne({ _id: invoiceId }, [

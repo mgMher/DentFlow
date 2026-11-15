@@ -763,6 +763,25 @@ An admin, a receptionist, a phone with an authenticator app (or the walk's in-pa
 | S-13 | Audit | Audit log | Each step logged; no secret or code in it | PASS (e2e) |
 | S-14 | Languages, phone | hy / ru / en; 375 px | All texts translated | PASS (browser, audit) |
 
+## 32. F10 — fiscal receipt numbers (manual)
+
+Receptionist; two issued invoices; the clinic's own cash register (any number will do in a test).
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| R-01 | With the payment | Add a payment with "Fiscal receipt number" | Saved; shown in the invoice's payments | PASS (browser + e2e) |
+| R-02 | Later | A payment without one → "Add number" on the invoice | Saved; the payment leaves the missing list | PASS (browser + e2e) |
+| R-03 | Duplicate | Use a number already on another payment | "Already recorded on another payment" | PASS (browser + e2e) |
+| R-04 | One receipt | One payment over two invoices plus credit | One row in the list for the whole amount; one number covers every part | PASS (e2e) |
+| R-05 | Change / clear | Change a number; Remove number | Updated; back in the missing list | PASS (e2e) |
+| R-06 | Bad input | "№12"; 41 characters | Refused | PASS (e2e) |
+| R-07 | Voids | A payment voided as a mistake; one refunded | Mistake leaves the list; refund stays, marked | PASS (e2e) |
+| R-08 | Fiscal receipts tab | Billing → Fiscal receipts | Without / with a number / all with counts, dates, add in place | PASS (browser + e2e) |
+| R-09 | Day report | Day report with a payment without a number | Warning with the count; "Fill in" opens the list for that day; numbers in the payments table | PASS (browser + e2e) |
+| R-10 | Who may | Dentist, assistant, another clinic | Refused / sees nothing | PASS (e2e) |
+| R-11 | Audit | After setting a number | "Recorded a fiscal receipt number", old → new | PASS (e2e) |
+| R-12 | Languages, phone | hy / ru / en; 375 px | All texts translated; no sideways scroll | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

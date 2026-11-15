@@ -503,6 +503,25 @@ export interface Payment {
     voidedBy?: PersonRef;
     voidType?: PaymentVoidType;
     voidReason?: string;
+    /** F10: the number of the receipt the clinic's cash register printed. */
+    fiscalNumber?: string;
+    fiscalRecordedAt?: string;
+}
+
+/** F10: money received as one fiscal receipt (a multi-invoice payment's parts together). */
+export interface FiscalReceipt {
+    receiptKey: string;
+    paymentIds: string[];
+    date: string;
+    amount: number;
+    currency: Currency;
+    method: PaymentMethod;
+    patient: { _id: string; firstName: string; lastName: string; patronymic?: string } | null;
+    invoices: { _id: string; invoiceNumber: string }[];
+    onAccount: boolean;
+    fiscalNumber: string | null;
+    fiscalRecordedAt: string | null;
+    refunded: boolean;
 }
 
 export interface PatientBillingSummary {
@@ -698,12 +717,13 @@ export interface CashReportLine {
     by: string;
     /** A payment that was later given back. */
     refunded: boolean;
+    fiscalNumber: string | null;
 }
 
 export interface CashReport {
     date: string;
     currency: Currency;
-    totals: { received: number; refunded: number; net: number; count: number; onAccount: number };
+    totals: { received: number; refunded: number; net: number; count: number; onAccount: number; fiscalMissing: number };
     expectedCash: number;
     byMethod: { method: PaymentMethod; received: number; refunded: number; net: number; count: number }[];
     byCashier: { name: string; received: number; refunded: number; cash: number; count: number }[];

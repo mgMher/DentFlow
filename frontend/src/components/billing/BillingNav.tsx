@@ -8,9 +8,10 @@ const SECTIONS = [
     { path: '/billing', key: 'billing.sections.invoices' },
     { path: '/billing/cash', key: 'billing.sections.cash' },
     { path: '/billing/debtors', key: 'billing.sections.debtors' },
+    { path: '/billing/fiscal', key: 'billing.sections.fiscal' },
 ];
 
-/** Invoices · Day report · Debtors, for the people who take payments (F5). */
+/** Invoices · Day report · Debtors · Fiscal receipts, for the people who take payments (F5, F10). */
 const BillingNav: React.FC = () => {
     const { t } = useTranslation();
     const navigate = useNavigate();

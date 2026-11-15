@@ -52,7 +52,8 @@ describe('Cash report and debtors (e2e)', () => {
         it('totals: received (mistakes left out), refunded, net, on account', async () => {
             const r = await report();
             expect(r.date).toBe(today);
-            expect(r.totals).toEqual({ received: 15000, refunded: 10000, net: 5000, count: 3, onAccount: 3000 });
+            // F10: none of the three has a fiscal receipt number yet.
+            expect(r.totals).toEqual({ received: 15000, refunded: 10000, net: 5000, count: 3, onAccount: 3000, fiscalMissing: 3 });
         });
 
         it('by method, and the cash that should be in the drawer', async () => {

@@ -505,7 +505,8 @@
     "sections": {
       "invoices": "Invoices",
       "cash": "Day report",
-      "debtors": "Debtors"
+      "debtors": "Debtors",
+      "fiscal": "Fiscal receipts"
     }
   },
   "staff": {
@@ -984,7 +985,8 @@
     "twoFactorRequired": "Two-factor sign-in is required for your role and can't be turned off.",
     "twoFactorChallengeExpired": "This sign-in took too long. Enter your password again.",
     "sessionNotFound": "That device is already signed out.",
-    "useOwnTwoFactor": "Change your own two-factor sign-in in Account security."
+    "useOwnTwoFactor": "Change your own two-factor sign-in in Account security.",
+    "fiscalNumberUsed": "This fiscal receipt number is already recorded on another payment."
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1371,7 +1373,8 @@
         "addPayment": "Took a payment on an invoice",
         "voidPayment": "Voided a payment",
         "close": "Closed the day",
-        "reopen": "Reopened the day"
+        "reopen": "Reopened the day",
+        "setFiscalNumber": "Recorded a fiscal receipt number"
       },
       "clinic": {
         "updateCurrent": "Changed clinic details",
@@ -1553,7 +1556,8 @@
       "counted": "Counted",
       "difference": "Difference",
       "count": "Count",
-      "guardian": "Parent or guardian"
+      "guardian": "Parent or guardian",
+      "fiscalNumber": "Fiscal receipt"
     },
     "reasons": {
       "wrongPassword": "Wrong password",
@@ -1677,5 +1681,25 @@
     "backupLeft_other": "{{count}} backup codes left",
     "trustedCount_one": "{{count}} device skips the code for now (trusted for 30 days). \"Log out everywhere\" clears it.",
     "trustedCount_other": "{{count}} devices skip the code for now (trusted for 30 days). \"Log out everywhere\" clears them."
+  },
+  "fiscal": {
+    "about": "Receipts printed on your own cash register (ՀԴՄ): type each receipt's number against the payment it is for. A payment over several invoices is one receipt.",
+    "missing": "Without a number",
+    "recorded": "With a number",
+    "none": "No payments",
+    "noneMissing": "Every payment has a fiscal receipt number",
+    "column": "Fiscal receipt",
+    "add": "Add number",
+    "onAccount": "on account",
+    "dialogTitle": "Fiscal receipt number",
+    "number": "Receipt number",
+    "numberOptional": "Fiscal receipt number (optional)",
+    "hint": "As printed on the receipt from your cash register",
+    "hintLater": "Can also be added later in Billing → Fiscal receipts",
+    "invalid": "Digits and letters only (up to 40)",
+    "clear": "Remove number",
+    "fillIn": "Fill in",
+    "missingOnDay_one": "{{count}} payment of this day has no fiscal receipt number.",
+    "missingOnDay_other": "{{count}} payments of this day have no fiscal receipt number."
   }
 }

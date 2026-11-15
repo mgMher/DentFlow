@@ -14,6 +14,7 @@ import {
 import { Trim } from 'src/common/decorators';
 import { Currency } from 'src/common/utils';
 import { PaymentMethod, PaymentVoidType } from '../payment.schema';
+import { OptionalFiscalNumber } from './fiscal.dto';
 
 export class CreatePaymentDto {
     @ApiProperty({ example: 15000, description: 'Major units; at most the remaining balance' })
@@ -49,6 +50,8 @@ export class CreatePaymentDto {
     @IsString()
     @MaxLength(1000)
     notes?: string;
+    @OptionalFiscalNumber()
+    fiscalNumber?: string | null;
 }
 
 export class VoidPaymentDto {

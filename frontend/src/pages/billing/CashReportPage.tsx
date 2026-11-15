@@ -126,6 +126,7 @@ const CashReportPage: React.FC = () => {
                         <TableCell>{t('billing.invoice')}</TableCell>
                         <TableCell>{t('billing.paymentMethod')}</TableCell>
                         <TableCell align="right">{t('billing.amount')}</TableCell>
+                        {!refunds && <TableCell>{t('fiscal.column')}</TableCell>}
                         <TableCell>{refunds ? t('cash.refundedBy') : t('cash.cashier')}</TableCell>
                     </TableRow>
                 </TableHead>
@@ -154,6 +155,7 @@ const CashReportPage: React.FC = () => {
                                 {money(l.amount)}
                                 {!refunds && l.refunded && <Chip size="small" label={t('cash.refundedLater')} sx={{ ml: 1 }} />}
                             </TableCell>
+                            {!refunds && <TableCell sx={{ whiteSpace: 'nowrap' }}>{l.fiscalNumber ?? '—'}</TableCell>}
                             <TableCell>{l.by}</TableCell>
                         </TableRow>
                     ))}
@@ -215,6 +217,19 @@ const CashReportPage: React.FC = () => {
                 <LoadingSpinner />
             ) : (
                 <>
+                    {report.totals.fiscalMissing > 0 && (
+                        <Alert
+                            severity="warning"
+                            sx={{ mb: 2, displayPrint: 'none' }}
+                            action={
+                                <Button color="inherit" size="small" onClick={() => navigate(`/billing/fiscal?from=${date}&to=${date}`)}>
+                                    {t('fiscal.fillIn')}
+                                </Button>
+                            }
+                        >
+                            {t('fiscal.missingOnDay', { count: report.totals.fiscalMissing })}
+                        </Alert>
+                    )}
                     <Grid container spacing={2} sx={{ mb: 2 }}>
                         <Grid item xs={12} sm={6} lg={3}>
                             <StatCard

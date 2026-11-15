@@ -15,6 +15,7 @@ import {
     ValidateNested,
 } from 'class-validator';
 import { PaymentMethod } from '../payment.schema';
+import { OptionalFiscalNumber } from './fiscal.dto';
 
 export class AllocationDto {
     @ApiProperty() @IsMongoId() invoiceId: string;
@@ -45,6 +46,9 @@ export class TakePaymentDto {
     @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) reference?: string;
 
     @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(1000) notes?: string;
+
+    @OptionalFiscalNumber()
+    fiscalNumber?: string | null;
 
     @ApiPropertyOptional({
         description: "F8: also pay the open invoices of the patients this one is the guardian of; each invoice is paid on the child's account, the rest is the payer's credit",

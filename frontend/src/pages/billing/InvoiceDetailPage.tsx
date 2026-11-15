@@ -11,6 +11,7 @@ import {
     Divider,
     Grid,
     IconButton,
+    Link,
     MenuItem,
     Paper,
     Table,
@@ -50,6 +51,8 @@ import { Payment, PaymentMethod, PaymentVoidType } from '../../types';
 import api from '../../api/axios';
 import { toast } from 'react-toastify';
 import { apiErrorMessage } from '../../utils/apiError';
+import FiscalNumberDialog from '../../components/billing/FiscalNumberDialog';
+import { FISCAL_NUMBER, cleanFiscalNumber } from '../../utils/fiscal';
 
 const SummaryRow: React.FC<{ label: string; value: string; strong?: boolean; color?: string }> = ({
     label,
@@ -93,7 +96,9 @@ const InvoiceDetailPage: React.FC = () => {
     const payments = storedPayments.invoiceId === id ? storedPayments.list : [];
 
     const [paymentOpen, setPaymentOpen] = useState(false);
-    const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash' as PaymentMethod, date: '', reference: '', notes: '' });
+    const [paymentForm, setPaymentForm] = useState({ amount: '', method: 'cash' as PaymentMethod, date: '', reference: '', notes: '', fiscalNumber: '' });
+    // F10: recording the fiscal receipt number of a payment afterwards.
+    const [fiscalTarget, setFiscalTarget] = useState<Payment | null>(null);
     const [cancelOpen, setCancelOpen] = useState(false);
     const [cancelReason, setCancelReason] = useState('');
     const [refundTarget, setRefundTarget] = useState<Payment | null>(null);
@@ -184,25 +189,29 @@ const InvoiceDetailPage: React.FC = () => {
 
     const openPayment = () => {
         pay.clearError();
-        setPaymentForm({ amount: String(invoice.balance), method: 'cash', date: toLocalDateString(), reference: '', notes: '' });
+        setPaymentForm({ amount: String(invoice.balance), method: 'cash', date: toLocalDateString(), reference: '', notes: '', fiscalNumber: '' });
         setPaymentOpen(true);
     };
 
     const amount = Number(paymentForm.amount);
     const amountError =
         paymentForm.amount.trim() === '' || !(amount > 0) || !fitsCurrency(amount, digits) || amount > invoice.balance;
+    const fiscalInput = cleanFiscalNumber(paymentForm.fiscalNumber);
+    const fiscalError = !!fiscalInput && !FISCAL_NUMBER.test(fiscalInput);
 
     const submitPayment = () => {
-        if (amountError) return;
+        if (amountError || fiscalError) return;
         dispatch(
             billingActions.addPayment({
                 invoiceId: invoice._id,
                 data: {
                     amount,
                     method: paymentForm.method,
-                    date: paymentForm.date || undefined,
+                    // Today: let the server stamp the actual time (as in the take-payment dialog), not midnight.
+                    date: paymentForm.date && paymentForm.date !== toLocalDateString() ? paymentForm.date : undefined,
                     reference: paymentForm.reference.trim() || undefined,
                     notes: paymentForm.notes.trim() || undefined,
+                    fiscalNumber: fiscalInput || undefined,
                 },
             }),
         );
@@ -404,6 +413,7 @@ const InvoiceDetailPage: React.FC = () => {
                                     <TableCell align="right">{t('billing.amount')}</TableCell>
                                     <TableCell>{t('billing.paymentMethod')}</TableCell>
                                     <TableCell>{t('billing.reference')}</TableCell>
+                                    <TableCell>{t('fiscal.column')}</TableCell>
                                     <TableCell>{t('billing.receivedBy')}</TableCell>
                                     {admin && <TableCell sx={{ displayPrint: 'none' }} />}
                                 </TableRow>
@@ -433,6 +443,21 @@ const InvoiceDetailPage: React.FC = () => {
                                                         {staffName(payment.voidedBy)}, {formatDate(payment.voidedAt)}: {payment.voidReason}
                                                     </Typography>
                                                 </Box>
+                                            )}
+                                        </TableCell>
+                                        <TableCell sx={{ whiteSpace: 'nowrap' }}>
+                                            {payment.fiscalNumber ? (
+                                                editor ? (
+                                                    <Link component="button" variant="body2" onClick={() => setFiscalTarget(payment)}>{payment.fiscalNumber}</Link>
+                                                ) : (
+                                                    payment.fiscalNumber
+                                                )
+                                            ) : editor && !payment.voidedAt ? (
+                                                <Button size="small" sx={{ displayPrint: 'none' }} onClick={() => setFiscalTarget(payment)}>
+                                                    {t('fiscal.add')}
+                                                </Button>
+                                            ) : (
+                                                '—'
                                             )}
                                         </TableCell>
                                         <TableCell>{staffName(payment.receivedBy)}</TableCell>
@@ -515,6 +540,15 @@ const InvoiceDetailPage: React.FC = () => {
                             onChange={(e) => setPaymentForm({ ...paymentForm, reference: e.target.value })}
                             helperText={t('billing.referenceHint')}
                             inputProps={{ maxLength: 100 }}
+                        />
+                        <TextField
+                            label={t('fiscal.numberOptional')}
+                            fullWidth
+                            value={paymentForm.fiscalNumber}
+                            onChange={(e) => setPaymentForm({ ...paymentForm, fiscalNumber: e.target.value })}
+                            error={fiscalError}
+                            helperText={fiscalError ? t('fiscal.invalid') : t('fiscal.hintLater')}
+                            inputProps={{ maxLength: 40 }}
                         />
                         <TextField
                             label={t('patients.notes')}
@@ -620,6 +654,17 @@ const InvoiceDetailPage: React.FC = () => {
                     sx={{ mt: 2 }}
                 />
             </ConfirmDialog>
+            <FiscalNumberDialog
+                paymentId={fiscalTarget?._id ?? null}
+                current={fiscalTarget?.fiscalNumber}
+                summary={fiscalTarget ? `${formatCurrency(fiscalTarget.amount, fiscalTarget.currency)} · ${t(paymentMethodKey(fiscalTarget.method))} · ${formatDateTime(fiscalTarget.date)}` : undefined}
+                onClose={() => setFiscalTarget(null)}
+                onSaved={() => {
+                    setFiscalTarget(null);
+                    toast.success(t('toast.saveSuccess'));
+                    dispatch(billingActions.getInvoice(invoice._id));
+                }}
+            />
         </Box>
     );
 };

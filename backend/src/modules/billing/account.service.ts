@@ -12,6 +12,7 @@ import { Patient, PatientDocument } from 'src/modules/patients/patient.schema';
 import { STATUS_FROM_AMOUNTS } from './billing.service';
 import { ApplyCreditDto, TakePaymentDto } from './dto/account.dto';
 import { VoidPaymentDto } from './dto';
+import { FiscalService } from './fiscal.service';
 
 const PERSON = 'firstName lastName';
 type Id = Types.ObjectId;
@@ -49,6 +50,7 @@ export class AccountService {
         @InjectModel(Patient.name) private readonly patientModel: Model<PatientDocument>,
         private readonly clinicRefs: ClinicRefsService,
         private readonly notifications: NotificationsService,
+        private readonly fiscal: FiscalService,
     ) {}
 
     async getAccount(clinicId: Id, patientId: Id) {
@@ -209,6 +211,7 @@ export class AccountService {
         }
 
         // A family payment (F8) may also pay the payer's children's invoices.
+        if (dto.fiscalNumber) await this.fiscal.assertUnused(clinicId, dto.fiscalNumber);
         const members = await this.familyIds(clinicId, patientId, !!dto.family);
         const open = await this.openInvoices(clinicId, members, currency);
         const plan = this.allocate(open, total, dto, currency);
@@ -255,6 +258,8 @@ export class AccountService {
             notes: dto.notes,
             receivedBy: userId,
             receiptId,
+            // F10: one fiscal receipt for the whole payment.
+            ...this.fiscal.stamp(dto.fiscalNumber, userId),
         };
         let payments: { invoiceId?: Id; amount: number }[];
         try {

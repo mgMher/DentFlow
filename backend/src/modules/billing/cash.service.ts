@@ -111,7 +111,15 @@ export class CashService {
             amount: major(p.amount),
             by: nameOf(by),
             refunded: p.voidType === PaymentVoidType.REFUND,
+            fiscalNumber: p.fiscalNumber ?? null,
         });
+        // F10: receipts of the day still without a fiscal number (parts of one payment count once).
+        const receiptKeys = new Map<string, boolean>();
+        for (const p of received) {
+            const key = String(p.receiptId ?? p._id);
+            receiptKeys.set(key, (receiptKeys.get(key) ?? false) || !!p.fiscalNumber);
+        }
+        const fiscalMissing = [...receiptKeys.values()].filter((has) => !has).length;
 
         return {
             date,
@@ -122,6 +130,7 @@ export class CashService {
                 net: major(totalIn - totalOut),
                 count: received.length,
                 onAccount: major(received.filter((p) => !p.invoiceId).reduce((s, p) => s + p.amount, 0)),
+                fiscalMissing,
             },
             expectedCash: major(expectedCash),
             byMethod: byMethod.map((m) => ({ ...m, received: major(m.received), refunded: major(m.refunded), net: major(m.net) })),

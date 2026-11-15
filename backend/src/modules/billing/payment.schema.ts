@@ -109,6 +109,20 @@ export class Payment {
 
     @Prop({ enum: ['minor'], default: 'minor' })
     moneyUnits: string;
+
+    /**
+     * F10: the number of the fiscal receipt the clinic's own cash register
+     * (ՀԴՄ) printed for this money. One receipt covers every part of a
+     * payment spread over several invoices (same `receiptId`).
+     */
+    @Prop({ trim: true })
+    fiscalNumber?: string;
+
+    @Prop()
+    fiscalRecordedAt?: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    fiscalRecordedBy?: Types.ObjectId;
 }
 
 export const PaymentSchema = SchemaFactory.createForClass(Payment);
@@ -116,3 +130,4 @@ export const PaymentSchema = SchemaFactory.createForClass(Payment);
 PaymentSchema.index({ clinicId: 1, invoiceId: 1 });
 PaymentSchema.index({ clinicId: 1, patientId: 1, date: 1 });
 PaymentSchema.index({ clinicId: 1, date: -1 });
+PaymentSchema.index({ clinicId: 1, fiscalNumber: 1 }, { sparse: true });

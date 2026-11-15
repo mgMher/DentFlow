@@ -15,6 +15,7 @@ export const AUDIT_AREAS: Record<string, string | null> = {
     BillingController: 'billing',
     AccountController: 'billing',
     CashController: 'billing',
+    FiscalController: 'billing',
     DocumentsController: 'documents',
     UsersController: 'staff',
     ClinicsController: 'clinic',
@@ -121,6 +122,7 @@ export const DIFF_RULES: Record<string, DiffRule> = {
     'appointments.updateStatus': { model: 'Appointment', filter: byId(), fields: only('status') },
     'appointments.cancel': { model: 'Appointment', filter: byId(), fields: only('status') },
 
+    'billing.setFiscalNumber': { model: 'Payment', filter: byId(), fields: only('fiscalNumber') },
     'billing.updateInvoice': { model: 'Invoice', filter: byId(), pick: invoice, extra: ['totalAmount'] },
     // These answer with the payment, not the invoice: the invoice gives the patient and what changed on it.
     'billing.issueInvoice': { model: 'Invoice', filter: byId(), fields: only('status') },

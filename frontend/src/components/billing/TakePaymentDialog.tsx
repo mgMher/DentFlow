@@ -25,6 +25,7 @@ import { apiErrorMessage } from '../../utils/apiError';
 import { fitsCurrency, minorDigits, PAYMENT_METHODS, paymentMethodKey } from '../../utils/billing';
 import { formatCurrency, formatDate } from '../../utils/formatters';
 import { toLocalDateString } from '../../utils/dates';
+import { FISCAL_NUMBER, cleanFiscalNumber } from '../../utils/fiscal';
 
 /** A patient's account, or a family's (F8): its open invoices then say whose they are. */
 type PayableAccount = Pick<PatientAccount, 'currency' | 'outstanding'> & {
@@ -66,6 +67,7 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
     const [method, setMethod] = useState<PaymentMethod>('cash');
     const [date, setDate] = useState(toLocalDateString());
     const [reference, setReference] = useState('');
+    const [fiscalNumber, setFiscalNumber] = useState('');
     const [parts, setParts] = useState<Record<string, string>>({});
     const [edited, setEdited] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -77,6 +79,7 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
         setMethod('cash');
         setDate(toLocalDateString());
         setReference('');
+        setFiscalNumber('');
         setParts(oldestFirst(account, account.outstanding));
         setEdited(false);
         setError(null);
@@ -98,7 +101,9 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
     });
     const onInvoices = Math.round(rows.reduce((s, r) => s + r.part * scale, 0)) / scale;
     const toCredit = amountOk ? Math.round((value - onInvoices) * scale) / scale : 0;
-    const valid = amountOk && rows.every((r) => r.ok) && toCredit >= 0;
+    const fiscal = cleanFiscalNumber(fiscalNumber);
+    const fiscalOk = !fiscal || FISCAL_NUMBER.test(fiscal);
+    const valid = amountOk && rows.every((r) => r.ok) && toCredit >= 0 && fiscalOk;
     const money = (n: number) => formatCurrency(n, account.currency);
     const cashCount = useMemo(() => rows.filter((r) => r.part > 0).length, [rows]);
 
@@ -113,6 +118,7 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
                 // Today: let the server stamp the actual time, so the statement keeps payments after the invoices they pay.
                 ...(date !== toLocalDateString() ? { date } : {}),
                 reference: reference.trim() || undefined,
+                fiscalNumber: fiscal || undefined,
                 allocations: rows.filter((r) => r.part > 0).map((r) => ({ invoiceId: r.invoice._id, amount: r.part })),
                 ...(familyNames ? { family: true } : {}),
             });
@@ -166,6 +172,17 @@ const TakePaymentDialog: React.FC<TakePaymentDialogProps> = ({ open, patientId, 
                     </Grid>
                     <Grid item xs={12} sm={6}>
                         <TextField fullWidth label={t('billing.reference')} value={reference} onChange={(e) => setReference(e.target.value)} inputProps={{ maxLength: 100 }} />
+                    </Grid>
+                    <Grid item xs={12}>
+                        <TextField
+                            fullWidth
+                            label={t('fiscal.numberOptional')}
+                            value={fiscalNumber}
+                            onChange={(e) => setFiscalNumber(e.target.value)}
+                            error={!fiscalOk}
+                            helperText={fiscalOk ? t('fiscal.hintLater') : t('fiscal.invalid')}
+                            inputProps={{ maxLength: 40 }}
+                        />
                     </Grid>
                 </Grid>
 

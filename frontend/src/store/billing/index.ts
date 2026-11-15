@@ -60,6 +60,7 @@ export interface PaymentInput {
     date?: string;
     reference?: string;
     notes?: string;
+    fiscalNumber?: string;
 }
 
 // ── Actions ───────────────────────────────────────────────────────────────────
