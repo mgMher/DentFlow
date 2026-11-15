@@ -21,6 +21,7 @@ export const AUDIT_AREAS = [
     'settings',
     'reminders',
     'auth',
+    'commission',
 ] as const;
 
 const humanize = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();

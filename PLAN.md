@@ -265,7 +265,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F8 | ✅ Guardian / family links for children — built 2026-11-13, see below | Pediatric patients |
 | F9 | ✅ Password reset by email, 2FA for admins, "log out everywhere" — built 2026-11-15, see below | Security basics |
 | F10 | ✅ e-HDM fiscal receipt (Armenia) — manual recording built 2026-11-15, see below | Legal requirement for cash |
-| F11 | Export reports to Excel/CSV; dentist commission from collected revenue | Owners ask for it |
+| F11 | ✅ Export reports to Excel/CSV; dentist commission from collected revenue — built 2026-11-15, see below | Owners ask for it |
 | F12 | Periodontal chart, mixed dentition | Specialist clinics |
 | F13 | Platform super-admin (list clinics, support) | Needed to run the SaaS |
 
@@ -406,6 +406,18 @@ Decision (agreed 2026-11-15): no automatic integration for now. Clinics print fi
   - **Clinic's own ՀԴՄ device**: SRC integration spec v0.7.3 — TCP to the device on the clinic network (it checks the caller's IP), 12-byte header `D5 80 D4 B4 D5 84 00 05 <op> 00 <len>`, JSON encrypted with 3DES-ECB-PKCS7 (key = first 24 bytes of SHA-256(device password), then the session key from operator login), strictly increasing `seq`; ops include login (2), print receipt (4), return (6), X/Z reports (9). A cloud server can't reach it directly: needs a small bridge at the clinic. Reference implementation: github.com/lobotomoe/hdm-am
   - **Cloud fiscalisation**: e.g. vcr.am — REST (`X-API-Key`), `POST /api/v1/sales`, `/sales/refund`, `/prepayments`; one-time SRC certificate (CSR filed in file-online.taxservice.am); no hardware
   - Activity code for dental services in the 875-N classifier: 86.23 (confirm with the accountant, with the clinic's tax regime — VAT / turnover tax / micro-enterprise)
+
+### F11 — Report export and dentist commission — ✅ built 2026-11-15, branch `feat/f11-export-commission` (stacked on F10)
+
+Decisions (agreed 2026-11-15): Excel (.xlsx) and CSV; the Reports page tables are exportable (the commission tab lives on that page, so it exports too). Commission is one % per dentist (a clinic default, overridable per dentist) of the money collected for their work. Months are live until an admin approves them; approved months are frozen and later changes (refunds, voids) are settled as an adjustment in the next approved month. Admins see every dentist, a dentist sees their own.
+
+- [x] **Export.** `POST /exports` writes the tables the page shows (headers already in the user's language) as an Excel workbook (exceljs: a sheet per table, bold frozen header, filter, number / money / % / date formats, real numbers and dates) or one CSV (UTF-8 with BOM so Excel shows Armenian, tables one after another; text that looks like a formula is prefixed with an apostrophe). Limits: 12 sheets, 40 columns, 5000 rows. Reads nothing from the database (so it can't leak data the user can't already see); not audited
+- [x] **Reports page.** "Export" → Excel / CSV: summary, collected by period, by payment method, appointments, dentists (with unassigned), treatments — for the chosen dates; dentists get only their own sections
+- [x] **Commission.** Same attribution as the dentist report (payments split over the invoice lines they paid; a line's dentist is the treatment's, else the appointment's). `GET /commission/rates`, `PUT /commission/rates` (admins); `GET /commission/:month` (live or approved; admins all, a dentist their own row and lines); `POST /commission/:month/approve` (ended months only), `DELETE /commission/:month/approve` (latest approved month only; gives back what it settled). Rates are frozen with the approved month. An approved month shows how much it has changed since, and the next approval settles it (each change once). Money not tied to a dentist earns nothing and is shown separately. Approvals, reopenings and rate changes are in the audit log ("Commission" area)
+- [x] **UI.** Reports → "Commission" tab: month picker, status (live / not approved / approved with who and when), dentist rows (collected, rate, commission, adjustment, to pay) and totals, the work paid for (invoice, patient, line, collected, commission), Approve / Reopen and Rates (admins), Export
+- [x] **Fixed on the way.** Month names via date-fns (the browser's Intl had no Armenian month names)
+- [x] Tests: `test/e2e/exports.e2e-spec.ts` (4, reading the .xlsx back), `test/e2e/commission.e2e-spec.ts` (8); all 269 e2e and 36 unit tests pass; browser (export of the reports page as Excel and CSV in Armenian, rates, approve October, dentist's own view; hy / ru / en; phone width)
+- [ ] Not built: billing / patients / audit exports (not chosen); commission by treatment category or fixed amounts; deducting lab or material costs; paying commission (marking it paid); PDF export
 
 ---
 

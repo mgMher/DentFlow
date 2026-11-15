@@ -58,7 +58,9 @@ interface ResolvedRange {
 }
 
 /** A share of collected money, attributed to one invoice line. Amount in minor units, unrounded. */
-interface CollectedLine {
+export interface CollectedLine {
+    /** The invoice the money paid (none: money on account). */
+    invoiceId?: string;
     dentistId?: string;
     treatmentId?: string;
     description: string;
@@ -170,12 +172,13 @@ export class ReportsService {
             const items = invoice.items ?? [];
             const base = items.reduce((sum, it) => sum + (it.total || 0), 0);
             if (base <= 0) {
-                lines.push({ dentistId: invoiceDentist, description: '', amount: paid });
+                lines.push({ invoiceId: String(invoice._id), dentistId: invoiceDentist, description: '', amount: paid });
                 continue;
             }
             for (const item of items) {
                 const entry = item.treatmentEntryId ? entryById.get(String(item.treatmentEntryId)) : undefined;
                 lines.push({
+                    invoiceId: String(invoice._id),
                     dentistId: idOf(entry?.dentistId) ?? invoiceDentist,
                     treatmentId: idOf(item.treatmentId) ?? idOf(entry?.treatmentId),
                     description: item.description ?? '',
@@ -184,6 +187,16 @@ export class ReportsService {
             }
         }
         return lines;
+    }
+
+    /**
+     * F11: collected money in clinic days `startDate`–`endDate`, attributed to
+     * invoice lines and dentists exactly as the dentist report does (for
+     * commission). Amounts in minor units, unrounded.
+     */
+    async attributedCollected(clinicId: Types.ObjectId, startDate: string, endDate: string) {
+        const r = await this.range(clinicId, { startDate, endDate });
+        return { currency: r.currency, lines: await this.collectedByLine(r, clinicId) };
     }
 
     // ── Revenue ──────────────────────────────────────────────────────────────

@@ -660,6 +660,48 @@ export interface FamilyAccount {
     openInvoices: (PatientAccount['openInvoices'][number] & { patientId: string })[];
 }
 
+// Dentist commission (F11) — amounts in major units
+export interface CommissionStatement {
+    month: string;
+    currency: Currency;
+    status: 'approved' | 'live';
+    approvedAt: string | null;
+    approvedBy: string | null;
+    ownOnly: boolean;
+    canApprove: boolean;
+    canReopen: boolean;
+    /** The month is over (only ended months can be approved). */
+    ended: boolean;
+    rows: {
+        dentistId: string;
+        name: string;
+        collected: number;
+        rate: number;
+        commission: number;
+        adjustment: number;
+        total: number;
+        /** Approved months: change since approval, settled in the next approved month. */
+        changedSince?: number;
+    }[];
+    totals: { collected: number; commission: number; adjustment: number; total: number };
+    /** Collected but not tied to any dentist (admins). */
+    unassigned?: number;
+    lines: {
+        dentistId: string;
+        invoiceId: string | null;
+        invoiceNumber: string | null;
+        patient: string | null;
+        description: string;
+        collected: number;
+        commission: number;
+    }[];
+}
+
+export interface CommissionRates {
+    defaultRate: number;
+    dentists: { dentistId: string; firstName: string; lastName: string; isActive: boolean; rate: number | null }[];
+}
+
 // Audit log (F7)
 export interface AuditChange {
     field: string;

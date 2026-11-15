@@ -602,7 +602,8 @@
     "timesDone": "Times done",
     "otherLines": "Other",
     "collectedHint": "Collected = payments received in the period, refunds excluded. A payment is split over the lines of its invoice.",
-    "onAccount": "of which on account {{amount}}"
+    "onAccount": "of which on account {{amount}}",
+    "overview": "Overview"
   },
   "settings": {
     "title": "Settings",
@@ -986,7 +987,14 @@
     "twoFactorChallengeExpired": "This sign-in took too long. Enter your password again.",
     "sessionNotFound": "That device is already signed out.",
     "useOwnTwoFactor": "Change your own two-factor sign-in in Account security.",
-    "fiscalNumberUsed": "This fiscal receipt number is already recorded on another payment."
+    "fiscalNumberUsed": "This fiscal receipt number is already recorded on another payment.",
+    "exportBadRow": "The table could not be written to a file.",
+    "commissionMonthFuture": "That month has not started yet.",
+    "commissionMonthOpen": "A month can be approved once it has ended.",
+    "commissionApproved": "This month is already approved.",
+    "commissionNotApproved": "This month is not approved.",
+    "commissionLaterApproved": "Reopen the later approved months first.",
+    "invalidMonth": "Month must be YYYY-MM."
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1452,6 +1460,11 @@
         "deactivate": "Removed a staff member",
         "signOutEverywhere": "Signed a staff member out of all devices",
         "resetTwoFactor": "Reset a staff member's two-factor sign-in"
+      },
+      "commission": {
+        "approve": "Approved a commission month",
+        "reopen": "Reopened a commission month",
+        "setRates": "Changed commission rates"
       }
     },
     "areas": {
@@ -1467,7 +1480,8 @@
       "schedule": "Schedule",
       "settings": "Message templates",
       "reminders": "Reminders",
-      "auth": "Sign-ins"
+      "auth": "Sign-ins",
+      "commission": "Commission"
     },
     "fields": {
       "firstName": "First name",
@@ -1701,5 +1715,53 @@
     "fillIn": "Fill in",
     "missingOnDay_one": "{{count}} payment of this day has no fiscal receipt number.",
     "missingOnDay_other": "{{count}} payments of this day have no fiscal receipt number."
+  },
+  "exports": {
+    "export": "Export",
+    "excel": "Excel (.xlsx)",
+    "csv": "CSV",
+    "failed": "Could not create the file",
+    "summary": "Summary",
+    "metric": "Item",
+    "value": "Value",
+    "code": "Code",
+    "onAccount": "Of which on account",
+    "overdue": "Of which overdue",
+    "activePatients": "Active patients"
+  },
+  "commission": {
+    "title": "Commission",
+    "collected": "Collected",
+    "rate": "Rate",
+    "commission": "Commission",
+    "adjustment": "Adjustment",
+    "total": "To pay",
+    "totals": "Total",
+    "adjustmentHint": "Changes to earlier approved months (refunds, voided payments) settled in this month",
+    "changedSince": "Changed by {{amount}} since approval; settled in the next approved month",
+    "approved": "Approved",
+    "notApproved": "Not approved",
+    "inProgress": "Month in progress",
+    "approve": "Approve month",
+    "reopen": "Reopen",
+    "approveConfirm": "Approve the commission for {{month}}? The figures are frozen; later changes go into the next approved month.",
+    "reopenConfirm": "Reopen {{month}}? It becomes live again and what it settled from earlier months goes back to them.",
+    "approvedToast": "Month approved",
+    "reopenedToast": "Month reopened",
+    "approvedHint": "Approved by {{name}}, {{date}}. These figures are frozen.",
+    "liveHint": "Calculated from today's data. Approve the month to freeze it.",
+    "inProgressHint": "The month is not over yet; figures grow as payments come in.",
+    "none": "No dentists",
+    "unassigned": "{{amount}} collected this month is not tied to a dentist (advances, invoices without a dentist) and earns no commission.",
+    "lines": "Work paid for",
+    "noLines": "Nothing collected for this work in the month",
+    "linesLiveHint": "The lines show today's data; differences from the approved figures are settled in the next approved month.",
+    "work": "Work",
+    "rates": "Rates",
+    "ratesHint": "Commission is a % of the money collected for each dentist's work. Leave a dentist empty to use the clinic default. Approved months keep their rates.",
+    "defaultRate": "Clinic default",
+    "useDefault": "Default ({{rate}}%)",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month"
   }
 }

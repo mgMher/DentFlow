@@ -16,6 +16,7 @@ export const AUDIT_AREA_NAMES = [
     'settings',
     'reminders',
     'auth',
+    'commission',
 ] as const;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;

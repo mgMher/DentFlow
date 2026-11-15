@@ -782,6 +782,26 @@ Receptionist; two issued invoices; the clinic's own cash register (any number wi
 | R-11 | Audit | After setting a number | "Recorded a fiscal receipt number", old → new | PASS (e2e) |
 | R-12 | Languages, phone | hy / ru / en; 375 px | All texts translated; no sideways scroll | PASS (browser, audit) |
 
+## 33. F11 — report export and dentist commission
+
+Admin, two dentists with work paid last month, receptionist.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| E-01 | Excel | Reports → Export → Excel | .xlsx with a sheet per section; header row frozen; numbers and dates are real numbers and dates | PASS (browser + e2e) |
+| E-02 | CSV | Export → CSV | One file, sections one after another; Armenian shows correctly in Excel (BOM); commas and quotes quoted | PASS (browser + e2e) |
+| E-03 | Formula-looking text | A value starting with = | Stays text (CSV prefixed with '); never a formula | PASS (e2e) |
+| E-04 | Dentist export | Export as a dentist | Only their own sections, no money | — |
+| E-05 | Rates | Commission → Rates: default 30 %, one dentist 40 % | Rows recalculated: collected × rate | PASS (browser + e2e) |
+| E-06 | Live month | Last month | Each dentist's collected, rate, commission; the work behind it; unassigned money shown apart | PASS (browser + e2e) |
+| E-07 | Approve | Approve last month; this month | Frozen with who and when; this month can't be approved yet | PASS (browser + e2e) |
+| E-08 | Frozen | Change a rate after approval | Approved month keeps its rate | PASS (e2e) |
+| E-09 | Refund after approval | Refund a payment of an approved month | The month shows the change; the next month shows it as an adjustment; approving it settles it once | PASS (e2e) |
+| E-10 | Reopen | Reopen an earlier month while a later one is approved; reopen the latest | Refused / reopened, settled amounts go back | PASS (e2e) |
+| E-11 | Dentist view | As a dentist | Own row and lines only; no rates, approve or reopen | PASS (browser + e2e) |
+| E-12 | Audit, tenancy | Audit log; another clinic | Rate changes, approvals, reopenings logged; another clinic sees nothing | PASS (e2e) |
+| E-13 | Languages, phone | hy / ru / en; 375 px | All texts translated, month names too; tables scroll in their own box | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

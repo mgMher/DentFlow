@@ -9,6 +9,10 @@ import { TreatmentEntry, TreatmentEntrySchema } from '../dental-records/treatmen
 import { User, UserSchema } from '../auth/auth.schema';
 import { ReportsService } from './reports.service';
 import { ReportsController } from './reports.controller';
+import { Clinic, ClinicSchema } from '../clinics/clinic.schema';
+import { CommissionStatement, CommissionStatementSchema } from './commission-statement.schema';
+import { CommissionService } from './commission.service';
+import { CommissionController } from './commission.controller';
 
 @Module({
     imports: [
@@ -20,10 +24,12 @@ import { ReportsController } from './reports.controller';
             { name: Treatment.name, schema: TreatmentSchema },
             { name: TreatmentEntry.name, schema: TreatmentEntrySchema },
             { name: User.name, schema: UserSchema },
+            { name: Clinic.name, schema: ClinicSchema },
+            { name: CommissionStatement.name, schema: CommissionStatementSchema },
         ]),
     ],
-    controllers: [ReportsController],
-    providers: [ReportsService],
+    controllers: [ReportsController, CommissionController],
+    providers: [ReportsService, CommissionService],
     exports: [ReportsService],
 })
 export class ReportsModule {}

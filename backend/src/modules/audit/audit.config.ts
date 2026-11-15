@@ -26,6 +26,9 @@ export const AUDIT_AREAS: Record<string, string | null> = {
     AuthController: 'auth',
     AuditController: null,
     ReportsController: null,
+    CommissionController: 'commission',
+    // Writes a file from what the page already shows; reads nothing.
+    ExportsController: null,
     // Personal inbox; and patients' Telegram answers are logged by the service.
     NotificationsController: null,
     TelegramWebhookController: null,

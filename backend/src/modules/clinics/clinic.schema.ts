@@ -91,6 +91,10 @@ export class Clinic {
     @Prop({ type: [WorkingHourSchema], default: [] })
     workingHours: WorkingHour[];
 
+    /** F11: default dentist commission, % of money collected for their work. */
+    @Prop({ default: 0, min: 0, max: 100 })
+    commissionRate: number;
+
     @Prop({ default: 'Asia/Yerevan' })
     timezone: string;
 

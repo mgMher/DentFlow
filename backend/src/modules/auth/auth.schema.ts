@@ -55,6 +55,10 @@ export class User {
     @Prop()
     lockedUntil?: Date;
 
+    /** F11: this dentist's commission, % of money collected for their work; unset = the clinic default. */
+    @Prop({ min: 0, max: 100 })
+    commissionRate?: number;
+
     // ── F9: password reset by email ──────────────────────────────────────
     /** SHA-256 of the one-time reset token in the emailed link; the token itself is never stored. */
     @Prop({ select: false })
