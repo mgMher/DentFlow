@@ -3,6 +3,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { SessionsService } from './sessions.service';
+import { TwoFactorService } from './two-factor.service';
 import { User, UserSchema } from './auth.schema';
 import { Session, SessionSchema } from './session.schema';
 import { Clinic, ClinicSchema } from '../clinics/clinic.schema';
@@ -20,8 +21,8 @@ import { TreatmentsModule } from '../treatments/treatments.module';
         TreatmentsModule,
     ],
     controllers: [AuthController],
-    providers: [AuthService, SessionsService],
+    providers: [AuthService, SessionsService, TwoFactorService],
     // SessionsService: the auth guard checks sessions, and staff management revokes them.
-    exports: [AuthService, SessionsService, MongooseModule],
+    exports: [AuthService, SessionsService, TwoFactorService, MongooseModule],
 })
 export class AuthModule {}

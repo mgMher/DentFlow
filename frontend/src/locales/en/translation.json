@@ -90,7 +90,8 @@
     "currentPassword": "Current password",
     "newPassword": "New password",
     "logoutAll": "Sign out of all devices",
-    "showPassword": "Show password"
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -975,7 +976,15 @@
     "guardianAlreadyLinked": "This person is already a guardian of the patient.",
     "guardianCycle": "The patient is already this person's guardian.",
     "guardianIsPatient": "This guardian is a patient: change their name and phone on their own record.",
-    "guardianNotFound": "Guardian not found."
+    "guardianNotFound": "Guardian not found.",
+    "resetLinkInvalid": "This reset link has expired or was already used.",
+    "twoFactorCodeInvalid": "That code is not right. Check the time on your phone and try the newest code.",
+    "twoFactorAlreadyOn": "Two-factor sign-in is already on.",
+    "twoFactorNoSetup": "Start the setup again.",
+    "twoFactorRequired": "Two-factor sign-in is required for your role and can't be turned off.",
+    "twoFactorChallengeExpired": "This sign-in took too long. Enter your password again.",
+    "sessionNotFound": "That device is already signed out.",
+    "useOwnTwoFactor": "Change your own two-factor sign-in in Account security."
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1342,7 +1351,14 @@
         "loginFailed": "Failed sign-in",
         "logout": "Signed out",
         "logoutAll": "Signed out on all devices",
-        "changePassword": "Changed own password"
+        "changePassword": "Changed own password",
+        "setupTwoFactor": "Started setting up two-factor sign-in",
+        "enableTwoFactor": "Turned on two-factor sign-in",
+        "disableTwoFactor": "Turned off two-factor sign-in",
+        "regenerateBackupCodes": "Made new backup codes",
+        "revokeSession": "Signed out a device",
+        "passwordResetRequested": "Asked for a password reset link",
+        "passwordReset": "Set a new password from the email link"
       },
       "billing": {
         "takePayment": "Took a payment",
@@ -1430,7 +1446,9 @@
         "setStatus": "Activated or deactivated a staff member",
         "updateAvailability": "Changed a staff member's hours",
         "resetPassword": "Reset a staff member's password",
-        "deactivate": "Removed a staff member"
+        "deactivate": "Removed a staff member",
+        "signOutEverywhere": "Signed a staff member out of all devices",
+        "resetTwoFactor": "Reset a staff member's two-factor sign-in"
       }
     },
     "areas": {
@@ -1540,7 +1558,8 @@
     "reasons": {
       "wrongPassword": "Wrong password",
       "locked": "Account locked",
-      "deactivated": "Account deactivated"
+      "deactivated": "Account deactivated",
+      "wrongCode": "Wrong two-factor code"
     }
   },
   "family": {
@@ -1587,5 +1606,76 @@
     },
     "age_one": "{{count}} year",
     "age_other": "{{count}} years"
+  },
+  "security": {
+    "title": "Account security",
+    "twoFactor": "Two-factor sign-in",
+    "on": "On",
+    "off": "Off",
+    "twoFactorAbout": "After your password, a 6-digit code from an authenticator app on your phone (Google Authenticator, Microsoft Authenticator, 1Password…). Someone who learns your password still can't sign in.",
+    "requiredOn": "Required for your role.",
+    "requiredOff": "Required for your role: you will be asked to set it up at your next sign-in.",
+    "enabledOn": "On since {{date}}",
+    "newBackupCodes": "New backup codes",
+    "newBackupCodesHint": "Enter a code from your authenticator app. The old backup codes stop working.",
+    "turnOff": "Turn off",
+    "turnOffHint": "Enter a code from your authenticator app to turn two-factor sign-in off.",
+    "turnedOff": "Two-factor sign-in turned off",
+    "setUp": "Set up",
+    "setupTitle": "Set up two-factor sign-in",
+    "requiredForRole": "Your role requires two-factor sign-in. Set it up once to continue.",
+    "scanStep": "Open your authenticator app and scan this QR code.",
+    "qrAlt": "QR code for the authenticator app",
+    "manualKey": "Can't scan? Enter this key in the app:",
+    "enterFirstCode": "Then enter the 6-digit code the app shows:",
+    "turnOn": "Turn on",
+    "code": "6-digit code",
+    "backupCode": "Backup code",
+    "backupCodes": "Backup codes",
+    "backupCodesHint": "Keep these somewhere safe. Each one signs you in once if you lose your phone. They are shown only now.",
+    "copy": "Copy",
+    "copied": "Copied",
+    "download": "Download",
+    "savedThem": "I've saved them",
+    "continueToApp": "I've saved them — continue",
+    "codeTitle": "Two-factor sign-in",
+    "codeHint": "Enter the 6-digit code from your authenticator app.",
+    "backupHint": "Enter one of your backup codes. Each works once.",
+    "useBackup": "Lost your phone? Use a backup code",
+    "useApp": "Use the authenticator app",
+    "trustDevice": "Don't ask again on this device for 30 days",
+    "verify": "Verify",
+    "backToLogin": "Back to sign in",
+    "forgotTitle": "Reset your password",
+    "forgotSubtitle": "Enter your work email. We'll send a link to choose a new password.",
+    "sendLink": "Send reset link",
+    "forgotSent": "If {{email}} has a DentFlow account, a link is on its way. It works for an hour. Check spam too.",
+    "forgotNoEmail": "No email arrives? Your clinic administrator can also set a new password for you on the Staff page.",
+    "resetTitle": "Choose a new password",
+    "resetSubtitle": "You'll be signed out on all your devices.",
+    "newPassword": "New password",
+    "repeatPassword": "Repeat the new password",
+    "setPassword": "Save new password",
+    "resetDone": "Your password is changed. Sign in with the new one.",
+    "requestNewLink": "Request a new link",
+    "devices": "Signed-in devices",
+    "thisDevice": "This device",
+    "unknownDevice": "Unknown device",
+    "lastUsed": "last used {{date}}",
+    "signedInOn": "signed in {{date}}",
+    "signOutDevice": "Sign out",
+    "deviceSignedOut": "Device signed out",
+    "logoutAllHint": "Every device, this one included, is signed out and trusted devices are forgotten.",
+    "staffMenu": "Security",
+    "staffSignOut": "Sign out of all devices",
+    "staffSignOutHint": "{{name}} will be signed out everywhere and has to sign in again.",
+    "staffResetTwoFactor": "Reset two-factor sign-in",
+    "staffResetTwoFactorHint": "For a lost phone: the authenticator and backup codes of {{name}} stop working and they are signed out. If their role requires it, they set it up again at the next sign-in.",
+    "staffSignedOut": "{{name}} is signed out everywhere",
+    "staffTwoFactorReset": "Two-factor reset for {{name}}",
+    "backupLeft_one": "{{count}} backup code left",
+    "backupLeft_other": "{{count}} backup codes left",
+    "trustedCount_one": "{{count}} device skips the code for now (trusted for 30 days). \"Log out everywhere\" clears it.",
+    "trustedCount_other": "{{count}} devices skip the code for now (trusted for 30 days). \"Log out everywhere\" clears them."
   }
 }

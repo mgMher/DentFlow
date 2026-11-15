@@ -29,6 +29,9 @@ import ReportsPage from '../pages/reports/ReportsPage';
 import SettingsPage from '../pages/settings/SettingsPage';
 import SchedulePage from '../pages/schedule/SchedulePage';
 import NotificationsPage from '../pages/notifications/NotificationsPage';
+import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
+import AccountSecurityPage from '../pages/account/AccountSecurityPage';
 import AuditLogPage from '../pages/audit/AuditLogPage';
 
 interface AppRouterProps {
@@ -42,6 +45,8 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
 
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
@@ -78,6 +83,7 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     </Route>
                     <Route path="/schedule" element={<SchedulePage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
+                    <Route path="/account" element={<AccountSecurityPage />} />
                     <Route element={<RequirePermission permission="manageClinic" />}>
                         <Route path="/settings" element={<SettingsPage />} />
                     </Route>

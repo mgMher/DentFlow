@@ -22,6 +22,7 @@ import {SettingsModule} from './modules/settings/settings.module';
 import {RemindersModule} from './modules/reminders/reminders.module';
 import {DocumentsModule} from './modules/documents/documents.module';
 import {AuditModule} from './modules/audit/audit.module';
+import {MailModule} from './common/mail/mail.module';
 
 @Module({
     imports: [
@@ -31,6 +32,7 @@ import {AuditModule} from './modules/audit/audit.module';
         MigrationsModule,
         ClinicRefsModule,
         AuditModule,
+        MailModule,
         // Applied per route (auth endpoints), not globally.
         ThrottlerModule.forRoot({ttl: 60, limit: 100}),
         AuthModule,

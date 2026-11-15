@@ -2,6 +2,8 @@
 export interface LoginRequest {
     email: string;
     password: string;
+    /** F9: a browser trusted for 30 days skips the two-factor code. */
+    trustedDevice?: string;
 }
 
 export interface RegisterRequest {
@@ -21,6 +23,9 @@ export interface AuthResponse {
 
 export interface UserProfile {
     _id: string;
+    /** From /auth/me (F9). */
+    twoFactorEnabled?: boolean;
+    twoFactorRequired?: boolean;
     email: string;
     firstName: string;
     lastName: string;
@@ -567,6 +572,31 @@ export interface StatementLine {
     charge: number;
     payment: number;
     balance: number;
+}
+
+// Account security (F9)
+export interface TwoFactorSetup {
+    secret: string;
+    otpauthUrl: string;
+    /** PNG data URL of the QR code. */
+    qr: string;
+}
+
+export interface TwoFactorStatus {
+    enabled: boolean;
+    enabledAt: string | null;
+    required: boolean;
+    backupCodesLeft: number;
+    trustedDevices: number;
+}
+
+export interface SignedInDevice {
+    _id: string;
+    userAgent?: string;
+    ip?: string;
+    lastUsedAt: string;
+    createdAt: string;
+    current: boolean;
 }
 
 // Family links (F8)

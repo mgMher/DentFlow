@@ -47,6 +47,7 @@ import {
 } from '../../components/ui';
 import { useAuth, useHttpState, usePermission } from '../../hooks';
 import StaffStatusDialog from './StaffStatusDialog';
+import StaffSecurityMenu from './StaffSecurityMenu';
 import { formatCurrency, getFullName, getInitials } from '../../utils/formatters';
 import { formatArmenianPhone } from '../../utils/validators';
 import { EMAIL_PATTERN, isArmenianPhone } from '../../utils/validators';
@@ -288,6 +289,7 @@ const StaffDetailPage: React.FC = () => {
                         {t('staff.resetPassword')}
                     </Button>
                 )}
+                {canManageStaff && !isSelf && <StaffSecurityMenu staffId={staff._id} name={getFullName(staff.firstName, staff.lastName)} />}
                 {canManageStaff && (
                     <Button
                         variant="outlined"

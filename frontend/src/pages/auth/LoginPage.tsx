@@ -27,6 +27,7 @@ import { RootState } from '../../store';
 import { authActions } from '../../store/auth';
 import { LoginRequest } from '../../types';
 import { LANGUAGES } from '../../utils/constants';
+import TwoFactorStep from './TwoFactorStep';
 
 const LoginPage: React.FC = () => {
     const { t, i18n } = useTranslation();
@@ -40,10 +41,11 @@ const LoginPage: React.FC = () => {
         state.http.errors.find((e) => e.type === 'LOGIN'),
     );
     const isAuthenticated = useSelector((state: RootState) => state.auth.isAuthenticated);
+    // F9: the password was right; an authenticator code (or its setup) comes next.
+    const twoFactor = useSelector((state: RootState) => state.auth.twoFactor);
 
     const [showPassword, setShowPassword] = React.useState(false);
     // No self-service reset yet (needs email delivery): an admin resets it from the staff page.
-    const [showForgotHint, setShowForgotHint] = React.useState(false);
     const [langAnchor, setLangAnchor] = React.useState<null | HTMLElement>(null);
 
     const {
@@ -153,139 +155,139 @@ const LoginPage: React.FC = () => {
                         </Typography>
                     </Box>
 
-                    {/* Title */}
-                    <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5 }}>
-                        {t('auth.loginTitle')}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                        {t('auth.welcomeBack')}
-                    </Typography>
+                    {twoFactor ? (
+                        <TwoFactorStep pending={twoFactor} />
+                    ) : (
+                        <>
+                            {/* Title */}
+                            <Typography variant="h6" fontWeight={600} sx={{ mb: 0.5 }}>
+                                {t('auth.loginTitle')}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                                {t('auth.welcomeBack')}
+                            </Typography>
 
-                    {/* Error Alert */}
-                    {loginError && (
-                        <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
-                            {loginError.error}
-                        </Alert>
-                    )}
-
-                    {/* Form */}
-                    <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-                        <Controller
-                            name="email"
-                            control={control}
-                            rules={{
-                                required: t('validation.required'),
-                                pattern: {
-                                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                                    message: t('validation.invalidEmail'),
-                                },
-                            }}
-                            render={({ field }) => (
-                                <TextField
-                                    {...field}
-                                    fullWidth
-                                    label={t('auth.email')}
-                                    type="email"
-                                    autoComplete="email"
-                                    autoFocus
-                                    error={!!errors.email}
-                                    helperText={errors.email?.message}
-                                    disabled={isLoading}
-                                    sx={{ mb: 2.5 }}
-                                />
-                            )}
-                        />
-
-                        <Controller
-                            name="password"
-                            control={control}
-                            // Presence only: accounts created under the old 6-character
-                            // rule must still be able to sign in.
-                            rules={{ required: t('validation.required') }}
-                            render={({ field }) => (
-                                <TextField
-                                    {...field}
-                                    fullWidth
-                                    label={t('auth.password')}
-                                    type={showPassword ? 'text' : 'password'}
-                                    autoComplete="current-password"
-                                    error={!!errors.password}
-                                    helperText={errors.password?.message}
-                                    disabled={isLoading}
-                                    InputProps={{
-                                        endAdornment: (
-                                            <InputAdornment position="end">
-                                                <IconButton
-                                                    onClick={() => setShowPassword(!showPassword)}
-                                                    edge="end"
-                                                    size="small"
-                                                >
-                                                    {showPassword ? <VisibilityOff /> : <Visibility />}
-                                                </IconButton>
-                                            </InputAdornment>
-                                        ),
-                                    }}
-                                    sx={{ mb: 1 }}
-                                />
-                            )}
-                        />
-
-                        <Box sx={{ textAlign: 'right', mb: 3 }}>
-                            <Link
-                                component="button"
-                                type="button"
-                                variant="body2"
-                                underline="hover"
-                                onClick={() => setShowForgotHint((v) => !v)}
-                                sx={{ color: 'primary.main', fontWeight: 500 }}
-                            >
-                                {t('auth.forgotPassword')}
-                            </Link>
-                            {showForgotHint && (
-                                <Alert severity="info" sx={{ mt: 1, textAlign: 'left' }}>
-                                    {t('auth.forgotPasswordHint')}
+                            {/* Error Alert */}
+                            {loginError && (
+                                <Alert severity="error" sx={{ mb: 2, borderRadius: 2 }}>
+                                    {loginError.error}
                                 </Alert>
                             )}
-                        </Box>
 
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            size="large"
-                            disabled={isLoading}
-                            sx={{
-                                py: 1.5,
-                                fontSize: '1rem',
-                                fontWeight: 600,
-                                borderRadius: 2,
-                                background: 'linear-gradient(135deg, #0B5E6E, #1A8A9E)',
-                                '&:hover': {
-                                    background: 'linear-gradient(135deg, #074750, #0B5E6E)',
-                                },
-                            }}
-                        >
-                            {isLoading ? (
-                                <CircularProgress size={24} sx={{ color: '#fff' }} />
-                            ) : (
-                                t('auth.login')
-                            )}
-                        </Button>
+                            {/* Form */}
+                            <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
+                                <Controller
+                                    name="email"
+                                    control={control}
+                                    rules={{
+                                        required: t('validation.required'),
+                                        pattern: {
+                                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                            message: t('validation.invalidEmail'),
+                                        },
+                                    }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label={t('auth.email')}
+                                            type="email"
+                                            autoComplete="email"
+                                            autoFocus
+                                            error={!!errors.email}
+                                            helperText={errors.email?.message}
+                                            disabled={isLoading}
+                                            sx={{ mb: 2.5 }}
+                                        />
+                                    )}
+                                />
 
-                        <Box sx={{ textAlign: 'center', mt: 3 }}>
-                            <Typography variant="body2" color="text.secondary">
-                                {t('auth.noAccount')}{' '}
-                                <Link
-                                    component={RouterLink}
-                                    to="/register"
-                                    underline="hover"
-                                    sx={{ fontWeight: 600, color: 'primary.main' }}
+                                <Controller
+                                    name="password"
+                                    control={control}
+                                    // Presence only: accounts created under the old 6-character
+                                    // rule must still be able to sign in.
+                                    rules={{ required: t('validation.required') }}
+                                    render={({ field }) => (
+                                        <TextField
+                                            {...field}
+                                            fullWidth
+                                            label={t('auth.password')}
+                                            type={showPassword ? 'text' : 'password'}
+                                            autoComplete="current-password"
+                                            error={!!errors.password}
+                                            helperText={errors.password?.message}
+                                            disabled={isLoading}
+                                            InputProps={{
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton
+                                                            onClick={() => setShowPassword(!showPassword)}
+                                                            edge="end"
+                                                            size="small"
+                                                        >
+                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                            sx={{ mb: 1 }}
+                                        />
+                                    )}
+                                />
+
+                                <Box sx={{ textAlign: 'right', mb: 3 }}>
+                                    <Link
+                                        component={RouterLink}
+                                        to="/forgot-password"
+                                        variant="body2"
+                                        underline="hover"
+                                        sx={{ color: 'primary.main', fontWeight: 500 }}
+                                    >
+                                        {t('auth.forgotPassword')}
+                                    </Link>
+                                </Box>
+
+                                <Button
+                                    type="submit"
+                                    fullWidth
+                                    variant="contained"
+                                    size="large"
+                                    disabled={isLoading}
+                                    sx={{
+                                        py: 1.5,
+                                        fontSize: '1rem',
+                                        fontWeight: 600,
+                                        borderRadius: 2,
+                                        background: 'linear-gradient(135deg, #0B5E6E, #1A8A9E)',
+                                        '&:hover': {
+                                            background: 'linear-gradient(135deg, #074750, #0B5E6E)',
+                                        },
+                                    }}
                                 >
-                                    {t('auth.register')}
-                                </Link>
-                            </Typography>
-                        </Box>
-                    </Box>
+                                    {isLoading ? (
+                                        <CircularProgress size={24} sx={{ color: '#fff' }} />
+                                    ) : (
+                                        t('auth.login')
+                                    )}
+                                </Button>
+
+                                <Box sx={{ textAlign: 'center', mt: 3 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {t('auth.noAccount')}{' '}
+                                        <Link
+                                            component={RouterLink}
+                                            to="/register"
+                                            underline="hover"
+                                            sx={{ fontWeight: 600, color: 'primary.main' }}
+                                        >
+                                            {t('auth.register')}
+                                        </Link>
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        </>
+                    )}
                 </CardContent>
             </Card>
         </Box>

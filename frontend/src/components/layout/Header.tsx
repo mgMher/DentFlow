@@ -13,6 +13,7 @@ import {
     Settings as SettingsIcon,
     Password as PasswordIcon,
     PhonelinkErase as LogoutAllIcon,
+    Security as SecurityIcon,
     Menu as MenuIcon,
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
@@ -168,6 +169,10 @@ const Header: React.FC<HeaderProps> = ({ sidebarWidth, onMenuClick, themeMode, o
                             {t('nav.settings')}
                         </MenuItem>
                     )}
+                    <MenuItem onClick={() => { handleMenuClose(); navigate('/account'); }}>
+                        <ListItemIcon><SecurityIcon fontSize="small" /></ListItemIcon>
+                        {t('security.title')}
+                    </MenuItem>
                     <MenuItem onClick={() => { handleMenuClose(); changePassword.clearError(); setPasswordOpen(true); }}>
                         <ListItemIcon><PasswordIcon fontSize="small" /></ListItemIcon>
                         {t('auth.changePassword')}

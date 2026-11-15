@@ -1,11 +1,26 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Request } from 'express';
 import { Public, CurrentUser } from 'src/common/decorators';
+import { ParseObjectIdPipe } from 'src/common/pipes';
+import { errorBody } from 'src/common/utils';
+import { Types } from 'mongoose';
 import { AuthService } from './auth.service';
-import { SessionMeta } from './sessions.service';
-import { ChangePasswordDto, RegisterDto, LoginDto, RefreshTokenDto, TokenResponseDto } from './dto';
+import { TwoFactorService } from './two-factor.service';
+import { SessionMeta, SessionsService } from './sessions.service';
+import {
+    ChangePasswordDto,
+    ForgotPasswordDto,
+    LoginDto,
+    RefreshTokenDto,
+    RegisterDto,
+    ResetPasswordWithTokenDto,
+    TokenResponseDto,
+    TwoFactorChallengeDto,
+    TwoFactorCodeDto,
+    TwoFactorLoginDto,
+} from './dto';
 
 const metaOf = (req: Request): SessionMeta => ({
     userAgent: req.headers['user-agent'],
@@ -21,7 +36,11 @@ const metaOf = (req: Request): SessionMeta => ({
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-    constructor(private readonly authService: AuthService) {}
+    constructor(
+        private readonly authService: AuthService,
+        private readonly twoFactor: TwoFactorService,
+        private readonly sessions: SessionsService,
+    ) {}
 
     @Public()
     @Post('register')
@@ -88,6 +107,124 @@ export class AuthController {
         @Body() dto: ChangePasswordDto,
     ) {
         return this.authService.changePassword(userId, sessionId, dto);
+    }
+
+    // ── F9: two-factor sign-in, step two ─────────────────────────────────
+
+    @Public()
+    @Post('login/2fa')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(30, 60)
+    @ApiOperation({ summary: 'Finish signing in with an authenticator or backup code' })
+    async loginTwoFactor(@Body() dto: TwoFactorLoginDto, @Req() req: Request) {
+        return this.authService.loginWithCode(dto, metaOf(req));
+    }
+
+    @Public()
+    @Post('login/2fa/setup')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(10, 60)
+    @ApiOperation({ summary: 'Two-factor is required but not set up: get a secret / QR code to scan' })
+    async loginTwoFactorSetup(@Body() dto: TwoFactorChallengeDto) {
+        return this.authService.loginSetup(dto);
+    }
+
+    @Public()
+    @Post('login/2fa/enable')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(30, 60)
+    @ApiOperation({ summary: 'Confirm the first code, switch two-factor on and finish signing in (returns backup codes once)' })
+    async loginTwoFactorEnable(@Body() dto: TwoFactorLoginDto, @Req() req: Request) {
+        return this.authService.loginEnable(dto, metaOf(req));
+    }
+
+    // ── F9: password reset by email ───────────────────────────────────────
+
+    @Public()
+    @Post('forgot-password')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(5, 600)
+    @ApiOperation({ summary: 'Email a one-time reset link (same answer whether or not the email has an account)' })
+    async forgotPassword(@Body() dto: ForgotPasswordDto, @Req() req: Request) {
+        return this.authService.forgotPassword(dto, metaOf(req));
+    }
+
+    @Public()
+    @Post('reset-password')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(10, 600)
+    @ApiOperation({ summary: 'Set a new password with the emailed link; signs out every device' })
+    async resetPassword(@Body() dto: ResetPasswordWithTokenDto, @Req() req: Request) {
+        return this.authService.resetPassword(dto, metaOf(req));
+    }
+
+    // ── F9: my two-factor and devices ─────────────────────────────────────
+
+    @Get('2fa')
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'My two-factor status' })
+    twoFactorStatus(@CurrentUser('userId') userId: string, @CurrentUser('role') role: string) {
+        return this.twoFactor.status(userId, role);
+    }
+
+    @Post('2fa/setup')
+    @HttpCode(HttpStatus.OK)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Start setting up an authenticator app' })
+    setupTwoFactor(@CurrentUser('userId') userId: string) {
+        return this.twoFactor.beginSetup(userId);
+    }
+
+    @Post('2fa/enable')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(10, 60)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Confirm the first code; returns the backup codes once' })
+    enableTwoFactor(@CurrentUser('userId') userId: string, @Body() dto: TwoFactorCodeDto) {
+        return this.twoFactor.confirmSetup(userId, dto.code);
+    }
+
+    @Post('2fa/disable')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(10, 60)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Turn two-factor off (not for roles that require it)' })
+    disableTwoFactor(@CurrentUser('userId') userId: string, @CurrentUser('role') role: string, @Body() dto: TwoFactorCodeDto) {
+        return this.twoFactor.disable(userId, role, dto.code);
+    }
+
+    @Post('2fa/backup-codes')
+    @HttpCode(HttpStatus.OK)
+    @UseGuards(ThrottlerGuard)
+    @Throttle(10, 60)
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'New backup codes (the old ones stop working)' })
+    regenerateBackupCodes(@CurrentUser('userId') userId: string, @Body() dto: TwoFactorCodeDto) {
+        return this.twoFactor.regenerateBackupCodes(userId, dto.code);
+    }
+
+    @Get('sessions')
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'My signed-in devices' })
+    listSessions(@CurrentUser('userId') userId: string, @CurrentUser('sessionId') sessionId: string) {
+        return this.sessions.list(userId, sessionId);
+    }
+
+    @Delete('sessions/:id')
+    @ApiBearerAuth()
+    @ApiOperation({ summary: 'Sign out one of my devices' })
+    async revokeSession(@CurrentUser('userId') userId: string, @Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
+        if (!(await this.sessions.revokeOwn(userId, id))) {
+            throw new NotFoundException(errorBody('sessionNotFound', 'That device is already signed out'));
+        }
+        return { revoked: true };
     }
 
     @Get('me')

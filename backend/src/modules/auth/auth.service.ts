@@ -18,9 +18,13 @@ import { User, UserDocument } from './auth.schema';
 import { Clinic, ClinicDocument } from '../clinics/clinic.schema';
 import { UserProfile, UserProfileDocument } from '../users/user.schema';
 import { TreatmentsService } from '../treatments/treatments.service';
-import { ChangePasswordDto, LoginDto, RegisterDto } from './dto';
+import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RegisterDto, ResetPasswordWithTokenDto, TwoFactorChallengeDto, TwoFactorLoginDto } from './dto';
 import { SessionMeta, SessionsService } from './sessions.service';
 import { AuditService } from '../audit/audit.service';
+import { MailService } from 'src/common/mail/mail.service';
+import { TwoFactorService } from './two-factor.service';
+import { resetEmail } from './reset-email';
+import { createHash, randomBytes } from 'crypto';
 
 export const PASSWORD_HASH_COST = 12;
 
@@ -32,6 +36,10 @@ const isDuplicateKey = (err: unknown) => (err as { code?: number })?.code === 11
 
 const emailTaken = () =>
     new ConflictException(errorBody('accountEmailTaken', 'A user with this email already exists'));
+
+/** F9: how long an emailed reset link works. */
+const RESET_MINUTES = 60;
+const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
 @Injectable()
 export class AuthService implements OnModuleInit {
@@ -45,6 +53,8 @@ export class AuthService implements OnModuleInit {
         private readonly treatmentsService: TreatmentsService,
         @InjectConnection() private readonly connection: Connection,
         private readonly audit: AuditService,
+        private readonly twoFactor: TwoFactorService,
+        private readonly mail: MailService,
     ) {}
 
     /**
@@ -163,14 +173,112 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException(errorBody('accountDeactivated', 'Account is deactivated'));
         }
 
+        // F9: a correct password may still need an authenticator code, or setting one up.
+        const next = await this.twoFactor.gate(user, dto.trustedDevice);
+        if (next) {
+            return {
+                twoFactorRequired: next === 'code',
+                twoFactorSetupRequired: next === 'setup',
+                challenge: this.twoFactor.challenge(user._id, next === 'setup'),
+            };
+        }
+        return this.completeLogin(user, meta);
+    }
+
+    /** Step two: the code from the authenticator app, or a backup code. */
+    async loginWithCode(dto: TwoFactorLoginDto, meta: SessionMeta) {
+        const user = await this.challengeUser(dto.challenge, false);
+        if (!(await this.twoFactor.verify(user._id, dto.code))) {
+            await this.recordFailedLogin(user._id);
+            await this.auditSignIn('auth.loginFailed', user, meta, { reason: 'wrongCode' });
+            throw new UnauthorizedException(errorBody('twoFactorCodeInvalid', 'That code is not right'));
+        }
+        const trustedDevice = dto.trustDevice ? await this.twoFactor.trust(user._id, meta.userAgent) : undefined;
+        return { ...(await this.completeLogin(user, meta, { twoFactor: true })), ...(trustedDevice ? { trustedDevice } : {}) };
+    }
+
+    /** Required but not set up yet (admins): a secret and QR code to scan. */
+    async loginSetup(dto: TwoFactorChallengeDto) {
+        const user = await this.challengeUser(dto.challenge, true);
+        return this.twoFactor.beginSetup(user._id);
+    }
+
+    /** The first code switches two-factor on and finishes signing in; backup codes are shown this once. */
+    async loginEnable(dto: TwoFactorLoginDto, meta: SessionMeta) {
+        const user = await this.challengeUser(dto.challenge, true);
+        let backupCodes: string[];
+        try {
+            ({ backupCodes } = await this.twoFactor.confirmSetup(user._id, dto.code));
+        } catch (err) {
+            await this.recordFailedLogin(user._id);
+            throw err;
+        }
+        await this.auditSignIn('auth.enableTwoFactor', user, meta);
+        const trustedDevice = dto.trustDevice ? await this.twoFactor.trust(user._id, meta.userAgent) : undefined;
+        return { ...(await this.completeLogin(user, meta, { twoFactor: true })), backupCodes, ...(trustedDevice ? { trustedDevice } : {}) };
+    }
+
+    private async completeLogin(user: UserDocument, meta: SessionMeta, details?: Record<string, unknown>) {
         await this.userModel.updateOne(
             { _id: user._id },
             { $set: { lastLogin: new Date(), failedLoginAttempts: 0 }, $unset: { lockedUntil: 1 } },
         );
-
         const tokens = await this.sessions.start(user, meta);
-        await this.auditSignIn('auth.login', user, meta);
+        await this.auditSignIn('auth.login', user, meta, details);
         return { ...tokens, user: this.sanitizeUser(user) };
+    }
+
+    /** The account behind a two-factor challenge, still allowed to sign in. */
+    private async challengeUser(token: string, setup: boolean) {
+        const challenge = this.twoFactor.readChallenge(token);
+        if (challenge.setup !== setup) throw new UnauthorizedException(errorBody('twoFactorChallengeExpired', 'Sign in again'));
+        const user = await this.userModel.findById(challenge.userId);
+        if (!user || !user.isActive) throw new UnauthorizedException(errorBody('twoFactorChallengeExpired', 'Sign in again'));
+        if (user.lockedUntil && user.lockedUntil > new Date()) throw this.lockedError(user.lockedUntil);
+        return user;
+    }
+
+    // ── F9: password reset by email ───────────────────────────────────────
+
+    /**
+     * Email a one-time link, valid an hour. The answer never says whether the
+     * email has an account; a new request replaces an earlier link.
+     */
+    async forgotPassword(dto: ForgotPasswordDto, meta: SessionMeta) {
+        const user = await this.userModel.findOne({ email: dto.email, isActive: true });
+        if (user) {
+            const token = randomBytes(32).toString('base64url');
+            await this.userModel.updateOne(
+                { _id: user._id },
+                { $set: { resetTokenHash: hashToken(token), resetTokenExpiresAt: new Date(Date.now() + RESET_MINUTES * 60_000) } },
+            );
+            const clinic = await this.clinicModel.findById(user.clinicId).select('name language').lean();
+            const link = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '')}/reset-password?token=${token}`;
+            const mail = resetEmail(clinic?.language, user.firstName || user.email, clinic?.name ?? 'DentFlow', link, RESET_MINUTES);
+            try {
+                await this.mail.send({ to: user.email, ...mail });
+            } catch (err) {
+                this.logger.error(`Reset email to user ${user._id} failed: ${(err as Error).message}`);
+            }
+            await this.auditSignIn('auth.passwordResetRequested', user, meta);
+        }
+        return { sent: true };
+    }
+
+    /** A new password from the emailed link: once, within the hour; every device is signed out. */
+    async resetPassword(dto: ResetPasswordWithTokenDto, meta: SessionMeta) {
+        const user = await this.userModel.findOneAndUpdate(
+            { resetTokenHash: hashToken(dto.token), resetTokenExpiresAt: { $gt: new Date() }, isActive: true },
+            {
+                $set: { password: await bcrypt.hash(dto.newPassword, PASSWORD_HASH_COST), failedLoginAttempts: 0 },
+                $unset: { resetTokenHash: '', resetTokenExpiresAt: '', lockedUntil: '' },
+            },
+        );
+        if (!user) throw new BadRequestException(errorBody('resetLinkInvalid', 'This link has expired or was already used'));
+        await this.sessions.revokeAllForUser(user._id);
+        await this.twoFactor.forgetTrustedDevices(user._id);
+        await this.auditSignIn('auth.passwordReset', user, meta);
+        return { reset: true };
     }
 
     /** Sign-ins happen before there is a signed-in user, so they are logged here rather than by the audit interceptor. */
@@ -210,6 +318,8 @@ export class AuthService implements OnModuleInit {
     /** Sign out every device, including this one. */
     async logoutAll(userId: string) {
         await this.sessions.revokeAllForUser(userId);
+        // A lost device should not skip the code next time either (F9).
+        await this.twoFactor.forgetTrustedDevices(userId);
         return { message: 'Logged out of all devices' };
     }
 
@@ -246,7 +356,7 @@ export class AuthService implements OnModuleInit {
             throw new UnauthorizedException(errorBody('unauthorized', 'User not found'));
         }
 
-        return user;
+        return { ...user, twoFactorEnabled: !!user.twoFactorEnabledAt, twoFactorRequired: this.twoFactor.required(user.role) };
     }
 
     private async recordFailedLogin(userId: Types.ObjectId): Promise<void> {

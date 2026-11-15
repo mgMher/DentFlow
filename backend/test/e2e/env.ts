@@ -29,3 +29,7 @@ delete process.env.PUBLIC_API_URL;
 // Uploaded files go to a throwaway folder (removed when the file's app closes); 1 MB keeps size tests cheap.
 process.env.UPLOAD_DIR = join(tmpdir(), `dentflow-e2e-${randomBytes(4).toString('hex')}`);
 process.env.DOCUMENTS_MAX_MB = '1';
+// F9: never real email (messages land in MailService.outbox); two-factor is not
+// required unless a test asks (account-security.e2e-spec.ts switches it on).
+delete process.env.SMTP_HOST;
+process.env.TWO_FACTOR_REQUIRED_ROLES = 'none';

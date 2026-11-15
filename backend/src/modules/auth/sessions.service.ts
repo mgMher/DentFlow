@@ -190,6 +190,25 @@ export class SessionsService {
         await this.sessionModel.updateOne({ _id: sessionId, revokedAt: null }, { $set: { revokedAt: new Date() } });
     }
 
+    /** The user's signed-in devices, most recently used first (F9). */
+    async list(userId: Id, currentSessionId?: Id) {
+        const sessions = await this.sessionModel
+            .find({ userId: new Types.ObjectId(userId.toString()), revokedAt: null, expiresAt: { $gt: new Date() } })
+            .sort({ lastUsedAt: -1 })
+            .select('userAgent ip lastUsedAt createdAt')
+            .lean<{ _id: Types.ObjectId; userAgent?: string; ip?: string; lastUsedAt: Date; createdAt: Date }[]>();
+        return sessions.map((s) => ({ ...s, current: !!currentSessionId && s._id.equals(currentSessionId.toString()) }));
+    }
+
+    /** Sign out one of the user's own devices; false when it is not theirs or already gone. */
+    async revokeOwn(userId: Id, sessionId: Id): Promise<boolean> {
+        const r = await this.sessionModel.updateOne(
+            { _id: new Types.ObjectId(sessionId.toString()), userId: new Types.ObjectId(userId.toString()), revokedAt: null },
+            { $set: { revokedAt: new Date() } },
+        );
+        return r.modifiedCount === 1;
+    }
+
     /** Sign the user out everywhere, optionally keeping the session making the request. */
     async revokeAllForUser(userId: Id, exceptSessionId?: Id): Promise<void> {
         await this.sessionModel.updateMany(

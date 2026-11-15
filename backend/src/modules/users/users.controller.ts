@@ -146,6 +146,26 @@ export class UsersController {
         return this.usersService.countUpcomingAppointments(clinicId, id.toString());
     }
 
+    @Post(':id/sign-out-everywhere')
+    @HttpCode(HttpStatus.OK)
+    @Roles(...STAFF_MANAGERS)
+    @ApiOperation({ summary: 'Sign a staff member out of every device (F9)' })
+    signOutEverywhere(@CurrentUser('clinicId') clinicId: string, @Param('id', ParseObjectIdPipe) id: Types.ObjectId) {
+        return this.usersService.signOutEverywhere(clinicId, id.toString());
+    }
+
+    @Post(':id/reset-two-factor')
+    @HttpCode(HttpStatus.OK)
+    @Roles(...STAFF_MANAGERS)
+    @ApiOperation({ summary: "Switch off a staff member's two-factor (lost phone); they set it up again if required (F9)" })
+    resetTwoFactor(
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') actingAuthId: string,
+        @Param('id', ParseObjectIdPipe) id: Types.ObjectId,
+    ) {
+        return this.usersService.resetTwoFactor(clinicId, id.toString(), actingAuthId);
+    }
+
     @Post(':id/reset-password')
     @HttpCode(HttpStatus.OK)
     @Roles(...STAFF_MANAGERS)

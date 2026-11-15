@@ -23,6 +23,7 @@ import {
     UpdateAvailabilityDto,
     UpdateUserDto,
 } from './dto';
+import { TwoFactorService } from '../auth/two-factor.service';
 
 export interface PaginatedResult<T> {
     data: T[];
@@ -68,6 +69,7 @@ export class UsersService {
         private readonly sessions: SessionsService,
         @InjectModel(Clinic.name) private readonly clinicModel: Model<ClinicDocument>,
         private readonly upcoming: UpcomingAppointmentsService,
+        private readonly twoFactor: TwoFactorService,
     ) {}
 
     /**
@@ -417,8 +419,41 @@ export class UsersService {
             },
         );
         await this.sessions.revokeAllForUser(profile.authId);
+        await this.twoFactor.forgetTrustedDevices(profile.authId);
 
         return { message: 'Password reset' };
+    }
+
+    /** F9: sign a staff member out of every device (and forget their trusted devices). */
+    async signOutEverywhere(clinicId: string, userId: string) {
+        const authId = await this.authIdOf(clinicId, userId);
+        await this.sessions.revokeAllForUser(authId);
+        await this.twoFactor.forgetTrustedDevices(authId);
+        return { signedOut: true };
+    }
+
+    /**
+     * F9: a lost phone and lost backup codes. Two-factor is switched off for
+     * them and they are signed out; where it is required for their role they
+     * set it up again at their next sign-in. Not for your own account.
+     */
+    async resetTwoFactor(clinicId: string, userId: string, actingAuthId: string) {
+        const authId = await this.authIdOf(clinicId, userId);
+        if (authId.toString() === actingAuthId) {
+            throw new BadRequestException(errorBody('useOwnTwoFactor', 'Change your own two-factor in your account settings'));
+        }
+        await this.twoFactor.clear(authId);
+        await this.sessions.revokeAllForUser(authId);
+        return { reset: true };
+    }
+
+    private async authIdOf(clinicId: string, userId: string): Promise<Types.ObjectId> {
+        const profile = await this.userProfileModel
+            .findOne({ _id: new Types.ObjectId(userId), clinicId: new Types.ObjectId(clinicId) })
+            .select('authId')
+            .lean();
+        if (!profile?.authId) throw new NotFoundException(errorBody('staffNotFound', 'User not found'));
+        return profile.authId;
     }
 
     /**

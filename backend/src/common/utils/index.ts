@@ -9,3 +9,4 @@ export * from './clinic-time.util';
 export * from './money.util';
 export { sealSecret, openSecret } from './secret-box.util';
 export * from './age.util';
+export * from './totp.util';

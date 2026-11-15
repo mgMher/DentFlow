@@ -742,6 +742,27 @@ Receptionist and admin; an adult patient (parent) and a child under 18.
 | G-15 | Who may | Assistant | Sees the family; cannot change it | PASS (e2e) |
 | G-16 | Languages, phone | hy / ru / en; 375 px | All texts translated; card fits | PASS (browser, audit) |
 
+## 31. F9 — account security
+
+An admin, a receptionist, a phone with an authenticator app (or the walk's in-page code generator).
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| S-01 | Forgot password | Login → "Forgot password?" → email | Same confirmation for known and unknown emails; an email (log without SMTP) in the clinic language with a link | PASS (browser + e2e) |
+| S-02 | Reset | Open the link, new password twice | Password changed; old one refused; other devices signed out | PASS (browser + e2e) |
+| S-03 | Link rules | Reuse the link; a link over an hour old; an older link after a newer one | "Expired or already used" | PASS (e2e) |
+| S-04 | Admin must set up | Admin signs in without two-factor | Setup step: QR, key, first code → backup codes once → in | PASS (browser + e2e) |
+| S-05 | Code step | Sign in again | Code asked; wrong code refused (counts toward lockout); right code in | PASS (browser + e2e) |
+| S-06 | Codes once | Reuse the same app code; reuse a backup code | Refused | PASS (e2e) |
+| S-07 | Trusted device | Tick "Don't ask for 30 days"; sign in again; then "Log out everywhere" | No code next time; asked again after logging out everywhere | PASS (browser + e2e) |
+| S-08 | Optional for staff | Receptionist: Account security → Set up; Turn off | On with backup codes; off with a code | PASS (browser + e2e) |
+| S-09 | Required can't be off | Admin: Turn off | Not offered; refused by the API | PASS (e2e) |
+| S-10 | New backup codes | New backup codes with a code | 10 new; old ones stop working | PASS (e2e) |
+| S-11 | Devices | Two sign-ins; sign out the other | Both listed with "This device"; the other is signed out; someone else's device can't be | PASS (browser + e2e) |
+| S-12 | Staff security | Admin on a staff member: sign out everywhere; reset two-factor | They are signed out; after reset they sign in without a code (or set up again if required); receptionist can't | PASS (browser + e2e) |
+| S-13 | Audit | Audit log | Each step logged; no secret or code in it | PASS (e2e) |
+| S-14 | Languages, phone | hy / ru / en; 375 px | All texts translated | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

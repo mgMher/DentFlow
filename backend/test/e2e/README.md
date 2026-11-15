@@ -16,6 +16,7 @@ npm run test:e2e -- appointments      # one file
   `E2E_MONGO_URI` at another local server if needed.
 - Rate limits are off except in the one test that checks registration's limit.
 - No seed needed: every file registers its own clinics.
+- Email never leaves the test (no SMTP; messages land in `MailService.outbox`), and two-factor is not required unless a test turns it on.
 
 | File | Covers |
 |---|---|
@@ -24,6 +25,7 @@ npm run test:e2e -- appointments      # one file
 | `payments.e2e-spec.ts` | parallel payments never overpay, parallel voids, pay vs void, pay vs cancel, edit vs issue, invoice status lifecycle, roles, unique invoice numbers |
 | `appointments.e2e-spec.ts` | dentist / room / patient clashes, blocked time, hours, booking and move races, series, status lifecycle and its races |
 | `patients.e2e-spec.ts` | shared family email, archive with cancel, status race, 404 for unknown patients |
+| `account-security.e2e-spec.ts` | password reset by email (unknown emails, one-time and expiring links, clinic language, devices signed out), two-factor setup / sign-in / codes once / backup codes / trusted devices / off, required for admins with setup at sign-in and admin reset, device list and single sign-out, admin sign-out everywhere, audit without secrets |
 | `audit.e2e-spec.ts` | who / when / IP for every write, old → new values (patient details one level deep, tooth, invoice amounts in a USD clinic, settings, staff role, catalogue price, reschedule), masked photo, sign-ins and failed ones, document views, nothing for reads / refresh / failed writes, filters and paging, who may read it, tenancy, entries cannot be changed |
 | `family.e2e-spec.ts` | guardians as linked patients or contacts, main contact, edit / remove / promote, refusals (self, twice, loops, too many, no phone, other clinic, renaming a linked one), children and siblings, family account and one payment over the family's invoices with the rest to credit, roles, tenancy, audit |
 | `documents.e2e-spec.ts` | upload and download with identical bytes, type from the file's bytes (PNG / PDF / DICOM, a renamed program refused), empty and oversize files, teeth and kind checks, filters, who may edit and remove, removal keeps the file, tenancy — files go to a temporary `UPLOAD_DIR` removed afterwards |
