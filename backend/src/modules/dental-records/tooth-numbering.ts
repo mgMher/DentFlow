@@ -10,7 +10,9 @@
  * 2026-10; `universalToFdi` converts those once at startup.
  */
 
-export type ChartType = 'adult' | 'pediatric';
+/** `mixed` (F12): a child with both sets — each position shows the primary tooth or its permanent successor. */
+export type ChartType = 'adult' | 'pediatric' | 'mixed';
+export const CHART_TYPES: readonly ChartType[] = ['adult', 'pediatric', 'mixed'];
 
 const range = (from: number, to: number) =>
     Array.from({ length: Math.abs(to - from) + 1 }, (_, i) => (from <= to ? from + i : from - i));
@@ -25,8 +27,20 @@ const ALL_TEETH = new Set([...ADULT_TEETH, ...PEDIATRIC_TEETH]);
 /** Any permanent or primary tooth — a treatment may be recorded on either (mixed dentition). */
 export const isFdiTooth = (n: unknown): n is number => typeof n === 'number' && ALL_TEETH.has(n);
 
+/** The permanent tooth that replaces a primary one: 55 → 15, 71 → 31. */
+export const successorOf = (primary: number): number => primary - 40;
+
+/** The primary tooth a permanent one replaces (positions 1–5), or `null` for molars 6–8. */
+export const predecessorOf = (permanent: number): number | null =>
+    permanent % 10 >= 1 && permanent % 10 <= 5 && Math.floor(permanent / 10) <= 4 ? permanent + 40 : null;
+
+export const isPermanentTooth = (n: number) => Math.floor(n / 10) >= 1 && Math.floor(n / 10) <= 4;
+
+/** A new mixed chart: the primary teeth and the first permanent molars (usually in by 6–7). */
+export const MIXED_DEFAULT_TEETH: readonly number[] = [...PEDIATRIC_TEETH, 16, 26, 36, 46];
+
 export const teethFor = (chartType: ChartType): readonly number[] =>
-    chartType === 'pediatric' ? PEDIATRIC_TEETH : ADULT_TEETH;
+    chartType === 'pediatric' ? PEDIATRIC_TEETH : chartType === 'mixed' ? MIXED_DEFAULT_TEETH : ADULT_TEETH;
 
 /**
  * Universal 1–16 run upper right → upper left, 17–32 lower left → lower right.

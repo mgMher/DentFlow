@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Box, useTheme } from '@mui/material';
 import { useTranslation } from 'react-i18next';
 import { ChartType, ToothRecord } from '../../types';
-import { CHART_ROWS, surfaceKey, surfaceStatusKey, toothStatusKey, toothStatusShortKey } from '../../utils/dental';
+import { CHART_ROWS, isPrimaryTooth, mixedSlot, surfaceKey, surfaceStatusKey, toothStatusKey, toothStatusShortKey } from '../../utils/dental';
 import ToothGlyph from './ToothGlyph';
 
 const GLYPH = 30;
@@ -39,20 +39,27 @@ const Odontogram: React.FC<OdontogramProps> = ({ chartType, teeth, selectedTooth
     const height = lowerY + GLYPH + NUMBER_SPACE + 4;
     const xOf = (index: number) => PAD_X + index * CELL + (index >= half ? MIDLINE_GAP : 0) + (CELL - GLYPH) / 2;
 
+    const mixed = chartType === 'mixed';
+    const onChart = useMemo(() => new Set(teeth.map((tooth) => tooth.toothNumber)), [teeth]);
+
     const describe = (tooth: ToothRecord) => {
         const parts = [`${t('dental.tooth')} ${tooth.toothNumber}`, t(toothStatusKey(tooth.status))];
+        if (mixed && isPrimaryTooth(tooth.toothNumber)) parts.splice(1, 0, t('dental.primaryTooth'));
         tooth.surfaces?.forEach((s) => parts.push(`${t(surfaceKey(s.surface))}: ${t(surfaceStatusKey(s.status))}`));
         return parts.join(', ');
     };
 
-    const renderTooth = (toothNumber: number, index: number, upper: boolean) => {
+    const renderTooth = (position: number, index: number, upper: boolean) => {
+        // A mixed chart's position shows the permanent tooth, the primary one, or an empty place.
+        const toothNumber = mixed ? mixedSlot(position, onChart) ?? position : position;
         const tooth = byNumber.get(toothNumber);
-        if (!tooth) return null;
+        if (!tooth && !mixed) return null;
         const x = xOf(index);
         const y = upper ? upperY : lowerY;
         const selected = selectedTooth === toothNumber;
-        const label = describe(tooth);
-        const short = tooth.status === 'healthy' ? '' : t(toothStatusShortKey(tooth.status));
+        const label = tooth ? describe(tooth) : `${t('dental.tooth')} ${toothNumber}, ${t('dental.notErupted')}`;
+        const short = !tooth || tooth.status === 'healthy' ? '' : t(toothStatusShortKey(tooth.status));
+        const primary = mixed && isPrimaryTooth(toothNumber);
         // Number on the outside of the arch, status mark towards the middle.
         const numberY = upper ? y - 14 : y + GLYPH + 22;
         const shortY = upper ? y + GLYPH + 18 : y - 10;
@@ -89,21 +96,30 @@ const Odontogram: React.FC<OdontogramProps> = ({ chartType, teeth, selectedTooth
                     stroke={selected || focused === toothNumber ? theme.palette.primary.main : 'none'}
                     strokeWidth={2}
                 />
-                <g transform={`translate(${x}, ${y})`}>
-                    <ToothGlyph
-                        toothNumber={toothNumber}
-                        status={tooth.status}
-                        surfaces={tooth.surfaces ?? []}
-                        size={GLYPH}
+                {tooth ? (
+                    <g transform={primary ? `translate(${x + GLYPH * 0.1}, ${y + GLYPH * 0.1}) scale(0.8)` : `translate(${x}, ${y})`}>
+                        <ToothGlyph toothNumber={toothNumber} status={tooth.status} surfaces={tooth.surfaces ?? []} size={GLYPH} />
+                    </g>
+                ) : (
+                    // Not erupted yet: an empty place the permanent tooth will take.
+                    <rect
+                        x={x + 3}
+                        y={y + 3}
+                        width={GLYPH - 6}
+                        height={GLYPH - 6}
+                        rx={4}
+                        fill="none"
+                        stroke={theme.palette.text.disabled}
+                        strokeDasharray="3 3"
                     />
-                </g>
+                )}
                 <text
                     x={x + GLYPH / 2}
                     y={numberY}
                     textAnchor="middle"
                     fontSize={12}
                     fontWeight={selected ? 700 : 600}
-                    fill={theme.palette.text.primary}
+                    fill={!tooth ? theme.palette.text.disabled : primary ? theme.palette.secondary.main : theme.palette.text.primary}
                     style={{ pointerEvents: 'none', userSelect: 'none' }}
                 >
                     {toothNumber}

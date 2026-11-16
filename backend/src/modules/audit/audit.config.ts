@@ -17,6 +17,7 @@ export const AUDIT_AREAS: Record<string, string | null> = {
     CashController: 'billing',
     FiscalController: 'billing',
     DocumentsController: 'documents',
+    PerioController: 'perio',
     UsersController: 'staff',
     ClinicsController: 'clinic',
     TreatmentsController: 'catalog',
@@ -72,6 +73,35 @@ const teeth = (numbers: number[]) => (doc: Record<string, any> | null) => {
         out[`${n}.notes`] = t?.notes ?? null;
     }
     return out;
+};
+
+/** Mixed chart (F12): whether the permanent tooth is on the chart. */
+const onChart = (numbers: number[]) => (doc: Record<string, any> | null) => {
+    const out: Record<string, unknown> = {};
+    for (const n of numbers) out[`${n}.erupted`] = (doc?.teeth ?? []).some((x: any) => x.toothNumber === n);
+    return out;
+};
+
+/** One tooth of a perio exam as `16.pd` "3 2 3 / 3 2 4" (cheek side / tongue side), `16.mobility`, … */
+const perioTooth = (doc: Record<string, any> | null, r: AuditRequest) => {
+    const n = Number(r.params.toothNumber);
+    const t = (doc?.teeth ?? []).find((x: any) => x.toothNumber === n);
+    if (!t) return null;
+    const sites: any[] = t.sites ?? [];
+    const row = (f: (s: any) => string) => `${sites.slice(0, 3).map(f).join(' ')} / ${sites.slice(3).map(f).join(' ')}`;
+    const num = (k: string) => (s: any) => (s?.[k] == null ? '–' : String(s[k]));
+    const flag = (k: string) => (s: any) => (s?.[k] ? '●' : '○');
+    return {
+        [`${n}.missing`]: !!t.missing,
+        [`${n}.implant`]: !!t.implant,
+        [`${n}.mobility`]: t.mobility ?? null,
+        [`${n}.furcation`]: t.furcation ?? null,
+        [`${n}.pd`]: row(num('pd')),
+        [`${n}.rec`]: row(num('rec')),
+        [`${n}.bop`]: row(flag('bop')),
+        [`${n}.sup`]: row(flag('sup')),
+        [`${n}.plaque`]: row(flag('plaque')),
+    };
 };
 
 /** Invoices keep money in minor units (cents); the log shows it as people write it. */
@@ -133,6 +163,13 @@ export const DIFF_RULES: Record<string, DiffRule> = {
     'billing.addPayment': { model: 'Invoice', filter: byId(), pick: invoice, fields: only('paidAmount', 'status') },
     'billing.voidPayment': { model: 'Invoice', filter: byId(), pick: invoice, fields: only('paidAmount', 'status') },
     'billing.applyCredit': { model: 'Invoice', filter: byId(), pick: invoice, fields: only('paidAmount', 'status') },
+
+    'chart.eruptTooth': { model: 'DentalRecord', filter: byPatient, pick: (doc, r) => onChart([Number(r.body.toothNumber)])(doc), fields: allKeys },
+    'chart.uneruptTooth': { model: 'DentalRecord', filter: byPatient, pick: (doc, r) => onChart([Number(r.body.toothNumber)])(doc), fields: allKeys },
+
+    'perio.update': { model: 'PerioExam', filter: byId(), extra: [] },
+    'perio.saveTooth': { model: 'PerioExam', filter: byId(), pick: perioTooth, fields: allKeys },
+    'perio.remove': { model: 'PerioExam', filter: byId(), fields: only() },
 
     'documents.update': { model: 'PatientDocument', filter: byId() },
     'documents.remove': { model: 'PatientDocument', filter: byId(), fields: only() },

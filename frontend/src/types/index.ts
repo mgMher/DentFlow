@@ -290,7 +290,8 @@ export interface SurfaceState {
     status: SurfaceStatus;
 }
 
-export type ChartType = 'adult' | 'pediatric';
+/** `mixed` (F12): both sets, each position showing the primary tooth or its permanent successor. */
+export type ChartType = 'adult' | 'pediatric' | 'mixed';
 
 type PersonRef = string | { _id?: string; firstName?: string; lastName?: string };
 
@@ -325,6 +326,8 @@ export interface DentalChart {
     chartType: ChartType;
     /** Chart types switched away from; switching back restores them. */
     archivedChartTypes: ChartType[];
+    /** Mixed chart: primary teeth replaced by their permanent successor (kept on the server). */
+    replacedTeeth?: { toothNumber: number; replacedAt: string }[];
     notes?: string;
 }
 
@@ -1015,4 +1018,58 @@ export interface ApiResponse<T> {
     statusCode: number;
     message: string;
     data: T;
+}
+
+// ── Periodontal exams (F12) ───────────────────────────────────────────────────
+
+/** One probing site: depth and recession in mm, bleeding, pus, plaque. */
+export interface PerioSite {
+    pd: number | null;
+    /** Gum margin below the CEJ (positive) or above it (negative). Attachment loss = pd + rec. */
+    rec: number | null;
+    bop: boolean;
+    sup: boolean;
+    plaque: boolean;
+}
+
+export interface PerioTooth {
+    toothNumber: number;
+    missing: boolean;
+    implant: boolean;
+    mobility: number | null;
+    furcation: number | null;
+    /** DB, B, MB, DL, L, ML. */
+    sites: PerioSite[];
+}
+
+export interface PerioSummary {
+    teeth: number;
+    sitesProbed: number;
+    meanPd: number | null;
+    meanCal: number | null;
+    bopPercent: number | null;
+    plaquePercent: number | null;
+    sites4plus: number;
+    sites6plus: number;
+    mobileTeeth: number;
+    furcationTeeth: number;
+}
+
+type PerioPerson = { _id: string; firstName?: string; lastName?: string } | null;
+
+export interface PerioExamListItem {
+    _id: string;
+    date: string;
+    createdAt: string;
+    dentistId: PerioPerson;
+    notes?: string;
+    summary: PerioSummary;
+}
+
+export interface PerioExam extends PerioExamListItem {
+    patientId: string;
+    recordedBy: PerioPerson;
+    teeth: PerioTooth[];
+    updatedAt: string;
+    previous: { _id: string; date: string; teeth: PerioTooth[]; summary: PerioSummary } | null;
 }

@@ -122,7 +122,7 @@ export const ToothRecordSchema = SchemaFactory.createForClass(ToothRecord);
 /** The teeth of a chart type the patient was switched away from, kept so a switch never loses data. */
 @Schema({ _id: false })
 export class ArchivedChart {
-    @Prop({ required: true, enum: ['adult', 'pediatric'] })
+    @Prop({ required: true, enum: ['adult', 'pediatric', 'mixed'] })
     chartType: string;
 
     @Prop({ type: [ToothRecordSchema], default: [] })
@@ -136,6 +136,20 @@ export class ArchivedChart {
 }
 
 export const ArchivedChartSchema = SchemaFactory.createForClass(ArchivedChart);
+
+@Schema({ _id: false })
+export class ReplacedTooth {
+    @Prop({ type: ToothRecordSchema, required: true })
+    tooth: ToothRecord;
+
+    @Prop({ required: true })
+    replacedAt: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    replacedBy: Types.ObjectId;
+}
+
+export const ReplacedToothSchema = SchemaFactory.createForClass(ReplacedTooth);
 
 // Optimistic concurrency: two people saving the same chart used to end in a
 // 500 (VersionError) or, worse, one silently overwriting the other.
@@ -160,7 +174,7 @@ export class DentalRecord {
     @Prop({ type: [ToothRecordSchema], default: [] })
     teeth: ToothRecord[];
 
-    @Prop({ enum: ['adult', 'pediatric'], default: 'adult' })
+    @Prop({ enum: ['adult', 'pediatric', 'mixed'], default: 'adult' })
     chartType: string;
 
     /** Charts without it still use Universal numbers and are converted at startup. */
@@ -169,6 +183,14 @@ export class DentalRecord {
 
     @Prop({ type: [ArchivedChartSchema], default: [] })
     archivedCharts: ArchivedChart[];
+
+    /**
+     * F12, mixed dentition: teeth taken off the chart when the next one erupted
+     * (a primary tooth replaced by its permanent successor), kept with their
+     * history; undoing an eruption brings them back.
+     */
+    @Prop({ type: [ReplacedToothSchema], default: [] })
+    replacedTeeth: ReplacedTooth[];
 
     @Prop({ trim: true })
     notes: string;

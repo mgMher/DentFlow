@@ -27,7 +27,36 @@ export const CHART_ROWS: Record<ChartType, { upper: number[]; lower: number[] }>
         upper: [...range(55, 51), ...range(61, 65)],
         lower: [...range(85, 81), ...range(71, 75)],
     },
+    // Mixed (F12): the permanent positions; each shows the permanent tooth,
+    // else the primary one it replaces, else an empty place (`mixedSlot`).
+    mixed: {
+        upper: [...range(18, 11), ...range(21, 28)],
+        lower: [...range(48, 41), ...range(31, 38)],
+    },
 };
+
+/** The primary tooth a permanent one replaces (positions 1–5): 11 → 51; molars 6–8 have none. */
+export const predecessorOf = (permanent: number): number | null =>
+    permanent % 10 >= 1 && permanent % 10 <= 5 && Math.floor(permanent / 10) <= 4 ? permanent + 40 : null;
+
+/** The permanent tooth that replaces a primary one: 55 → 15. */
+export const successorOf = (primary: number) => primary - 40;
+
+export const isPrimaryTooth = (tooth: number) => Math.floor(tooth / 10) >= 5;
+
+/** What a position of a mixed chart shows: the permanent tooth, the primary one, or nothing yet. */
+export const mixedSlot = (permanent: number, onChart: Set<number>): number | null => {
+    if (onChart.has(permanent)) return permanent;
+    const primary = predecessorOf(permanent);
+    return primary && onChart.has(primary) ? primary : null;
+};
+
+/** A new chart's type by age: primary teeth only before ~6, both until ~13, then permanent. */
+export const chartTypeForAge = (age: number | null): ChartType =>
+    age === null ? 'adult' : age < 6 ? 'pediatric' : age < 13 ? 'mixed' : 'adult';
+
+export const chartTypeKey = (type: ChartType) =>
+    type === 'pediatric' ? 'dental.pediatricChart' : type === 'mixed' ? 'dental.mixedChart' : 'dental.adultChart';
 
 /** Every tooth a treatment can be recorded on, permanent first (mixed dentition is allowed). */
 export const ALL_TEETH: number[] = [

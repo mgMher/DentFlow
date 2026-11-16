@@ -21,6 +21,7 @@ import {ReportsModule} from './modules/reports/reports.module';
 import {SettingsModule} from './modules/settings/settings.module';
 import {RemindersModule} from './modules/reminders/reminders.module';
 import {DocumentsModule} from './modules/documents/documents.module';
+import {PerioModule} from './modules/perio/perio.module';
 import {AuditModule} from './modules/audit/audit.module';
 import {MailModule} from './common/mail/mail.module';
 import {ExportsModule} from './modules/exports/exports.module';
@@ -50,6 +51,7 @@ import {ExportsModule} from './modules/exports/exports.module';
         SettingsModule,
         RemindersModule,
         DocumentsModule,
+        PerioModule,
         ExportsModule,
     ],
     providers: [

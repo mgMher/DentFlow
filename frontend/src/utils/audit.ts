@@ -10,6 +10,7 @@ import { roleTranslationKey } from '../pages/staff/staffForm';
 export const AUDIT_AREAS = [
     'patients',
     'chart',
+    'perio',
     'plans',
     'appointments',
     'billing',

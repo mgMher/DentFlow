@@ -40,7 +40,10 @@ import {
     TOOTH_STATUSES,
     TOOTH_STATUS_COLORS,
     entryState,
+    isPrimaryTooth,
+    predecessorOf,
     sameSurfaces,
+    successorOf,
     surfaceKey,
     surfaceStatusKey,
     toothStatusKey,
@@ -73,6 +76,60 @@ const SurfaceChips: React.FC<{ surfaces: SurfaceState[] }> = ({ surfaces }) => {
     );
 };
 
+/**
+ * Mixed chart (F12): a primary tooth gives way to its permanent successor;
+ * an empty place gets its permanent tooth; an eruption entered by mistake is undone.
+ */
+const EruptionActions: React.FC<{
+    toothNumber: number;
+    onChart: Set<number>;
+    canEdit: boolean;
+    busy: boolean;
+    onErupt: (permanent: number, undo: boolean) => void;
+}> = ({ toothNumber, onChart, canEdit, busy, onErupt }) => {
+    const { t } = useTranslation();
+    const present = onChart.has(toothNumber);
+    if (isPrimaryTooth(toothNumber)) {
+        const successor = successorOf(toothNumber);
+        return (
+            <Box sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Chip size="small" color="secondary" variant="outlined" label={t('dental.primaryTooth')} />
+                {canEdit && (
+                    <Button size="small" variant="outlined" disabled={busy} onClick={() => onErupt(successor, false)}>
+                        {t('dental.successorErupted', { tooth: successor })}
+                    </Button>
+                )}
+            </Box>
+        );
+    }
+    if (!present) {
+        return (
+            <Alert
+                severity="info"
+                sx={{ mb: 2 }}
+                action={
+                    canEdit ? (
+                        <Button color="inherit" size="small" disabled={busy} onClick={() => onErupt(toothNumber, false)}>
+                            {t('dental.markErupted')}
+                        </Button>
+                    ) : undefined
+                }
+            >
+                {t('dental.notErupted')}
+            </Alert>
+        );
+    }
+    if (!canEdit) return null;
+    const primary = predecessorOf(toothNumber);
+    return (
+        <Box sx={{ mb: 2, textAlign: 'right' }}>
+            <Button size="small" color="inherit" disabled={busy} onClick={() => onErupt(toothNumber, true)}>
+                {primary ? t('dental.undoEruptionBack', { tooth: primary }) : t('dental.undoEruption')}
+            </Button>
+        </Box>
+    );
+};
+
 interface ToothDrawerProps {
     patientId: string;
     toothNumber: number | null;
@@ -80,6 +137,8 @@ interface ToothDrawerProps {
     tooth?: ToothRecord;
     canEdit: boolean;
     onClose: () => void;
+    /** F12: on a mixed chart, record that a permanent tooth erupted (or undo it). */
+    mixed?: { onChart: Set<number>; busy: boolean; error?: string | null; onErupt: (permanent: number, undo: boolean) => void };
 }
 
 /**
@@ -87,7 +146,7 @@ interface ToothDrawerProps {
  * to record a treatment on it, and its timeline — every change with who made
  * it, and the treatments done or planned on it.
  */
-const ToothDrawer: React.FC<ToothDrawerProps> = ({ patientId, toothNumber, tooth, canEdit, onClose }) => {
+const ToothDrawer: React.FC<ToothDrawerProps> = ({ patientId, toothNumber, tooth, canEdit, onClose, mixed }) => {
     const { t } = useTranslation();
     const dispatch = useDispatch();
     const storedHistory = useSelector((state: RootState) => state.dentalRecords.toothHistory);
@@ -152,10 +211,21 @@ const ToothDrawer: React.FC<ToothDrawerProps> = ({ patientId, toothNumber, tooth
             </Box>
             <Divider sx={{ mb: 2 }} />
 
-            {!tooth ? (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                    {t('dental.notOnChart')}
+            {mixed?.error && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                    {mixed.error}
                 </Alert>
+            )}
+            {mixed && toothNumber !== null && (
+                <EruptionActions toothNumber={toothNumber} onChart={mixed.onChart} canEdit={canEdit} busy={mixed.busy} onErupt={mixed.onErupt} />
+            )}
+
+            {!tooth ? (
+                !mixed && (
+                    <Alert severity="info" sx={{ mb: 2 }}>
+                        {t('dental.notOnChart')}
+                    </Alert>
+                )
             ) : canEdit ? (
                 <>
                     <TextField

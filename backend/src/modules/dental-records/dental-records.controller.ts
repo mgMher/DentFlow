@@ -8,6 +8,7 @@ import {
     UpdateToothDto,
     UpdateTeethDto,
     SetChartTypeDto,
+    EruptToothDto,
     GetChartQueryDto,
     CreateTreatmentEntryDto,
     CompleteTreatmentEntryDto,
@@ -33,6 +34,30 @@ export class DentalRecordsController {
         @Query() query: GetChartQueryDto,
     ) {
         return this.dentalRecordsService.getChart(new Types.ObjectId(clinicId), patientId, query.chartType);
+    }
+
+    @Patch(':patientId/erupt')
+    @Roles(...CHART_EDITORS)
+    @ApiOperation({ summary: 'Mixed chart: a permanent tooth erupted (its primary predecessor is replaced, history kept)' })
+    eruptTooth(
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
+        @Body() dto: EruptToothDto,
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') userId: string,
+    ) {
+        return this.dentalRecordsService.eruptTooth(new Types.ObjectId(clinicId), patientId, dto.toothNumber, new Types.ObjectId(userId));
+    }
+
+    @Patch(':patientId/unerupt')
+    @Roles(...CHART_EDITORS)
+    @ApiOperation({ summary: 'Mixed chart: undo an eruption entered by mistake' })
+    uneruptTooth(
+        @Param('patientId', ParseObjectIdPipe) patientId: Types.ObjectId,
+        @Body() dto: EruptToothDto,
+        @CurrentUser('clinicId') clinicId: string,
+        @CurrentUser('userId') userId: string,
+    ) {
+        return this.dentalRecordsService.uneruptTooth(new Types.ObjectId(clinicId), patientId, dto.toothNumber, new Types.ObjectId(userId));
     }
 
     @Patch(':patientId/chart-type')

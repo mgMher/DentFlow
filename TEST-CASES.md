@@ -802,6 +802,31 @@ Admin, two dentists with work paid last month, receptionist.
 | E-12 | Audit, tenancy | Audit log; another clinic | Rate changes, approvals, reopenings logged; another clinic sees nothing | PASS (e2e) |
 | E-13 | Languages, phone | hy / ru / en; 375 px | All texts translated, month names too; tables scroll in their own box | PASS (browser, audit) |
 
+## 34. F12 — periodontal chart and mixed dentition
+
+Admin, dentist, assistant, receptionist; an 8-year-old and an adult patient.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| PM-01 | Suggested type | Open the chart of a child aged 3, 8, 14 for the first time | Primary / mixed / permanent | PASS (browser: 8) |
+| PM-02 | New mixed chart | Mixed | 20 primary teeth and 16, 26, 36, 46; empty dashed places for the rest | PASS (browser + e2e) |
+| PM-03 | Switch keeps what was charted | Permanent chart with a note on 11 → mixed → permanent → mixed | 11 stays permanent with its note; other places primary; nothing lost either way | PASS (e2e) |
+| PM-04 | Eruption | Primary 51 → "Permanent 11 erupted" | 11 replaces 51 and opens; 51 with its history is kept | PASS (browser + e2e) |
+| PM-05 | Molar | Empty place 17 → "Erupted" | 17 added | PASS (e2e) |
+| PM-06 | Undo | On 11: "Undo: bring back primary 51"; then erupt 11 again | 51 back with its history; the same 11 comes back | PASS (browser + e2e) |
+| PM-07 | Refusals | Erupt on a permanent chart; erupt 16 twice; an assistant erupts | Refused with a clear message / not offered | PASS (e2e) |
+| PM-08 | New exam | Periodontal chart → New exam (chart has 18 missing, 36 implant) | All chart teeth; 18 struck through, 36 "Imp" | PASS (browser + e2e) |
+| PM-09 | Keyboard entry | Type 3 2 3 4 5 4 1 0 7 … | Fills site after site; "1 0" = 10; arrows, Backspace, Space work | PASS (browser) |
+| PM-10 | Colours and CAL | Depths 4, 6; recession 2 | 4 amber, 6 red; attachment loss = depth + recession | PASS (browser) |
+| PM-11 | Autosave | Type, then reload the page | "All changes saved"; values still there after the reload | PASS (browser) |
+| PM-12 | Figures | After entry | Mean depth, mean attachment loss, % bleeding / plaque, sites ≥ 4 / ≥ 6 mm, mobile teeth, furcation | PASS (browser + unit) |
+| PM-13 | Compare | Second exam | Previous depths under each site; 2 mm better green, worse red; figures side by side with arrows | PASS (browser + e2e) |
+| PM-14 | Print | Print | Landscape; patient, date and dentist heading; no menus or tabs | — |
+| PM-15 | Details, removal | ⋮ → date / dentist / notes; Remove with a reason | Saved; removed exam gone, previous one opens | PASS (browser + e2e) |
+| PM-16 | Roles | Receptionist; assistant | Receptionist reads only; assistant records but cannot remove | PASS (e2e) |
+| PM-17 | Audit, tenancy | Patient history; another clinic | "Recorded periodontal findings on a tooth · Tooth 16 · Depth: … → …"; eruptions logged; another clinic sees nothing | PASS (browser + e2e) |
+| PM-18 | Languages, phone | hy / ru / en; 375 px | All texts translated; the grid scrolls in its own box with the row names fixed | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)

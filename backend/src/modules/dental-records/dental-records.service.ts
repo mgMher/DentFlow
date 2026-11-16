@@ -30,10 +30,20 @@ import {
     CompleteTreatmentEntryDto,
     QueryRecordsDto,
 } from './dto';
-import { ChartType, isFdiTooth, teethFor, universalToFdi } from './tooth-numbering';
+import { ChartType, isFdiTooth, isPermanentTooth, predecessorOf, teethFor, universalToFdi } from './tooth-numbering';
 import { ClinicRefsService } from 'src/common/clinic-refs';
 import { runOnce } from 'src/common/migrations/run-once';
 import { errorBody } from 'src/common/utils';
+
+/** Quadrant, then position: the order teeth are listed in a chart. */
+const byChartPosition = (a: { toothNumber: number }, b: { toothNumber: number }) => {
+    const key = (n: number) => ((Math.floor(n / 10) - 1) % 4) * 10 + (n % 10);
+    return key(a.toothNumber) - key(b.toothNumber) || a.toothNumber - b.toothNumber;
+};
+
+/** Something was recorded on the tooth (a fresh chart is all healthy, empty teeth). */
+const isCharted = (t: ToothRecord) =>
+    (t.status && t.status !== ToothStatus.HEALTHY) || !!t.surfaces?.length || !!t.conditions?.length || !!t.notes || !!t.history?.length;
 
 /** A concurrent save makes us reload and re-apply; after this many tries the caller gets a 409. */
 const CHART_SAVE_ATTEMPTS = 5;
@@ -262,9 +272,11 @@ export class DentalRecordsService implements OnModuleInit {
     }
 
     /**
-     * Switch between the permanent and primary chart (D6). The current teeth
-     * are archived, never deleted, and switching back restores them — a
-     * mis-click used to wipe the whole chart and its history.
+     * Switch between the permanent, primary and mixed chart (D6, F12). The
+     * current teeth are archived, never deleted. The new chart reuses, tooth
+     * by tooth, what the current chart has, then what the last chart of that
+     * type had, then a healthy tooth — so 16 charted on a mixed chart is the
+     * same 16 on the permanent one.
      */
     async setChartType(
         clinicId: Types.ObjectId,
@@ -275,26 +287,111 @@ export class DentalRecordsService implements OnModuleInit {
         const chart = await this.mutateChart(clinicId, patientId, (chart) => {
             if (chart.chartType === chartType) return;
 
-            const archived = chart.toObject<DentalRecord>().archivedCharts ?? [];
+            const plain = chart.toObject<DentalRecord>();
+            const archived = plain.archivedCharts ?? [];
             const restoreIndex = archived.map((a) => a.chartType).lastIndexOf(chartType);
-            const restored = restoreIndex >= 0 ? archived[restoreIndex].teeth : null;
+            const pool = new Map<number, ToothRecord>();
+            for (const t of restoreIndex >= 0 ? archived[restoreIndex].teeth : []) pool.set(t.toothNumber, t);
+            // Only teeth something was recorded on: an untouched permanent chart
+            // (the default) must not fill a child's mixed chart with permanent teeth.
+            for (const t of plain.teeth) if (isCharted(t)) pool.set(t.toothNumber, t);
+            const fresh = (n: number) => this.defaultTooth(n);
+
+            let teeth: ToothRecord[];
+            if (chartType === 'mixed') {
+                teeth = [];
+                for (const q of [1, 2, 3, 4]) {
+                    for (let pos = 1; pos <= 8; pos++) {
+                        const permanent = q * 10 + pos;
+                        const primary = predecessorOf(permanent);
+                        if (pool.has(permanent)) teeth.push(pool.get(permanent)!);
+                        else if (primary && pool.has(primary)) teeth.push(pool.get(primary)!);
+                        else if (primary) teeth.push(fresh(primary));
+                        else if (pos === 6) teeth.push(fresh(permanent));
+                    }
+                }
+            } else {
+                teeth = teethFor(chartType).map((n) => pool.get(n) ?? fresh(n));
+            }
 
             chart.archivedCharts = [
                 ...archived.filter((_, i) => i !== restoreIndex),
-                {
-                    chartType: chart.chartType,
-                    teeth: chart.toObject().teeth,
-                    archivedAt: new Date(),
-                    archivedBy: userId,
-                },
+                { chartType: chart.chartType, teeth: plain.teeth, archivedAt: new Date(), archivedBy: userId },
             ];
-            chart.teeth = (restored ?? this.generateDefaultTeeth(chartType)) as ToothRecord[];
+            chart.teeth = teeth;
             chart.chartType = chartType;
             chart.lastUpdatedBy = userId;
             chart.markModified('teeth');
             chart.markModified('archivedCharts');
         });
         return this.toResponse(chart);
+    }
+
+    /**
+     * F12, mixed chart: a permanent tooth has erupted. Its primary predecessor
+     * (if still there) leaves the chart for `replacedTeeth`, history and all;
+     * a molar without a predecessor is simply added.
+     */
+    async eruptTooth(clinicId: Types.ObjectId, patientId: Types.ObjectId, permanent: number, userId: Types.ObjectId) {
+        if (!isFdiTooth(permanent) || !isPermanentTooth(permanent)) {
+            throw new BadRequestException(errorBody('invalidTooth', 'Not a permanent FDI tooth'));
+        }
+        const chart = await this.mutateChart(clinicId, patientId, (chart) => {
+            this.assertMixed(chart);
+            if (chart.teeth.some((t) => t.toothNumber === permanent)) {
+                throw new ConflictException(errorBody('toothAlreadyErupted', `Tooth ${permanent} is already on the chart`));
+            }
+            const plain = chart.toObject<DentalRecord>();
+            const primary = predecessorOf(permanent);
+            const replaced = [...(plain.replacedTeeth ?? [])];
+            const old = primary ? plain.teeth.find((t) => t.toothNumber === primary) : undefined;
+            if (old) replaced.push({ tooth: old, replacedAt: new Date(), replacedBy: userId });
+            const back = this.takeReplaced(replaced, permanent);
+            chart.teeth = [...plain.teeth.filter((t) => t.toothNumber !== primary), back ?? this.defaultTooth(permanent)].sort(
+                byChartPosition,
+            );
+            chart.replacedTeeth = replaced;
+            chart.lastUpdatedBy = userId;
+            chart.markModified('teeth');
+            chart.markModified('replacedTeeth');
+        });
+        return this.toResponse(chart);
+    }
+
+    /** Undo an eruption entered by mistake: the permanent tooth leaves, the primary one comes back. */
+    async uneruptTooth(clinicId: Types.ObjectId, patientId: Types.ObjectId, permanent: number, userId: Types.ObjectId) {
+        if (!isFdiTooth(permanent) || !isPermanentTooth(permanent)) {
+            throw new BadRequestException(errorBody('invalidTooth', 'Not a permanent FDI tooth'));
+        }
+        const chart = await this.mutateChart(clinicId, patientId, (chart) => {
+            this.assertMixed(chart);
+            const plain = chart.toObject<DentalRecord>();
+            const tooth = plain.teeth.find((t) => t.toothNumber === permanent);
+            if (!tooth) throw new NotFoundException(errorBody('toothNotInChart', `Tooth ${permanent} is not on this chart`));
+            const primary = predecessorOf(permanent);
+            const replaced = [...(plain.replacedTeeth ?? []), { tooth, replacedAt: new Date(), replacedBy: userId }];
+            const back = primary ? this.takeReplaced(replaced, primary) ?? this.defaultTooth(primary) : undefined;
+            chart.teeth = [...plain.teeth.filter((t) => t.toothNumber !== permanent), ...(back ? [back] : [])].sort(byChartPosition);
+            chart.replacedTeeth = replaced;
+            chart.lastUpdatedBy = userId;
+            chart.markModified('teeth');
+            chart.markModified('replacedTeeth');
+        });
+        return this.toResponse(chart);
+    }
+
+    private assertMixed(chart: DentalRecordDocument) {
+        if (chart.chartType !== 'mixed') {
+            throw new BadRequestException(errorBody('notMixedChart', 'Only a mixed-dentition chart changes tooth by tooth'));
+        }
+    }
+
+    /** The latest replaced record of a tooth, removed from the list. */
+    private takeReplaced(replaced: { tooth: ToothRecord }[], toothNumber: number): ToothRecord | undefined {
+        for (let i = replaced.length - 1; i >= 0; i--) {
+            if (replaced[i].tooth.toothNumber === toothNumber) return replaced.splice(i, 1)[0].tooth;
+        }
+        return undefined;
     }
 
     async updateTooth(clinicId: Types.ObjectId, patientId: Types.ObjectId, dto: UpdateToothDto, userId: Types.ObjectId) {
@@ -702,18 +799,22 @@ export class DentalRecordsService implements OnModuleInit {
 
     /** The chart without the archived teeth, which only the server needs; their types are listed instead. */
     private toResponse(chart: DentalRecordDocument) {
-        const { archivedCharts, ...rest } = chart.toObject<DentalRecord>();
-        return { ...rest, archivedChartTypes: (archivedCharts ?? []).map((a) => a.chartType) };
+        const { archivedCharts, replacedTeeth, ...rest } = chart.toObject<DentalRecord>();
+        return {
+            ...rest,
+            archivedChartTypes: (archivedCharts ?? []).map((a) => a.chartType),
+            // F12: which teeth have been replaced (the records stay on the server).
+            replacedTeeth: (replacedTeeth ?? []).map((r) => ({ toothNumber: r.tooth.toothNumber, replacedAt: r.replacedAt })),
+        };
     }
 
     private generateDefaultTeeth(chartType: ChartType) {
-        return teethFor(chartType).map((toothNumber) => ({
-            toothNumber,
-            status: ToothStatus.HEALTHY,
-            surfaces: [],
-            conditions: [],
-            notes: '',
-            history: [],
-        }));
+        return teethFor(chartType)
+            .map((toothNumber) => this.defaultTooth(toothNumber))
+            .sort(byChartPosition);
+    }
+
+    private defaultTooth(toothNumber: number): ToothRecord {
+        return { toothNumber, status: ToothStatus.HEALTHY, surfaces: [], conditions: [], notes: '', history: [] } as unknown as ToothRecord;
     }
 }

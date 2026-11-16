@@ -25,7 +25,7 @@ suites (341 checks) and 22 unit tests pass; `strict` is on in backend and fronte
 | Appointments | ✅ Cleaned | Week/day view per chair not built yet (F2) |
 | Schedule | ✅ Cleaned | — |
 | Treatments catalog | ✅ Cleaned | — |
-| Dental chart | ✅ Cleaned | FDI, per-surface, planned/done; no periodontal chart yet (F12) |
+| Dental chart | ✅ Cleaned | FDI, per-surface, planned/done; mixed dentition and periodontal chart (F12) |
 | Billing | ✅ Cleaned | Fiscal receipts (F10) and deposits (F4) not built |
 | Reports | ✅ Cleaned | Export / commission (F11) not built |
 | Dashboard | ✅ Cleaned | Activity is rebuilt from records until the audit log (F7) |
@@ -266,7 +266,7 @@ built from treatment entries. Reports come after billing because they read billi
 | F9 | ✅ Password reset by email, 2FA for admins, "log out everywhere" — built 2026-11-15, see below | Security basics |
 | F10 | ✅ e-HDM fiscal receipt (Armenia) — manual recording built 2026-11-15, see below | Legal requirement for cash |
 | F11 | ✅ Export reports to Excel/CSV; dentist commission from collected revenue — built 2026-11-15, see below | Owners ask for it |
-| F12 | Periodontal chart, mixed dentition | Specialist clinics |
+| F12 | ✅ Periodontal chart, mixed dentition — built 2026-11-16, see below | Specialist clinics |
 | F13 | Platform super-admin (list clinics, support) | Needed to run the SaaS |
 
 ### F1 — Treatment plans — ✅ built 2026-11-12, branch `feat/f1-treatment-plans`
@@ -418,6 +418,17 @@ Decisions (agreed 2026-11-15): Excel (.xlsx) and CSV; the Reports page tables ar
 - [x] **Fixed on the way.** Month names via date-fns (the browser's Intl had no Armenian month names)
 - [x] Tests: `test/e2e/exports.e2e-spec.ts` (4, reading the .xlsx back), `test/e2e/commission.e2e-spec.ts` (8); all 269 e2e and 36 unit tests pass; browser (export of the reports page as Excel and CSV in Armenian, rates, approve October, dentist's own view; hy / ru / en; phone width)
 - [ ] Not built: billing / patients / audit exports (not chosen); commission by treatment category or fixed amounts; deducting lab or material costs; paying commission (marking it paid); PDF export
+
+### F12 — Periodontal chart and mixed dentition — ✅ built 2026-11-16, branch `feat/f12-perio-mixed` (stacked on F11)
+
+Decisions (agreed 2026-11-16): a mixed-dentition chart is one row of positions, each showing the primary tooth or its permanent successor; the periodontal chart is the full one (six sites a tooth: depth, recession, bleeding, pus, plaque; mobility, furcation, missing, implant); exams are kept by date, compared with the previous one and printable; dentists, admins and assistants record them (assistants often probe), everyone who sees the chart can read them, dentists and admins remove them.
+
+- [x] **Mixed chart.** Third chart type `mixed`. A new one has the 20 primary teeth and the four first permanent molars. Switching type (any direction) archives the current chart as before and reuses, tooth by tooth, what was recorded on it, then the last chart of the target type, then a healthy tooth — an untouched default permanent chart no longer fills a child's chart with permanent teeth. `PATCH /dental-records/:patientId/erupt` `{toothNumber}`: the primary predecessor leaves the chart for `replacedTeeth` with its history (molars 6–8 are just added); `PATCH …/unerupt` undoes it (the permanent tooth is set aside, the primary one comes back; erupting again restores the same record). Both audited ("erupted: no → yes")
+- [x] **Suggested type by age** for a new chart: under 6 primary, 6–12 mixed, 13+ permanent
+- [x] **Periodontal exams.** Collection `perio_exams`: date (clinic day, not in the future), dentist (the recorder if a dentist; others may name one), who typed it, notes, teeth with six sites in DB B MB DL L ML order (PD 0–15, recession −5..15, bleeding, pus, plaque), mobility 0–3, furcation 0–3, missing, implant. A new exam takes the chart's teeth (permanent, primary or mixed) with missing teeth and implants already marked. `GET/POST /patients/:id/perio-exams`, `GET /perio-exams/:id` (with the previous exam and figures for both), `PUT /perio-exams/:id/teeth/:toothNumber` (one tooth, atomic — two people on different teeth don't clash), `PATCH /perio-exams/:id`, `DELETE /perio-exams/:id` (with a reason; kept). Figures: mean depth, mean attachment loss (depth + recession), % bleeding and plaque over all sites of present teeth, sites ≥ 4 and ≥ 6 mm, mobile teeth, teeth with furcation. Audited ("Periodontal chart" area), each tooth's change as `16 · Depth: 3 2 3 / 3 2 4 → …`
+- [x] **UI.** Chart tab → "Dental chart | Periodontal chart". Mixed chart: primary teeth smaller with coloured numbers, dashed empty places for teeth not yet erupted; in the tooth drawer "Permanent 11 erupted", "Erupted" for an empty place, "Undo: bring back primary 51". Perio: upper jaw (buccal, palatal) and lower jaw (lingual, buccal), each tooth's sites distal → mesial on the patient's right and mesial → distal on the left; type a depth and the cursor moves on ("1" waits for 10–15; a pasted run fills several sites), arrows move, Backspace clears, Space cycles bleeding → bleeding + pus → pus and toggles plaque; tooth number → missing / implant. Saved tooth by tooth as you type. Depths 4–5 amber, 6+ red; attachment loss worked out. Compare: the previous exam's depths under each site, red / green when 2 mm deeper / shallower, figures side by side with arrows. Print: landscape, patient and exam heading, the rest of the page hidden
+- [x] Tests: `test/e2e/mixed-dentition.e2e-spec.ts` (6), `test/e2e/perio.e2e-spec.ts` (9), `perio-summary.spec.ts` (2); all 284 e2e and 38 unit tests pass; browser (mixed chart for an 8-year-old, eruption and undo, empty place, perio entry by keyboard, colours, autosave, comparison, removal, history; hy / ru / en; phone width)
+- [ ] Not built: a chart drawing of the gum line / attachment level (numbers only); voice entry; perio for a single quadrant or selected teeth only; per-site furcation (one grade a tooth); risk assessment (e.g. staging and grading); a reminder for the next perio recall
 
 ---
 

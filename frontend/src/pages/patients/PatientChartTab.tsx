@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { Box, Card, CardContent, ToggleButton, ToggleButtonGroup, Typography } from '@mui/material';
 import { RootState } from '../../store';
@@ -7,13 +8,16 @@ import { dentalRecordsActions } from '../../store/dental-records';
 import { ConfirmDialog, EmptyState, LoadingSpinner } from '../../components/ui';
 import Odontogram from '../../components/dental/Odontogram';
 import ToothDrawer from '../../components/dental/ToothDrawer';
-import { usePermission } from '../../hooks';
-import { ChartType } from '../../types';
+import { useHttpState, usePermission } from '../../hooks';
+import { ChartType, Patient } from '../../types';
+import PerioPanel from '../../components/perio/PerioPanel';
 import {
     SURFACE_STATUSES,
     SURFACE_STATUS_COLORS,
     TOOTH_STATUSES,
     TOOTH_STATUS_COLORS,
+    chartTypeKey,
+    predecessorOf,
     surfaceStatusKey,
     toothStatusKey,
     toothStatusShortKey,
@@ -32,10 +36,41 @@ const LegendItem: React.FC<{ swatch: React.ReactNode; label: string }> = ({ swat
  * The patient's dental chart (FDI). Clinicians edit; everyone else views.
  * `suggestedChartType` only applies when the chart is created on first open.
  */
-const PatientChartTab: React.FC<{ patientId: string; suggestedChartType: ChartType }> = ({
-    patientId,
-    suggestedChartType,
-}) => {
+const PatientChartTab: React.FC<{ patient: Patient; suggestedChartType: ChartType }> = ({ patient, suggestedChartType }) => {
+    const [params, setParams] = useSearchParams();
+    // F12: the chart, or the periodontal exams (`?view=perio`, so a reload stays there).
+    const view = params.get('view') === 'perio' ? 'perio' : 'chart';
+    const setView = (next: 'chart' | 'perio') => {
+        const p = new URLSearchParams(params);
+        if (next === 'perio') p.set('view', 'perio');
+        else p.delete('view');
+        setParams(p, { replace: true });
+    };
+    const { t } = useTranslation();
+    const toggle = (
+        <ToggleButtonGroup size="small" exclusive value={view} onChange={(_e, v) => v && setView(v)} sx={{ mb: 2, displayPrint: 'none' }}>
+            <ToggleButton value="chart">{t('dental.odontogram')}</ToggleButton>
+            <ToggleButton value="perio">{t('perio.title')}</ToggleButton>
+        </ToggleButtonGroup>
+    );
+    return view === 'perio' ? (
+        <>
+            {toggle}
+            <Card>
+                <CardContent>
+                    <PerioPanel patient={patient} />
+                </CardContent>
+            </Card>
+        </>
+    ) : (
+        <>
+            {toggle}
+            <DentalChartView patientId={patient._id} suggestedChartType={suggestedChartType} />
+        </>
+    );
+};
+
+const DentalChartView: React.FC<{ patientId: string; suggestedChartType: ChartType }> = ({ patientId, suggestedChartType }) => {
     const { t } = useTranslation();
     const dispatch = useDispatch();
     const can = usePermission();
@@ -46,9 +81,31 @@ const PatientChartTab: React.FC<{ patientId: string; suggestedChartType: ChartTy
 
     const [selectedTooth, setSelectedTooth] = useState<number | null>(null);
     const [pendingType, setPendingType] = useState<ChartType | null>(null);
+    // Mixed chart: the tooth to open once an eruption is saved.
+    const [afterErupt, setAfterErupt] = useState<number | null>(null);
+    const erupt = useHttpState('ERUPT_TOOTH');
 
     // The store holds whichever patient was opened last; never draw their teeth here.
     const chart = stored && stored.patientId === patientId ? stored : null;
+    const onChart = useMemo(() => new Set((chart?.teeth ?? []).map((tooth) => tooth.toothNumber)), [chart?.teeth]);
+
+    const { success: erupted, clearSuccess: clearErupted } = erupt;
+    useEffect(() => {
+        if (!erupted) return;
+        clearErupted();
+        if (afterErupt !== null) {
+            setSelectedTooth(afterErupt);
+            dispatch(dentalRecordsActions.getToothHistory({ patientId, toothNumber: afterErupt }));
+            setAfterErupt(null);
+        }
+    }, [erupted, clearErupted, afterErupt, dispatch, patientId]);
+
+    const handleErupt = (permanent: number, undo: boolean) => {
+        // After an undo the primary tooth is back in its place; a molar just leaves.
+        setAfterErupt(undo ? predecessorOf(permanent) : permanent);
+        if (undo && !predecessorOf(permanent)) setSelectedTooth(null);
+        dispatch(dentalRecordsActions.eruptTooth({ patientId, toothNumber: permanent, undo }));
+    };
 
     useEffect(() => {
         dispatch(dentalRecordsActions.getChart({ patientId, chartType: suggestedChartType }));
@@ -86,7 +143,7 @@ const PatientChartTab: React.FC<{ patientId: string; suggestedChartType: ChartTy
     }
 
     const restoring = pendingType ? chart.archivedChartTypes?.includes(pendingType) : false;
-    const typeLabel = (type: ChartType) => t(type === 'pediatric' ? 'dental.pediatricChart' : 'dental.adultChart');
+    const typeLabel = (type: ChartType) => t(chartTypeKey(type));
 
     return (
         <>
@@ -118,6 +175,7 @@ const PatientChartTab: React.FC<{ patientId: string; suggestedChartType: ChartTy
                             onChange={(_e, value) => value && value !== chart.chartType && setPendingType(value)}
                         >
                             <ToggleButton value="adult">{t('dental.adultChart')}</ToggleButton>
+                            <ToggleButton value="mixed">{t('dental.mixedChart')}</ToggleButton>
                             <ToggleButton value="pediatric">{t('dental.pediatricChart')}</ToggleButton>
                         </ToggleButtonGroup>
                     </Box>
@@ -163,6 +221,21 @@ const PatientChartTab: React.FC<{ patientId: string; suggestedChartType: ChartTy
                                 />
                             ))}
                         </Box>
+                        {chart.chartType === 'mixed' && (
+                            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center' }}>
+                                <Typography variant="caption" fontWeight={700} color="text.secondary">
+                                    {t('dental.mixedChart')}:
+                                </Typography>
+                                <LegendItem
+                                    label={t('dental.legendPrimary')}
+                                    swatch={<Typography variant="caption" fontWeight={700} color="secondary.main">55</Typography>}
+                                />
+                                <LegendItem
+                                    label={t('dental.notErupted')}
+                                    swatch={<Box sx={{ width: 14, height: 14, borderRadius: '3px', border: '1.5px dashed', borderColor: 'text.disabled' }} />}
+                                />
+                            </Box>
+                        )}
                     </Box>
                 </CardContent>
             </Card>
@@ -173,6 +246,7 @@ const PatientChartTab: React.FC<{ patientId: string; suggestedChartType: ChartTy
                 tooth={chart.teeth.find((tooth) => tooth.toothNumber === selectedTooth)}
                 canEdit={canEdit}
                 onClose={closeDrawer}
+                mixed={chart.chartType === 'mixed' ? { onChart, busy: erupt.loading, error: erupt.error, onErupt: handleErupt } : undefined}
             />
 
             <ConfirmDialog

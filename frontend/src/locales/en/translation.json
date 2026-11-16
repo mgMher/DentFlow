@@ -390,7 +390,15 @@
       "filled": "Filling",
       "sealant": "Sealant",
       "sound": "Sound"
-    }
+    },
+    "mixedChart": "Mixed dentition",
+    "primaryTooth": "Primary tooth",
+    "notErupted": "Not erupted yet",
+    "markErupted": "Erupted",
+    "successorErupted": "Permanent {{tooth}} erupted",
+    "undoEruption": "Undo: not erupted yet",
+    "undoEruptionBack": "Undo: bring back primary {{tooth}}",
+    "legendPrimary": "primary tooth (its permanent successor has not erupted yet)"
   },
   "treatments": {
     "title": "Treatments",
@@ -994,7 +1002,13 @@
     "commissionApproved": "This month is already approved.",
     "commissionNotApproved": "This month is not approved.",
     "commissionLaterApproved": "Reopen the later approved months first.",
-    "invalidMonth": "Month must be YYYY-MM."
+    "invalidMonth": "Month must be YYYY-MM.",
+    "perioExamNotFound": "This periodontal exam was not found (it may have been removed)",
+    "toothNotInExam": "This tooth is not in the exam",
+    "perioExamInFuture": "An exam cannot be dated in the future",
+    "toothAlreadyErupted": "This tooth is already on the chart",
+    "notMixedChart": "Teeth erupt one by one only on a mixed-dentition chart",
+    "invalidDate": "Not a valid date"
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1395,7 +1409,9 @@
         "updateMultipleTeeth": "Changed several teeth",
         "addTreatmentEntry": "Recorded a treatment",
         "completeTreatmentEntry": "Marked a treatment done",
-        "voidTreatmentEntry": "Voided a treatment"
+        "voidTreatmentEntry": "Voided a treatment",
+        "eruptTooth": "Recorded that a permanent tooth erupted",
+        "uneruptTooth": "Undid an eruption"
       },
       "plans": {
         "create": "Created a treatment plan",
@@ -1465,6 +1481,12 @@
         "approve": "Approved a commission month",
         "reopen": "Reopened a commission month",
         "setRates": "Changed commission rates"
+      },
+      "perio": {
+        "create": "Started a periodontal exam",
+        "saveTooth": "Recorded periodontal findings on a tooth",
+        "update": "Changed a periodontal exam",
+        "remove": "Removed a periodontal exam"
       }
     },
     "areas": {
@@ -1481,7 +1503,8 @@
       "settings": "Message templates",
       "reminders": "Reminders",
       "auth": "Sign-ins",
-      "commission": "Commission"
+      "commission": "Commission",
+      "perio": "Periodontal chart"
     },
     "fields": {
       "firstName": "First name",
@@ -1571,7 +1594,18 @@
       "difference": "Difference",
       "count": "Count",
       "guardian": "Parent or guardian",
-      "fiscalNumber": "Fiscal receipt"
+      "fiscalNumber": "Fiscal receipt",
+      "erupted": "Erupted",
+      "missing": "Missing",
+      "implant": "Implant",
+      "mobility": "Mobility",
+      "furcation": "Furcation",
+      "pd": "Probing depth",
+      "rec": "Recession",
+      "bop": "Bleeding",
+      "sup": "Pus",
+      "plaque": "Plaque",
+      "date": "Date"
     },
     "reasons": {
       "wrongPassword": "Wrong password",
@@ -1763,5 +1797,65 @@
     "useDefault": "Default ({{rate}}%)",
     "previousMonth": "Previous month",
     "nextMonth": "Next month"
+  },
+  "perio": {
+    "title": "Periodontal chart",
+    "about": "Probing depths, recession, bleeding and plaque at six sites of every tooth, saved by date so visits can be compared.",
+    "none": "No periodontal exams yet",
+    "newExam": "New exam",
+    "exam": "Exam",
+    "examDetails": "Date, dentist and notes",
+    "compareWith": "Compare with {{date}}",
+    "thisExam": "This exam",
+    "previous": "Previous",
+    "saving": "Saving…",
+    "saved": "All changes saved",
+    "notSaved": "Not saved",
+    "print": "Print",
+    "moreActions": "More actions",
+    "remove": "Remove exam",
+    "removed": "Exam removed",
+    "removeExplain": "The exam of {{exam}} leaves the patient’s record. It is kept, with your reason, in case it is needed later.",
+    "removeReason": "Reason",
+    "keyboardHint": "Type a depth and the cursor moves on (for 10–15 type both digits). Arrows move, Backspace clears, Space marks bleeding / pus or plaque. Click a tooth number for missing or implant. Everything is saved as you go.",
+    "summary": "Summary",
+    "meanPd": "Mean probing depth",
+    "meanCal": "Mean attachment loss",
+    "bopPercent": "Bleeding on probing",
+    "plaquePercent": "Plaque",
+    "sites4plus": "Sites 4 mm and deeper",
+    "sites6plus": "Sites 6 mm and deeper",
+    "mobileTeeth": "Mobile teeth",
+    "furcationTeeth": "Teeth with furcation",
+    "mm": "mm",
+    "upperArch": "Upper jaw",
+    "lowerArch": "Lower jaw",
+    "buccal": "Buccal",
+    "palatal": "Palatal",
+    "lingual": "Lingual",
+    "pd": "Depth",
+    "rec": "Recession",
+    "cal": "Attachment loss",
+    "bop": "Bleeding",
+    "sup": "Pus",
+    "plaque": "Plaque",
+    "mobility": "Mobility",
+    "furcation": "Furcation",
+    "missing": "Missing",
+    "implant": "Implant",
+    "implantShort": "Imp",
+    "site": {
+      "0": "distobuccal",
+      "1": "buccal",
+      "2": "mesiobuccal",
+      "3": "distolingual",
+      "4": "lingual",
+      "5": "mesiolingual"
+    },
+    "legendModerate": "mm — pocket to watch",
+    "legendDeep": "mm — deep pocket",
+    "legendCal": "Recession: gum below the enamel–cement junction is positive, above it negative. Attachment loss = depth + recession.",
+    "legendCompare": "Small grey numbers: the previous exam’s depth. Red: 2 mm deeper or more; green: 2 mm shallower or more.",
+    "recordedBy": "Recorded by {{name}}"
   }
 }

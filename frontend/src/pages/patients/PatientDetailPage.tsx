@@ -43,6 +43,7 @@ import {
     getInitials,
 } from '../../utils/formatters';
 import { formatArmenianPhone } from '../../utils/validators';
+import { chartTypeForAge } from '../../utils/dental';
 import { usePermission } from '../../hooks';
 import PatientProfileTab from './PatientProfileTab';
 import PatientAppointmentsTab from './PatientAppointmentsTab';
@@ -114,12 +115,12 @@ const PatientDetailPage: React.FC = () => {
     const [pendingStatus, setPendingStatus] = useState<PatientStatus | null>(null);
     const can = usePermission();
 
-    // Primary teeth are normally gone by ~13, so that is the default for a new
-    // chart. It is only a starting point — the type can be switched by hand.
-    const suggestedChartType: ChartType = useMemo(() => {
-        if (!storedPatient?.dateOfBirth) return 'adult';
-        return ageFromDateOfBirth(storedPatient.dateOfBirth) < 13 ? 'pediatric' : 'adult';
-    }, [storedPatient?.dateOfBirth]);
+    // A new chart by age: primary teeth before ~6, mixed until ~13, then
+    // permanent. Only a starting point — the type can be switched by hand.
+    const suggestedChartType: ChartType = useMemo(
+        () => chartTypeForAge(storedPatient?.dateOfBirth ? ageFromDateOfBirth(storedPatient.dateOfBirth) : null),
+        [storedPatient?.dateOfBirth],
+    );
 
     useEffect(() => {
         if (id) {
@@ -158,6 +159,8 @@ const PatientDetailPage: React.FC = () => {
 
     return (
         <Box sx={{ maxWidth: '100%', overflowX: 'hidden' }}>
+            {/* A printed tab (the perio chart) has its own heading; the page around it is not printed. */}
+            <Box sx={{ displayPrint: 'none' }}>
             <PageHeader title={t('patients.patientProfile')}>
                 <Button
                     variant="outlined"
@@ -167,9 +170,10 @@ const PatientDetailPage: React.FC = () => {
                     {t('common.back')}
                 </Button>
             </PageHeader>
+            </Box>
 
             {/* Patient Info Header Card */}
-            <Card sx={{ mb: 3 }}>
+            <Card sx={{ mb: 3, displayPrint: 'none' }}>
                 <CardContent>
                     <Box
                         sx={{
@@ -273,7 +277,7 @@ const PatientDetailPage: React.FC = () => {
                 <Alert
                     severity="error"
                     icon={<WarningIcon />}
-                    sx={{ mb: 3, alignItems: 'center' }}
+                    sx={{ mb: 3, alignItems: 'center', displayPrint: 'none' }}
                 >
                     <AlertTitle sx={{ mb: 0.5 }}>{t('patients.allergies')}</AlertTitle>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
@@ -300,7 +304,7 @@ const PatientDetailPage: React.FC = () => {
             )}
 
             {/* Tabs */}
-            <Paper sx={{ mb: 2 }}>
+            <Paper sx={{ mb: 2, displayPrint: 'none' }}>
                 <Tabs
                     value={tabValue}
                     onChange={handleTabChange}
@@ -325,7 +329,7 @@ const PatientDetailPage: React.FC = () => {
             </TabPanel>
 
             <TabPanel value={tabValue} index={TABS.chart}>
-                <PatientChartTab patientId={patient._id} suggestedChartType={suggestedChartType} />
+                <PatientChartTab patient={patient} suggestedChartType={suggestedChartType} />
             </TabPanel>
 
             <TabPanel value={tabValue} index={TABS.treatments}>

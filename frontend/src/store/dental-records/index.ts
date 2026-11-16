@@ -20,6 +20,7 @@ const GET_CHART = 'GET_CHART';
 const GET_CHART_SUCCESS = 'GET_CHART_SUCCESS';
 const SET_CHART_TYPE = 'SET_CHART_TYPE';
 const UPDATE_TOOTH = 'UPDATE_TOOTH';
+const ERUPT_TOOTH = 'ERUPT_TOOTH';
 const GET_TOOTH_HISTORY = 'GET_TOOTH_HISTORY';
 const GET_TOOTH_HISTORY_SUCCESS = 'GET_TOOTH_HISTORY_SUCCESS';
 const ADD_ENTRY = 'ADD_ENTRY';
@@ -64,6 +65,8 @@ export const dentalRecordsActions = {
     getChart: (payload: { patientId: string; chartType?: ChartType }) => ({ type: GET_CHART, payload }),
     setChartType: (payload: { patientId: string; chartType: ChartType }) => ({ type: SET_CHART_TYPE, payload }),
     updateTooth: (payload: { patientId: string; data: ToothUpdate }) => ({ type: UPDATE_TOOTH, payload }),
+    /** Mixed chart: a permanent tooth erupted (or `undo` it). */
+    eruptTooth: (payload: { patientId: string; toothNumber: number; undo?: boolean }) => ({ type: ERUPT_TOOTH, payload }),
     getToothHistory: (payload: { patientId: string; toothNumber: number }) => ({ type: GET_TOOTH_HISTORY, payload }),
     clearToothHistory: () => ({ type: GET_TOOTH_HISTORY_SUCCESS, payload: null }),
     addEntry: (payload: { patientId: string; data: NewTreatmentEntry }) => ({ type: ADD_ENTRY, payload }),
@@ -82,6 +85,8 @@ const service = {
     setChartType: (patientId: string, chartType: ChartType) =>
         api.patch(`${base(patientId)}/chart-type`, { chartType }),
     updateTooth: (patientId: string, data: ToothUpdate) => api.patch(`${base(patientId)}/tooth`, data),
+    eruptTooth: (patientId: string, toothNumber: number, undo?: boolean) =>
+        api.patch(`${base(patientId)}/${undo ? 'unerupt' : 'erupt'}`, { toothNumber }),
     getToothHistory: (patientId: string, toothNumber: number) =>
         api.get(`${base(patientId)}/tooth/${toothNumber}/history`),
     addEntry: (patientId: string, data: NewTreatmentEntry) => api.post(`${base(patientId)}/treatment-entry`, data),
@@ -174,6 +179,17 @@ function* updateToothSaga(action: any) {
     }
 }
 
+function* eruptToothSaga(action: any) {
+    const { patientId, toothNumber, undo } = action.payload;
+    const res: AxiosResponse | null = yield call(write, action, 'errors.updateTooth', () =>
+        service.eruptTooth(patientId, toothNumber, undo),
+    );
+    if (res) {
+        yield put({ type: GET_CHART_SUCCESS, payload: unwrap(res) });
+        yield put({ type: GET_TOOTH_HISTORY_SUCCESS, payload: null });
+    }
+}
+
 function* getToothHistorySaga(action: any) {
     const { patientId, toothNumber } = action.payload;
     yield call(
@@ -212,6 +228,7 @@ export function* watchDentalRecords() {
     yield takeLatest(GET_CHART, getChartSaga);
     yield takeLatest(SET_CHART_TYPE, setChartTypeSaga);
     yield takeLatest(UPDATE_TOOTH, updateToothSaga);
+    yield takeLatest(ERUPT_TOOTH, eruptToothSaga);
     yield takeLatest(GET_TOOTH_HISTORY, getToothHistorySaga);
     yield takeLatest(ADD_ENTRY, entryWriteSaga);
     yield takeLatest(COMPLETE_ENTRY, entryWriteSaga);

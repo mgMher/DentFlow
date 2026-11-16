@@ -43,6 +43,10 @@ export const PERMISSIONS = {
     viewAuditLog: ['super_admin', 'clinic_admin'],
     /** GET /patients/:id/history — audit.controller */
     viewPatientHistory: ['super_admin', 'clinic_admin', 'dentist'],
+    /** POST /patients/:id/perio-exams, PUT/PATCH /perio-exams/:id — perio.controller RECORDERS */
+    recordPerio: ['super_admin', 'clinic_admin', 'dentist', 'assistant'],
+    /** DELETE /perio-exams/:id — perio.controller REMOVERS */
+    removePerio: ['super_admin', 'clinic_admin', 'dentist'],
     /** POST/PATCH /appointments */
     manageAppointments: ['clinic_admin', 'dentist', 'receptionist'],
 } as const satisfies Record<string, readonly UserRole[]>;

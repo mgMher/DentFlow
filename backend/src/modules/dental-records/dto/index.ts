@@ -1,4 +1,4 @@
-export { UpdateToothDto, UpdateTeethDto, SetChartTypeDto, GetChartQueryDto, SurfaceStateDto } from './update-tooth.dto';
+export { UpdateToothDto, UpdateTeethDto, SetChartTypeDto, GetChartQueryDto, SurfaceStateDto, EruptToothDto } from './update-tooth.dto';
 export {
     CreateTreatmentEntryDto,
     CompleteTreatmentEntryDto,

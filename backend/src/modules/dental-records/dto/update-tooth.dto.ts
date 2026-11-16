@@ -75,18 +75,25 @@ export class UpdateTeethDto {
 }
 
 export class SetChartTypeDto {
-    @ApiProperty({ enum: ['adult', 'pediatric'], example: 'pediatric' })
+    @ApiProperty({ enum: ['adult', 'pediatric', 'mixed'], example: 'mixed' })
     @IsNotEmpty()
-    @IsIn(['adult', 'pediatric'])
-    chartType: 'adult' | 'pediatric';
+    @IsIn(['adult', 'pediatric', 'mixed'])
+    chartType: 'adult' | 'pediatric' | 'mixed';
 }
 
 export class GetChartQueryDto {
     @ApiPropertyOptional({
-        enum: ['adult', 'pediatric'],
+        enum: ['adult', 'pediatric', 'mixed'],
         description: 'Only used when the chart does not exist yet',
     })
     @IsOptional()
-    @IsIn(['adult', 'pediatric'])
-    chartType?: 'adult' | 'pediatric';
+    @IsIn(['adult', 'pediatric', 'mixed'])
+    chartType?: 'adult' | 'pediatric' | 'mixed';
+}
+
+/** F12: a permanent tooth in a mixed chart (its primary predecessor, if any, is replaced). */
+export class EruptToothDto {
+    @ApiProperty({ example: 11, description: 'FDI number of the permanent tooth' })
+    @IsInt()
+    toothNumber: number;
 }
