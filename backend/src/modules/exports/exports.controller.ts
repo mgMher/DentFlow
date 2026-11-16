@@ -1,5 +1,6 @@
 import { Body, Controller, HttpCode, HttpStatus, Post, StreamableFile } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { AllowInSupport, AllowWhenReadOnly } from 'src/common/decorators';
 import { ExportDto } from './dto/export.dto';
 import { ExportsService } from './exports.service';
 
@@ -10,6 +11,8 @@ import { ExportsService } from './exports.service';
 @ApiTags('Exports')
 @ApiBearerAuth()
 @Controller('exports')
+@AllowWhenReadOnly()
+@AllowInSupport()
 export class ExportsController {
     constructor(private readonly exports: ExportsService) {}
 

@@ -61,7 +61,10 @@
     "schedule": "Schedule",
     "notifications": "Notifications",
     "menu": "Menu",
-    "audit": "Audit log"
+    "audit": "Audit log",
+    "clinics": "Clinics",
+    "platformLog": "Platform log",
+    "platformAdmins": "Platform admins"
   },
   "auth": {
     "login": "Sign In",
@@ -1008,7 +1011,15 @@
     "perioExamInFuture": "An exam cannot be dated in the future",
     "toothAlreadyErupted": "This tooth is already on the chart",
     "notMixedChart": "Teeth erupt one by one only on a mixed-dentition chart",
-    "invalidDate": "Not a valid date"
+    "invalidDate": "Not a valid date",
+    "platformOnly": "Only platform admins can do this",
+    "subscriptionEnded": "The subscription has ended: the clinic is read-only until it is renewed",
+    "supportReadOnly": "This is a read-only support view: nothing can be changed",
+    "supportEnded": "The support view has ended",
+    "supportAccessOff": "The clinic has not allowed support access",
+    "lastPlatformAdmin": "The last platform admin cannot be removed",
+    "clinicAlreadySuspended": "The clinic is already suspended",
+    "clinicNotSuspended": "The clinic is not suspended"
   },
   "plans": {
     "tab": "Treatment plans",
@@ -1401,7 +1412,9 @@
       "clinic": {
         "updateCurrent": "Changed clinic details",
         "updateWorkingHours": "Changed working hours",
-        "updateSettings": "Changed clinic settings"
+        "updateSettings": "Changed clinic settings",
+        "grantSupportAccess": "Allowed DentFlow support to view the clinic",
+        "revokeSupportAccess": "Turned off DentFlow support access"
       },
       "chart": {
         "setChartType": "Switched the chart type",
@@ -1487,6 +1500,19 @@
         "saveTooth": "Recorded periodontal findings on a tooth",
         "update": "Changed a periodontal exam",
         "remove": "Removed a periodontal exam"
+      },
+      "support": {
+        "view": "Looked at"
+      },
+      "platform": {
+        "updateSubscription": "Changed the subscription",
+        "suspend": "Suspended the clinic",
+        "reactivate": "Reactivated the clinic",
+        "sendPasswordReset": "Sent an admin a password-reset link",
+        "resetTwoFactor": "Turned off an admin's two-factor",
+        "startSupport": "Opened a read-only support view",
+        "addAdmin": "Added a platform admin",
+        "removeAdmin": "Removed a platform admin"
       }
     },
     "areas": {
@@ -1504,7 +1530,11 @@
       "reminders": "Reminders",
       "auth": "Sign-ins",
       "commission": "Commission",
-      "perio": "Periodontal chart"
+      "perio": "Periodontal chart",
+      "platform": "DentFlow (platform)",
+      "support": "DentFlow support",
+      "reports": "Reports",
+      "audit": "Audit log"
     },
     "fields": {
       "firstName": "First name",
@@ -1605,14 +1635,22 @@
       "bop": "Bleeding",
       "sup": "Pus",
       "plaque": "Plaque",
-      "date": "Date"
+      "date": "Date",
+      "plan": "Plan",
+      "expiresAt": "Last day",
+      "suspendReason": "Reason",
+      "supportAccessUntil": "Support access until",
+      "section": "Screen"
     },
     "reasons": {
       "wrongPassword": "Wrong password",
       "locked": "Account locked",
       "deactivated": "Account deactivated",
-      "wrongCode": "Wrong two-factor code"
-    }
+      "wrongCode": "Wrong two-factor code",
+      "clinicSuspended": "Clinic suspended"
+    },
+    "byPlatform": "DentFlow: {{name}}",
+    "bySupport": "DentFlow support: {{name}}"
   },
   "family": {
     "title": "Family",
@@ -1857,5 +1895,122 @@
     "legendCal": "Recession: gum below the enamel–cement junction is positive, above it negative. Attachment loss = depth + recession.",
     "legendCompare": "Small grey numbers: the previous exam’s depth. Red: 2 mm deeper or more; green: 2 mm shallower or more.",
     "recordedBy": "Recorded by {{name}}"
+  },
+  "platform": {
+    "badge": "Platform",
+    "clinics": "Clinics",
+    "clinicsSubtitle": "Every clinic on DentFlow: its plan, last day and how much it is used",
+    "searchClinics": "Name, email or phone",
+    "noClinics": "No clinics",
+    "clinic": "Clinic",
+    "stateLabel": "State",
+    "state": {
+      "active": "Active",
+      "trial": "Trial",
+      "ending": "Ending soon",
+      "ended": "Ended (read-only)",
+      "suspended": "Suspended"
+    },
+    "lastDay": "Last day",
+    "lastDayHint": "After this day the clinic can only read, not change, until you extend it",
+    "noEnd": "No end",
+    "plus30": "+30 days",
+    "plusYear": "+1 year",
+    "created": "Registered",
+    "registered": "Registered {{date}}",
+    "clinicLog": "Platform log for this clinic",
+    "usageTitle": "Use",
+    "usage": {
+      "staff": "Staff",
+      "patients": "Patients",
+      "appointments30": "Appointments, 30 days",
+      "invoices30": "Invoices, 30 days",
+      "documents": "Documents",
+      "storage": "Storage",
+      "lastSignIn": "Last sign-in"
+    },
+    "access": "Access",
+    "suspend": "Suspend clinic",
+    "suspendHint": "Suspending signs everyone in the clinic out and keeps them out; reminders stop. Nothing is deleted.",
+    "suspendExplain": "Everyone at {{clinic}} is signed out and cannot sign in until you reactivate it. The reason is shown in the clinic’s own log.",
+    "suspendReason": "Reason",
+    "suspended": "Clinic suspended",
+    "suspendedSince": "Suspended since {{date}}: {{reason}}",
+    "reactivate": "Reactivate",
+    "reactivated": "Clinic reactivated",
+    "admins": "Clinic's admins",
+    "adminsHint": "Help them sign in: a reset link goes to their email (you never see the password); turning off two-factor is for a lost phone.",
+    "person": "Name",
+    "deactivated": "Deactivated",
+    "locked": "Locked",
+    "sendReset": "Send reset link",
+    "sendResetConfirm": "Email {{email}} a link to choose a new password? Their current password keeps working until they use it.",
+    "resetSent": "Reset link sent to {{email}}",
+    "resetTwoFactor": "Turn off two-factor",
+    "resetTwoFactorConfirm": "Turn off two-factor sign-in for {{email}}? They are signed out everywhere and set it up again at their next sign-in.",
+    "twoFactorReset": "Two-factor turned off; they set it up again at their next sign-in",
+    "details": "Clinic details",
+    "address": "Address",
+    "language": "Language",
+    "currency": "Currency",
+    "timezone": "Time zone",
+    "log": "Platform log",
+    "logSubtitle": "What platform admins did, what support looked at, and sign-ins in every clinic",
+    "logPlatform": "Platform admins",
+    "logSignIns": "Sign-ins",
+    "logHint": "Kept forever. What you do to a clinic is also in that clinic’s own log.",
+    "oneClinic": "One clinic",
+    "platformAdmins": "Platform admins",
+    "platformAdminsSubtitle": "The people who run DentFlow. They sign in with two-factor.",
+    "addAdmin": "Add platform admin",
+    "addAdminHint": "They get an email with a link to choose their password (valid 24 hours).",
+    "sendInvite": "Send invitation",
+    "inviteSent": "Invitation sent to {{email}}",
+    "inviteNotSent": "Added, but the email to {{email}} could not be sent; send a link again later",
+    "you": "You",
+    "removedAdmin": "Removed",
+    "neverSignedIn": "Not yet",
+    "removeAdmin": "Remove",
+    "removeAdminConfirm": "Remove {{email}} as a platform admin? They are signed out at once.",
+    "adminRemoved": "Platform admin removed"
+  },
+  "subscription": {
+    "title": "Subscription",
+    "plan": "Plan",
+    "statusLabel": "Status",
+    "status": {
+      "active": "Active",
+      "trial": "Trial",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "endsOn": "Access until {{date}} (inclusive)",
+    "endedOn": "Ended on {{date}}: the clinic is read-only",
+    "noEnd": "No end date",
+    "about": "Set by DentFlow. After the last day everything can still be seen and exported, but not changed, until it is renewed.",
+    "ended": "The subscription ended on {{date}}. The clinic is read-only: you can look and export, not change. Contact DentFlow to renew.",
+    "ending_one": "The subscription ends on {{date}} ({{count}} day left). Renew it with DentFlow to keep making changes.",
+    "ending_other": "The subscription ends on {{date}} ({{count}} days left). Renew it with DentFlow to keep making changes."
+  },
+  "support": {
+    "tab": "Subscription and support",
+    "title": "DentFlow support access",
+    "about": "When you need help, let DentFlow support look at your clinic for a few hours. They can only look, never change anything, and every screen they open is in your log (\"DentFlow support\").",
+    "off": "Support cannot look at your clinic.",
+    "allowedUntil": "DentFlow support can view your clinic (read-only) until {{time}}.",
+    "turnOff": "Turn off",
+    "turnedOff": "Support access turned off",
+    "turnedOn": "Support access turned on",
+    "viewing": "Read-only support view of {{clinic}}. Every screen you open is in the clinic’s log.",
+    "exit": "Exit support view",
+    "ended": "The support view has ended (time is up, or the clinic turned access off).",
+    "notAllowed": "The clinic has not allowed support access. Ask one of its admins to turn it on in Settings → Subscription and support.",
+    "notWhileSuspended": "A suspended clinic cannot be opened.",
+    "open": "Open read-only view",
+    "openHint": "Opens the clinic as its admins see it, without changes, for up to an hour at a time.",
+    "opening": "Opening the clinic…",
+    "allowFor_one": "Allow for {{count}} hour",
+    "allowFor_other": "Allow for {{count}} hours",
+    "clinicAllows": "The clinic allows support to view it (read-only) until {{time}}."
   }
 }

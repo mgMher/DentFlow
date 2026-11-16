@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    ForbiddenException,
     HttpException,
     HttpStatus,
     Injectable,
@@ -22,8 +23,9 @@ import { ChangePasswordDto, ForgotPasswordDto, LoginDto, RegisterDto, ResetPassw
 import { SessionMeta, SessionsService } from './sessions.service';
 import { AuditService } from '../audit/audit.service';
 import { MailService } from 'src/common/mail/mail.service';
+import { ClinicStatusService } from 'src/common/clinic-refs/clinic-status.service';
 import { TwoFactorService } from './two-factor.service';
-import { resetEmail } from './reset-email';
+import { inviteEmail, resetEmail } from './reset-email';
 import { createHash, randomBytes } from 'crypto';
 
 export const PASSWORD_HASH_COST = 12;
@@ -39,6 +41,10 @@ const emailTaken = () =>
 
 /** F9: how long an emailed reset link works. */
 const RESET_MINUTES = 60;
+/** A new sign-up's free trial (F13); the platform admin can change the end date. */
+export const TRIAL_DAYS = 30;
+/** A link to choose the first password (new platform admin) lasts a day. */
+const INVITE_HOURS = 24;
 const hashToken = (token: string) => createHash('sha256').update(token).digest('hex');
 
 @Injectable()
@@ -55,6 +61,7 @@ export class AuthService implements OnModuleInit {
         private readonly audit: AuditService,
         private readonly twoFactor: TwoFactorService,
         private readonly mail: MailService,
+        private readonly clinicStatus: ClinicStatusService,
     ) {}
 
     /**
@@ -110,6 +117,7 @@ export class AuthService implements OnModuleInit {
             name: dto.clinicName,
             phone: dto.phone || '',
             email,
+            subscription: { plan: 'trial', status: 'trial', expiresAt: new Date(Date.now() + TRIAL_DAYS * 86_400_000) },
         });
 
         let user: UserDocument | undefined;
@@ -171,6 +179,12 @@ export class AuthService implements OnModuleInit {
         if (!user.isActive) {
             await this.auditSignIn('auth.loginFailed', user, meta, { reason: 'deactivated' });
             throw new UnauthorizedException(errorBody('accountDeactivated', 'Account is deactivated'));
+        }
+
+        // F13: a clinic suspended by the platform: say so now, not after signing in.
+        if (user.clinicId && !(await this.clinicStatus.get(user.clinicId)).active) {
+            await this.auditSignIn('auth.loginFailed', user, meta, { reason: 'clinicSuspended' });
+            throw new ForbiddenException(errorBody('clinicInactive', 'This clinic account is suspended'));
         }
 
         // F9: a correct password may still need an authenticator code, or setting one up.
@@ -247,22 +261,35 @@ export class AuthService implements OnModuleInit {
     async forgotPassword(dto: ForgotPasswordDto, meta: SessionMeta) {
         const user = await this.userModel.findOne({ email: dto.email, isActive: true });
         if (user) {
-            const token = randomBytes(32).toString('base64url');
-            await this.userModel.updateOne(
-                { _id: user._id },
-                { $set: { resetTokenHash: hashToken(token), resetTokenExpiresAt: new Date(Date.now() + RESET_MINUTES * 60_000) } },
-            );
-            const clinic = await this.clinicModel.findById(user.clinicId).select('name language').lean();
-            const link = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '')}/reset-password?token=${token}`;
-            const mail = resetEmail(clinic?.language, user.firstName || user.email, clinic?.name ?? 'DentFlow', link, RESET_MINUTES);
-            try {
-                await this.mail.send({ to: user.email, ...mail });
-            } catch (err) {
-                this.logger.error(`Reset email to user ${user._id} failed: ${(err as Error).message}`);
-            }
+            await this.sendPasswordLink(user);
             await this.auditSignIn('auth.passwordResetRequested', user, meta);
         }
         return { sent: true };
+    }
+
+    /**
+     * Email a one-time link to choose a password: a reset (an hour), or the
+     * first password of a new platform admin (a day). A new link replaces an
+     * earlier one. Also used by the platform console (F13).
+     */
+    async sendPasswordLink(user: Pick<UserDocument, '_id' | 'email' | 'firstName' | 'clinicId'>, invite = false): Promise<boolean> {
+        const token = randomBytes(32).toString('base64url');
+        const minutes = invite ? INVITE_HOURS * 60 : RESET_MINUTES;
+        await this.userModel.updateOne(
+            { _id: user._id },
+            { $set: { resetTokenHash: hashToken(token), resetTokenExpiresAt: new Date(Date.now() + minutes * 60_000) } },
+        );
+        const clinic = user.clinicId ? await this.clinicModel.findById(user.clinicId).select('name language').lean() : null;
+        const link = `${(process.env.CLIENT_URL || 'http://localhost:3000').replace(/\/$/, '')}/reset-password?token=${token}`;
+        const name = user.firstName || user.email;
+        const mail = invite ? inviteEmail(clinic?.language, name, link, INVITE_HOURS) : resetEmail(clinic?.language, name, clinic?.name ?? 'DentFlow', link, minutes);
+        try {
+            await this.mail.send({ to: user.email, ...mail });
+            return true;
+        } catch (err) {
+            this.logger.error(`Password email to user ${user._id} failed: ${(err as Error).message}`);
+            return false;
+        }
     }
 
     /** A new password from the emailed link: once, within the hour; every device is signed out. */
@@ -283,10 +310,10 @@ export class AuthService implements OnModuleInit {
 
     /** Sign-ins happen before there is a signed-in user, so they are logged here rather than by the audit interceptor. */
     private auditSignIn(event: string, user: UserDocument, meta: SessionMeta, details?: Record<string, unknown>) {
-        if (!user.clinicId) return Promise.resolve();
+        // A platform admin (F13) has no clinic: theirs go to the platform log.
         return this.audit.record({
-            clinicId: user.clinicId,
-            actor: { kind: 'staff', userId: user._id, name: [user.firstName, user.lastName].filter(Boolean).join(' '), role: user.role },
+            clinicId: user.clinicId ?? undefined,
+            actor: { kind: user.clinicId ? 'staff' : 'platform', userId: user._id, name: [user.firstName, user.lastName].filter(Boolean).join(' '), role: user.role },
             event,
             details: { email: user.email, ...details },
             ip: meta.ip,
@@ -343,6 +370,31 @@ export class AuthService implements OnModuleInit {
         );
         await this.sessions.revokeAllForUser(user._id, sessionId);
         return { message: 'Password changed' };
+    }
+
+    /**
+     * F13: in a support view the platform admin is shown as a read-only
+     * clinic admin of the clinic they are looking at.
+     */
+    async getSupportMe(userId: string, clinicId: string) {
+        const [user, clinic] = await Promise.all([
+            this.userModel.findById(userId).select('email firstName lastName').lean(),
+            this.clinicModel.findById(clinicId).select('name phone address city country supportAccessUntil').lean(),
+        ]);
+        if (!user || !clinic) throw new UnauthorizedException(errorBody('supportEnded', 'The support view has ended'));
+        const { supportAccessUntil, ...clinicInfo } = clinic;
+        return {
+            _id: user._id,
+            email: user.email,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            role: Role.CLINIC_ADMIN,
+            clinicId: clinicInfo,
+            isActive: true,
+            twoFactorEnabled: false,
+            twoFactorRequired: false,
+            support: { clinicName: clinic.name, until: supportAccessUntil },
+        };
     }
 
     async getMe(userId: string) {

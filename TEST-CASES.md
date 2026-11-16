@@ -827,13 +827,36 @@ Admin, dentist, assistant, receptionist; an 8-year-old and an adult patient.
 | PM-17 | Audit, tenancy | Patient history; another clinic | "Recorded periodontal findings on a tooth · Tooth 16 · Depth: … → …"; eruptions logged; another clinic sees nothing | PASS (browser + e2e) |
 | PM-18 | Languages, phone | hy / ru / en; 375 px | All texts translated; the grid scrolls in its own box with the row names fixed | PASS (browser, audit) |
 
+## 35. F13 — platform admin console
+
+A platform admin (created with `npm run platform:admin`), two clinics (one new sign-up on a trial), their admins and a dentist.
+
+| ID | What to test | Steps | Expected | Status |
+|---|---|---|---|---|
+| PA-01 | First admin | `npm run platform:admin -- email First Last`; open the link | Password chosen from the link; signs in to /platform | PASS (browser) |
+| PA-02 | Separation | Platform admin opens /patients; clinic admin opens /platform | Each is sent back to their own pages; API 403 | PASS (browser + e2e) |
+| PA-03 | Clinics list | Clinics | Both clinics with state, plan, last day, staff, patients, 30-day figures, last sign-in; filters with counts; search | PASS (browser + e2e) |
+| PA-04 | Trial | Register a new clinic | Trial, last day in 30 days | PASS (browser + e2e) |
+| PA-05 | Ending | Last day in 3 days | "Ending soon"; clinic admins see the warning with days left | PASS (e2e: state); the banner not walked |
+| PA-06 | Ended | Last day yesterday | Clinic sees "ended — read-only"; a save is refused with a clear message; exports, own account and support access still work | PASS (browser + e2e) |
+| PA-07 | Extend | +30 days / no end | Writable again | PASS (e2e) |
+| PA-08 | Suspend | Suspend with a reason; reactivate | Staff signed out, sign-in refused ("suspended"); back after reactivation; both in the clinic's log. Reminders skip suspended clinics (not tested) | PASS (browser + e2e) |
+| PA-09 | Support allowed | Clinic admin: Settings → Subscription and support → allow for 4 hours | Banner with "Turn off"; console shows "allows until …" | PASS (browser + e2e) |
+| PA-10 | Support view | Console → Open read-only view | The clinic as its admin sees it, banner, no bell; a save refused ("read-only support view"); Exit returns to the console | PASS (browser + e2e) |
+| PA-11 | Support logged | Clinic's audit log | "Looked at · DentFlow support: name · screen", once per screen; leaving logged as support | PASS (browser + e2e) |
+| PA-12 | Support withdrawn | Clinic turns access off during a view | The view ends at once; console says so | PASS (e2e) |
+| PA-13 | Sign-in help | Send reset link; turn off two-factor | Email with a link; two-factor off and signed out; not for non-admin staff | PASS (e2e) |
+| PA-14 | Platform log | Platform log: all / platform admins / sign-ins; one clinic | Actions with the clinic's name; sign-ins everywhere including failed ones | PASS (browser + e2e) |
+| PA-15 | Platform admins | Add one; they set a password from the email; remove them; remove yourself | Invite works; removed one signed out; yourself refused | PASS (browser + e2e) |
+| PA-16 | Languages, phone | hy / ru / en; 375 px | All texts translated; tables scroll in their own box | PASS (browser, audit) |
+
 ---
 
 ## Known gaps (not bugs — not yet built)
 
 | Area | Note |
 |---|---|
-| Platform admin | `Role.SUPER_ADMIN` is declared but unused — no way to list clinics or support a customer |
+| Platform admin | Built in F13 (§35). Plans are labels only: DentFlow does not bill clinics; all platform admins have the same rights |
 | Audit log | Every change through the app is logged since F7, with old → new values for key records. Changes before F7, or made directly in the database, are not |
 | Photos | Profile photos are still base64 on the patient document (192px, ~8KB). The F6 file store could take them if they get bigger |
 | Legacy phones | Formats that don't parse are logged, not fixed — need manual cleanup |

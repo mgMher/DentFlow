@@ -4,6 +4,7 @@ import { getConnectionToken } from '@nestjs/mongoose';
 import { ThrottlerGuard } from '@nestjs/throttler';
 import { Connection } from 'mongoose';
 import { rm } from 'fs/promises';
+import * as bcrypt from 'bcryptjs';
 import { AppModule } from 'src/app.module';
 import { configureApp } from 'src/app.setup';
 
@@ -121,6 +122,22 @@ export async function startApp({ throttle = false } = {}) {
         return r.data;
     }
 
+    /** F13: a platform admin (no clinic), as the `platform:admin` command would create, signed in. */
+    async function addPlatformAdmin(firstName = 'Platform') {
+        const connection = moduleRef.get<Connection>(getConnectionToken());
+        const email = `platform-${unique()}@e2e.test`;
+        const created = await connection.model('User').create({
+            email,
+            password: await bcrypt.hash('platformpass1', 4),
+            role: 'super_admin',
+            firstName,
+            lastName: 'Admin',
+        });
+        const session = await login(email, 'platformpass1');
+        if (session.status !== 201 && session.status !== 200) throw new Error(`platform login failed: ${JSON.stringify(session.body)}`);
+        return { authId: String(created._id), token: session.data.accessToken as string, email };
+    }
+
     async function close() {
         const connection = moduleRef.get<Connection>(getConnectionToken());
         // Index builds run in the background; one finishing after the drop recreates the database.
@@ -130,7 +147,9 @@ export async function startApp({ throttle = false } = {}) {
         if (process.env.UPLOAD_DIR?.includes('dentflow-e2e-')) await rm(process.env.UPLOAD_DIR, { recursive: true, force: true });
     }
 
-    return { app, url, api, call, registerClinic, login, addStaff, addPatient, close };
+    const db = () => moduleRef.get<Connection>(getConnectionToken());
+
+    return { app, url, api, call, db, registerClinic, login, addStaff, addPatient, addPlatformAdmin, close };
 }
 
 export type TestApp = Awaited<ReturnType<typeof startApp>>;

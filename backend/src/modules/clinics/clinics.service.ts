@@ -1,7 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { errorBody } from 'src/common/utils';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import { InjectConnection, InjectModel } from '@nestjs/mongoose';
+import { Connection, Model, Types } from 'mongoose';
+import { ClinicStatusService } from 'src/common/clinic-refs/clinic-status.service';
 import { Clinic, ClinicDocument } from './clinic.schema';
 import { UpdateClinicDto, UpdateWorkingHoursDto, UpdateSettingsDto, UpdateWorkingHourDto } from './dto';
 
@@ -29,7 +30,30 @@ const assertValidWorkingHours = (hours: UpdateWorkingHourDto[]) => {
 export class ClinicsService {
     constructor(
         @InjectModel(Clinic.name) private readonly clinicModel: Model<ClinicDocument>,
+        private readonly clinicStatus: ClinicStatusService,
+        @InjectConnection() private readonly connection: Connection,
     ) {}
+
+    /** F13: support may look in (read-only) until now + `hours`. */
+    async grantSupportAccess(clinicId: string, userId: string, hours: number) {
+        const until = new Date(Date.now() + hours * 3_600_000);
+        await this.clinicModel.updateOne(
+            { _id: clinicId },
+            { $set: { supportAccessUntil: until, supportAccessGrantedBy: new Types.ObjectId(userId) } },
+        );
+        this.clinicStatus.invalidate(clinicId);
+        return { supportAccessUntil: until };
+    }
+
+    /** F13: no more support access; support views open right now end too. */
+    async revokeSupportAccess(clinicId: string) {
+        await this.clinicModel.updateOne({ _id: clinicId }, { $unset: { supportAccessUntil: 1, supportAccessGrantedBy: 1 } });
+        await this.connection
+            .collection('auth_sessions')
+            .updateMany({ supportClinicId: new Types.ObjectId(clinicId), revokedAt: null }, { $set: { revokedAt: new Date() } });
+        this.clinicStatus.invalidate(clinicId);
+        return { supportAccessUntil: null };
+    }
 
     /**
      * Retrieve a clinic by its ID.

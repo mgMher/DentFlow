@@ -18,6 +18,9 @@ import {
     Notifications as NotificationsIcon,
     ManageSearch as AuditIcon,
     ChevronLeft as CollapseIcon,
+    Business as ClinicsIcon,
+    AdminPanelSettings as AdminsIcon,
+    Security as SecurityIcon,
     ChevronRight as ExpandIcon,
 } from '@mui/icons-material';
 import { DRAWER_WIDTH, DRAWER_WIDTH_COLLAPSED } from '../../utils/constants';
@@ -30,6 +33,8 @@ interface NavItem {
     icon: React.ReactNode;
     /** Hidden for roles that would only get a 403 there. Must match the route guard in AppRouter. */
     permission?: Permission;
+    /** Active only on this path and these prefixes (not every page under it). */
+    activeOn?: string[];
 }
 
 const navItems: NavItem[] = [
@@ -46,6 +51,14 @@ const navItems: NavItem[] = [
     { path: '/audit', labelKey: 'nav.audit', icon: <AuditIcon />, permission: 'viewAuditLog' },
 ];
 
+/** F13: the platform console. */
+const platformItems: NavItem[] = [
+    { path: '/platform', labelKey: 'nav.clinics', icon: <ClinicsIcon />, activeOn: ['/platform/clinics/'] },
+    { path: '/platform/audit', labelKey: 'nav.platformLog', icon: <AuditIcon /> },
+    { path: '/platform/admins', labelKey: 'nav.platformAdmins', icon: <AdminsIcon /> },
+    { path: '/account', labelKey: 'security.title', icon: <SecurityIcon /> },
+];
+
 interface SidebarProps {
     collapsed: boolean;
     onToggle: () => void;
@@ -53,15 +66,17 @@ interface SidebarProps {
     mobile?: boolean;
     mobileOpen?: boolean;
     onMobileClose?: () => void;
+    /** F13: the platform console's items instead of the clinic's. */
+    platform?: boolean;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobile = false, mobileOpen = false, onMobileClose }) => {
+const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobile = false, mobileOpen = false, onMobileClose, platform = false }) => {
     const { t } = useTranslation();
     const navigate = useNavigate();
     const location = useLocation();
     const theme = useTheme();
     const can = usePermission();
-    const visibleItems = navItems.filter((item) => !item.permission || can(item.permission));
+    const visibleItems = platform ? platformItems : navItems.filter((item) => !item.permission || can(item.permission));
     const width = collapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH;
 
     return (
@@ -98,6 +113,11 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobile = false, 
                         <Typography variant="h6" sx={{ fontWeight: 800, color: theme.palette.primary.main }}>
                             DentFlow
                         </Typography>
+                        {platform && (
+                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                {t('platform.badge')}
+                            </Typography>
+                        )}
                     </Box>
                 )}
                 <IconButton onClick={mobile ? onMobileClose : onToggle} size="small">
@@ -109,7 +129,9 @@ const Sidebar: React.FC<SidebarProps> = ({ collapsed, onToggle, mobile = false, 
 
             <List sx={{ px: 1, py: 1 }}>
                 {visibleItems.map((item) => {
-                    const isActive = location.pathname === item.path || location.pathname.startsWith(item.path + '/');
+                    const isActive = item.activeOn
+                        ? location.pathname === item.path || item.activeOn.some((p) => location.pathname.startsWith(p))
+                        : location.pathname === item.path || location.pathname.startsWith(item.path + '/');
 
                     const button = (
                         <ListItem key={item.path} disablePadding sx={{ mb: 0.5 }}>

@@ -236,7 +236,12 @@ export class RemindersService implements OnModuleInit, OnModuleDestroy {
         this.running = true;
         try {
             const all = await this.settingsModel.find({ enabled: true });
+            // F13: a suspended clinic sends nothing (a read-only one still reminds its patients).
+            const suspended = new Set(
+                (await this.clinicModel.find({ isActive: false }).select('_id').lean()).map((c) => c._id.toString()),
+            );
             for (const settings of all) {
+                if (suspended.has(settings.clinicId.toString())) continue;
                 try {
                     const result = await this.tickClinic(settings, now);
                     totals.sent += result.sent;

@@ -22,7 +22,49 @@ const NO_REFRESH_PATHS = ['/auth/login', '/auth/register', '/auth/refresh'];
 export const clearSession = () => {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(REFRESH_TOKEN_KEY);
+    endSupportSession();
 };
+
+/**
+ * F13: a platform admin's read-only view of a clinic. Kept for this tab only
+ * (sessionStorage) and used instead of their own token; it is never refreshed —
+ * when it ends they go back to the console.
+ */
+const SUPPORT_KEY = 'support-session';
+
+export interface SupportSession {
+    accessToken: string;
+    expiresAt: string;
+    clinic: { _id: string; name: string };
+}
+
+export const readSupportSession = (): SupportSession | null => {
+    try {
+        const raw = sessionStorage.getItem(SUPPORT_KEY);
+        return raw ? (JSON.parse(raw) as SupportSession) : null;
+    } catch {
+        return null;
+    }
+};
+
+export const startSupportSession = (session: SupportSession) => {
+    try {
+        sessionStorage.setItem(SUPPORT_KEY, JSON.stringify(session));
+    } catch {
+        // Private mode without storage: the view simply can't open.
+    }
+};
+
+export const endSupportSession = () => {
+    try {
+        sessionStorage.removeItem(SUPPORT_KEY);
+    } catch {
+        // Nothing stored.
+    }
+};
+
+/** The token requests are sent with: the support view's, else the user's own. */
+export const activeToken = () => readSupportSession()?.accessToken ?? localStorage.getItem(ACCESS_TOKEN_KEY);
 
 const redirectToLogin = () => {
     clearSession();
@@ -63,7 +105,7 @@ const refreshAccessToken = (): Promise<string> => {
 };
 
 api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const token = activeToken();
     if (token && config.headers) {
         config.headers['Authorization'] = `Bearer ${token}`;
     }
@@ -75,6 +117,13 @@ api.interceptors.response.use(
     async (error: AxiosError) => {
         const originalRequest = error.config as (InternalAxiosRequestConfig & { _retry?: boolean }) | undefined;
         const isAuthCall = NO_REFRESH_PATHS.some((path) => originalRequest?.url?.includes(path));
+
+        // A support view that ended (time up, or the clinic withdrew access): back to the console.
+        if (error.response?.status === 401 && readSupportSession()) {
+            endSupportSession();
+            window.location.replace('/platform?supportEnded=1');
+            return Promise.reject(error.response);
+        }
 
         if (error.response?.status === 401 && originalRequest && !originalRequest._retry && !isAuthCall) {
             originalRequest._retry = true;

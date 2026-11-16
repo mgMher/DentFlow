@@ -1,6 +1,6 @@
 import { call, put, takeLatest } from 'redux-saga/effects';
 import { AxiosResponse } from 'axios';
-import api, { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, clearSession } from '../../api/axios';
+import api, { ACCESS_TOKEN_KEY, REFRESH_TOKEN_KEY, clearSession, endSupportSession, readSupportSession } from '../../api/axios';
 import { apiErrorMessage } from '../../utils/apiError';
 import { clinicActions } from '../clinic';
 import { httpActions } from '../http';
@@ -97,7 +97,8 @@ function* loginSaga(action: ReturnType<typeof authActions.login>) {
         }
         saveSession(data);
         yield put({ type: LOGIN_SUCCESS, payload: data.user });
-        yield put(clinicActions.getClinic());
+        // A platform admin (F13) has no clinic.
+        if (data.user?.clinicId) yield put(clinicActions.getClinic());
         yield put(httpActions.appendSuccess(action.type));
     } catch (err: any) {
         yield put(httpActions.removeLoading(action.type));
@@ -109,7 +110,7 @@ function* completeLoginSaga(action: ReturnType<typeof authActions.completeLogin>
     saveSession(action.payload);
     saveTrusted(action.payload.email, action.payload.trustedDevice);
     yield put({ type: LOGIN_SUCCESS, payload: action.payload.user });
-    yield put(clinicActions.getClinic());
+    if (action.payload.user?.clinicId) yield put(clinicActions.getClinic());
 }
 
 function* registerSaga(action: ReturnType<typeof authActions.register>) {
@@ -136,10 +137,17 @@ function* registerSaga(action: ReturnType<typeof authActions.register>) {
  * A full reload then wipes every slice of in-memory patient data.
  */
 function* logoutSaga() {
+    // F13: leaving a support view ends only that view; the platform admin stays signed in.
+    const support = !!readSupportSession();
     try {
         yield call(service.logout);
     } catch {
         // Already expired or offline — the local session is dropped either way.
+    }
+    if (support) {
+        endSupportSession();
+        window.location.replace('/platform');
+        return;
     }
     clearSession();
     window.location.replace('/login');

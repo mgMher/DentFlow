@@ -17,7 +17,8 @@ export interface SessionMeta {
 export interface TokenSubject {
     // Optional only because Mongoose types `_id` that way; it is always set on a saved user.
     _id?: Id;
-    clinicId: Id;
+    /** Empty for a platform admin (F13). */
+    clinicId?: Id | null;
     email: string;
     role: string;
 }
@@ -83,7 +84,7 @@ export class SessionsService {
         await this.sessionModel.create({
             _id: sessionId,
             userId: user._id,
-            clinicId: user.clinicId,
+            clinicId: user.clinicId ?? undefined,
             tokenHash: hashToken(tokens.refreshToken),
             userAgent: meta.userAgent?.slice(0, 300),
             ip: meta.ip,
@@ -93,6 +94,42 @@ export class SessionsService {
         await this.pruneOldSessions(user._id!);
 
         return tokens;
+    }
+
+    /**
+     * F13: a platform admin's read-only view of a clinic that allowed it. One
+     * access token, no refresh: when it runs out (at most an hour, never past
+     * the clinic's permission) the admin opens a new one from the console.
+     */
+    async startSupport(admin: TokenSubject, clinicId: Id, until: Date, meta: SessionMeta): Promise<{ accessToken: string; expiresAt: Date }> {
+        const sessionId = new Types.ObjectId();
+        const expiresAt = new Date(Math.min(until.getTime(), Date.now() + 60 * 60_000));
+        const seconds = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+        const accessToken = jwt.sign(
+            { userId: String(admin._id), clinicId: clinicId.toString(), email: admin.email, role: admin.role, sid: sessionId.toString(), support: true },
+            jwtConfig.accessSecret,
+            { expiresIn: seconds },
+        );
+        await this.sessionModel.create({
+            _id: sessionId,
+            userId: admin._id,
+            supportClinicId: clinicId,
+            // Never used to refresh: a random value nobody holds.
+            tokenHash: hashToken(randomUUID()),
+            userAgent: meta.userAgent?.slice(0, 300),
+            ip: meta.ip,
+            lastUsedAt: new Date(),
+            expiresAt,
+        });
+        return { accessToken, expiresAt };
+    }
+
+    /** F13: a clinic withdrew its permission; its open support views end now. */
+    async endSupport(clinicId: Id): Promise<void> {
+        await this.sessionModel.updateMany(
+            { supportClinicId: new Types.ObjectId(clinicId.toString()), revokedAt: null },
+            { $set: { revokedAt: new Date() } },
+        );
     }
 
     /**
@@ -193,7 +230,7 @@ export class SessionsService {
     /** The user's signed-in devices, most recently used first (F9). */
     async list(userId: Id, currentSessionId?: Id) {
         const sessions = await this.sessionModel
-            .find({ userId: new Types.ObjectId(userId.toString()), revokedAt: null, expiresAt: { $gt: new Date() } })
+            .find({ userId: new Types.ObjectId(userId.toString()), revokedAt: null, expiresAt: { $gt: new Date() }, supportClinicId: null })
             .sort({ lastUsedAt: -1 })
             .select('userAgent ip lastUsedAt createdAt')
             .lean<{ _id: Types.ObjectId; userAgent?: string; ip?: string; lastUsedAt: Date; createdAt: Date }[]>();
@@ -224,7 +261,7 @@ export class SessionsService {
     private signAccess(user: TokenSubject, sessionId: Id): string {
         const payload = {
             userId: String(user._id),
-            clinicId: user.clinicId.toString(),
+            clinicId: user.clinicId?.toString() ?? null,
             email: user.email,
             role: user.role,
             sid: sessionId.toString(),
@@ -239,7 +276,7 @@ export class SessionsService {
         // in the same second were byte-identical, so rotation changed nothing and
         // a stolen token could not be told apart from the current one.
         const refreshToken = jwt.sign(
-            { userId: String(user._id), clinicId: user.clinicId.toString(), sid: sessionId.toString() },
+            { userId: String(user._id), clinicId: user.clinicId?.toString() ?? null, sid: sessionId.toString() },
             jwtConfig.refreshSecret,
             {
                 expiresIn: jwtConfig.refreshExpiration as jwt.SignOptions['expiresIn'],

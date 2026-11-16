@@ -1,7 +1,7 @@
 import { Controller, Delete, Get, Param, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Types } from 'mongoose';
-import { CurrentUser } from 'src/common/decorators';
+import { AllowWhenReadOnly, CurrentUser } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { NotificationsService } from './notifications.service';
 import { QueryNotificationDto } from './dto';
@@ -12,6 +12,7 @@ type AuthUser = { userId: string; clinicId: string };
 @ApiTags('Notifications')
 @ApiBearerAuth()
 @Controller('notifications')
+@AllowWhenReadOnly()
 export class NotificationsController {
     constructor(private readonly notificationsService: NotificationsService) {}
 

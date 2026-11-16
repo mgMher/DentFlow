@@ -15,9 +15,20 @@ interface AuditEntryListProps {
     params?: Record<string, string | undefined>;
     /** Link each entry to its patient (the clinic-wide log). */
     showPatient?: boolean;
+    /** F13, the platform log: link each entry to its clinic. */
+    showClinic?: boolean;
 }
 
-const Entry: React.FC<{ entry: AuditEntry; showPatient?: boolean }> = ({ entry, showPatient }) => {
+/** Who did it, in words: staff by name, a patient, DentFlow (platform / support). */
+const actorText = (t: (key: string, o?: any) => string, actor: AuditEntry['actor']) => {
+    const name = actor.name || t('audit.someone');
+    if (actor.kind === 'patient') return t('audit.byPatient', { name: actor.name ?? '' });
+    if (actor.kind === 'support') return t('audit.bySupport', { name });
+    if (actor.kind === 'platform') return t('audit.byPlatform', { name });
+    return name;
+};
+
+const Entry: React.FC<{ entry: AuditEntry; showPatient?: boolean; showClinic?: boolean }> = ({ entry, showPatient, showClinic }) => {
     const { t, i18n } = useTranslation();
     const details = detailItems(t, entry);
     const failed = isFailure(entry);
@@ -33,6 +44,11 @@ const Entry: React.FC<{ entry: AuditEntry; showPatient?: boolean }> = ({ entry, 
                     <Typography variant="body2" fontWeight={600} color={failed ? 'error.main' : 'text.primary'}>
                         {eventLabel(t, entry.event)}
                     </Typography>
+                    {showClinic && entry.clinic && (
+                        <Link component={RouterLink} to={`/platform/clinics/${entry.clinic._id}`} variant="body2" sx={{ overflowWrap: 'anywhere' }}>
+                            {entry.clinic.name ?? '—'}
+                        </Link>
+                    )}
                     {showPatient && patient && (
                         <Link component={RouterLink} to={`/patients/${patient._id}`} variant="body2" sx={{ overflowWrap: 'anywhere' }}>
                             {getFullName(patient.firstName, patient.lastName, patient.patronymic)}
@@ -40,10 +56,8 @@ const Entry: React.FC<{ entry: AuditEntry; showPatient?: boolean }> = ({ entry, 
                     )}
                 </Box>
                 <Typography variant="caption" color="text.secondary" component="div">
-                    {entry.actor.kind === 'patient'
-                        ? t('audit.byPatient', { name: entry.actor.name ?? '' })
-                        : entry.actor.name || t('audit.someone')}
-                    {entry.actor.role && ` · ${roleLabel(t, entry.actor.role)}`}
+                    {actorText(t, entry.actor)}
+                    {entry.actor.role && !['platform', 'support'].includes(entry.actor.kind) && ` · ${roleLabel(t, entry.actor.role)}`}
                     {entry.ip && (
                         <Box component="span" title={entry.userAgent}>
                             {` · ${entry.ip}`}
@@ -81,7 +95,7 @@ const Entry: React.FC<{ entry: AuditEntry; showPatient?: boolean }> = ({ entry, 
 };
 
 /** Audit entries newest first, grouped by day, with "Load more". */
-const AuditEntryList: React.FC<AuditEntryListProps> = ({ url, params, showPatient }) => {
+const AuditEntryList: React.FC<AuditEntryListProps> = ({ url, params, showPatient, showClinic }) => {
     const { t, i18n } = useTranslation();
     const [items, setItems] = useState<AuditEntry[] | null>(null);
     const [next, setNext] = useState<string | null>(null);
@@ -146,7 +160,7 @@ const AuditEntryList: React.FC<AuditEntryListProps> = ({ url, params, showPatien
                             </Box>
                         )}
                         <Box sx={{ borderTop: i && day(entry) === day(items[i - 1]) ? '1px solid' : 0, borderColor: 'divider' }}>
-                            <Entry entry={entry} showPatient={showPatient} />
+                            <Entry entry={entry} showPatient={showPatient} showClinic={showClinic} />
                         </Box>
                     </React.Fragment>
                 ))}

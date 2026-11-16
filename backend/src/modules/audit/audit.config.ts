@@ -28,6 +28,8 @@ export const AUDIT_AREAS: Record<string, string | null> = {
     AuditController: null,
     ReportsController: null,
     CommissionController: 'commission',
+    // F13: the platform console; support views are logged as `support.view`.
+    PlatformController: 'platform',
     // Writes a file from what the page already shows; reads nothing.
     ExportsController: null,
     // Personal inbox; and patients' Telegram answers are logged by the service.
@@ -59,6 +61,10 @@ const oid = (id: unknown) => (typeof id === 'string' && Types.ObjectId.isValid(i
 const byId = (param = 'id') => (r: AuditRequest) => (oid(r.params[param]) ? { _id: oid(r.params[param]), clinicId: r.clinicId } : null);
 const byPatient = (r: AuditRequest) => (oid(r.params.patientId) ? { patientId: oid(r.params.patientId), clinicId: r.clinicId } : null);
 const clinic = (r: AuditRequest) => ({ _id: r.clinicId });
+const platformClinic = (r: AuditRequest) => (oid(r.params.clinicId) ? { _id: oid(r.params.clinicId) } : null);
+/** Subscription as plan / status / end day. */
+const subscription = (doc: Record<string, any> | null) =>
+    doc ? { plan: doc.subscription?.plan ?? null, status: doc.subscription?.status ?? null, expiresAt: doc.subscription?.expiresAt ?? null } : null;
 const only = (...fields: string[]) => () => fields;
 const allKeys = (_r: AuditRequest, b: Record<string, unknown> | null, a: Record<string, unknown> | null) =>
     Array.from(new Set([...Object.keys(b ?? {}), ...Object.keys(a ?? {})]));
@@ -166,6 +172,13 @@ export const DIFF_RULES: Record<string, DiffRule> = {
 
     'chart.eruptTooth': { model: 'DentalRecord', filter: byPatient, pick: (doc, r) => onChart([Number(r.body.toothNumber)])(doc), fields: allKeys },
     'chart.uneruptTooth': { model: 'DentalRecord', filter: byPatient, pick: (doc, r) => onChart([Number(r.body.toothNumber)])(doc), fields: allKeys },
+
+    // F13: the clinic's own changes to support access, and the platform's changes to a clinic.
+    'clinic.grantSupportAccess': { model: 'Clinic', filter: clinic, fields: only('supportAccessUntil') },
+    'clinic.revokeSupportAccess': { model: 'Clinic', filter: clinic, fields: only('supportAccessUntil') },
+    'platform.updateSubscription': { model: 'Clinic', filter: platformClinic, pick: subscription, fields: allKeys },
+    'platform.suspend': { model: 'Clinic', filter: platformClinic, fields: only('isActive', 'suspendReason') },
+    'platform.reactivate': { model: 'Clinic', filter: platformClinic, fields: only('isActive') },
 
     'perio.update': { model: 'PerioExam', filter: byId(), extra: [] },
     'perio.saveTooth': { model: 'PerioExam', filter: byId(), pick: perioTooth, fields: allKeys },

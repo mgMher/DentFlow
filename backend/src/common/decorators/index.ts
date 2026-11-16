@@ -10,3 +10,13 @@ export {
     TIME_OF_DAY,
     Trim,
 } from './validation.decorators';
+export {
+    AllowInSupport,
+    AllowWhenReadOnly,
+    NoClinic,
+    Platform,
+    NO_CLINIC_KEY,
+    PLATFORM_KEY,
+    READ_ONLY_ALLOWED_KEY,
+    SUPPORT_ALLOWED_KEY,
+} from './access.decorators';

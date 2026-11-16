@@ -2,7 +2,7 @@ import { Body, Controller, Delete, Get, HttpCode, HttpStatus, NotFoundException,
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { Request } from 'express';
-import { Public, CurrentUser } from 'src/common/decorators';
+import { AllowInSupport, AllowWhenReadOnly, CurrentUser, NoClinic, Public } from 'src/common/decorators';
 import { ParseObjectIdPipe } from 'src/common/pipes';
 import { errorBody } from 'src/common/utils';
 import { Types } from 'mongoose';
@@ -35,6 +35,9 @@ const metaOf = (req: Request): SessionMeta => ({
  */
 @ApiTags('Auth')
 @Controller('auth')
+// Your own account: also for platform admins (no clinic, F13) and when the clinic is read-only.
+@NoClinic()
+@AllowWhenReadOnly()
 export class AuthController {
     constructor(
         private readonly authService: AuthService,
@@ -79,6 +82,7 @@ export class AuthController {
     }
 
     @Post('logout')
+    @AllowInSupport()
     @HttpCode(HttpStatus.OK)
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Sign out this device' })
@@ -230,7 +234,7 @@ export class AuthController {
     @Get('me')
     @ApiBearerAuth()
     @ApiOperation({ summary: 'Get current authenticated user profile' })
-    async getMe(@CurrentUser('userId') userId: string) {
-        return this.authService.getMe(userId);
+    async getMe(@CurrentUser() user: { userId: string; clinicId?: string; support?: boolean }) {
+        return user.support ? this.authService.getSupportMe(user.userId, user.clinicId!) : this.authService.getMe(user.userId);
     }
 }

@@ -1,51 +1,64 @@
 import { CanActivate, ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { Clinic, ClinicDocument } from 'src/modules/clinics/clinic.schema';
+import { ClinicStatusService, isReadOnly } from '../clinic-refs/clinic-status.service';
 import { errorBody } from '../utils';
-import { IS_PUBLIC_KEY } from '../decorators';
+import {
+    IS_PUBLIC_KEY,
+    NO_CLINIC_KEY,
+    PLATFORM_KEY,
+    READ_ONLY_ALLOWED_KEY,
+    Role,
+    SUPPORT_ALLOWED_KEY,
+} from '../decorators';
 
-/** A suspended clinic is locked out within this long; short enough for support, long enough to skip a query per request. */
-const CACHE_TTL_MS = 60_000;
+const READS = ['GET', 'HEAD', 'OPTIONS'];
 
+/**
+ * Which clinic a request acts in, and whether it may:
+ * - platform console routes are for platform admins only (F13);
+ * - everything else needs a clinic, which must not be suspended;
+ * - past its end date a clinic is read-only (F13);
+ * - a support view (a platform admin looking in) is read-only (F13).
+ */
 @Injectable()
 export class ClinicGuard implements CanActivate {
-    private readonly activeCache = new Map<string, { active: boolean; until: number }>();
-
     constructor(
         private reflector: Reflector,
-        @InjectModel(Clinic.name) private readonly clinicModel: Model<ClinicDocument>,
+        private readonly clinics: ClinicStatusService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
-        const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-            context.getHandler(),
-            context.getClass(),
-        ]);
+        const targets = [context.getHandler(), context.getClass()];
+        const flag = (key: string) => !!this.reflector.getAllAndOverride<boolean>(key, targets);
+        if (flag(IS_PUBLIC_KEY)) return true;
 
-        if (isPublic) return true;
+        const request = context.switchToHttp().getRequest();
+        const user = request.user ?? {};
+        const isPlatformAdmin = user.role === Role.SUPER_ADMIN && !user.clinicId && !user.support;
 
-        const clinicId: string | undefined = context.switchToHttp().getRequest().user?.clinicId;
+        if (flag(PLATFORM_KEY)) {
+            if (isPlatformAdmin) return true;
+            throw new ForbiddenException(errorBody('platformOnly', 'Only platform admins can do this'));
+        }
 
+        const clinicId: string | undefined = user.clinicId;
         if (!clinicId) {
+            if (flag(NO_CLINIC_KEY)) return true;
             throw new ForbiddenException(errorBody('forbidden', 'Clinic context is required'));
         }
 
-        if (!(await this.isActive(clinicId))) {
+        const status = await this.clinics.get(clinicId);
+        if (!status.active) {
             throw new ForbiddenException(errorBody('clinicInactive', 'This clinic account is suspended'));
         }
 
+        if (READS.includes(request.method)) return true;
+        if (user.support && !flag(SUPPORT_ALLOWED_KEY)) {
+            throw new ForbiddenException(errorBody('supportReadOnly', 'The support view is read-only'));
+        }
+        if (isReadOnly(status) && !flag(READ_ONLY_ALLOWED_KEY)) {
+            throw new ForbiddenException(errorBody('subscriptionEnded', 'The subscription has ended; the clinic is read-only until it is renewed'));
+        }
         return true;
-    }
-
-    private async isActive(clinicId: string): Promise<boolean> {
-        const cached = this.activeCache.get(clinicId);
-        if (cached && cached.until > Date.now()) return cached.active;
-
-        const clinic = await this.clinicModel.findById(clinicId).select('isActive').lean();
-        const active = !!clinic && clinic.isActive !== false;
-        this.activeCache.set(clinicId, { active, until: Date.now() + CACHE_TTL_MS });
-        return active;
     }
 }

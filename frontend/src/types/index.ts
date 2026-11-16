@@ -31,8 +31,11 @@ export interface UserProfile {
     lastName: string;
     patronymic?: string;
     role: UserRole;
-    clinicId: string;
+    /** Empty for a platform admin (F13). From /auth/me it is the clinic itself. */
+    clinicId: string | null;
     avatar?: string;
+    /** F13: set when a platform admin is looking into a clinic (read-only). */
+    support?: { clinicName: string; until: string };
 }
 
 export type UserRole = 'super_admin' | 'clinic_admin' | 'dentist' | 'receptionist' | 'assistant';
@@ -131,9 +134,14 @@ export interface Clinic {
     timezone: string;
     language: 'hy' | 'ru' | 'en';
     currency: Currency;
-    subscription: { plan: string; status: string; expiresAt: string };
+    subscription?: { plan?: string; status?: SubscriptionStatus; expiresAt?: string };
     isActive: boolean;
+    /** F13: until when DentFlow support may look in (read-only). */
+    supportAccessUntil?: string | null;
+    suspendReason?: string;
 }
+
+export type SubscriptionStatus = 'active' | 'trial' | 'expired' | 'cancelled';
 
 export interface Address {
     street?: string;
@@ -722,7 +730,9 @@ export interface AuditEntry {
     method?: string;
     targetId?: string;
     patientId?: { _id: string; firstName: string; lastName: string; patronymic?: string } | null;
-    actor: { kind: 'staff' | 'patient' | 'system'; userId?: string; name?: string; role?: UserRole };
+    actor: { kind: 'staff' | 'patient' | 'system' | 'platform' | 'support'; userId?: string; name?: string; role?: UserRole };
+    /** Platform log only (F13): the clinic it is about. */
+    clinic?: { _id: string; name: string | null } | null;
     changes?: AuditChange[];
     details?: Record<string, string | number | boolean>;
     ip?: string;
@@ -1072,4 +1082,64 @@ export interface PerioExam extends PerioExamListItem {
     teeth: PerioTooth[];
     updatedAt: string;
     previous: { _id: string; date: string; teeth: PerioTooth[]; summary: PerioSummary } | null;
+}
+
+// ── Platform console (F13) ────────────────────────────────────────────────────
+
+export type ClinicState = 'active' | 'trial' | 'ending' | 'ended' | 'suspended';
+
+export interface ClinicUsage {
+    staff: number;
+    patients: number;
+    appointments30: number;
+    invoices30: number;
+    documents: number;
+    documentBytes: number;
+    lastSignIn: string | null;
+}
+
+export interface PlatformClinic {
+    _id: string;
+    name: string;
+    email?: string;
+    phone?: string;
+    isActive: boolean;
+    createdAt: string;
+    subscription?: { plan?: string; status?: SubscriptionStatus; expiresAt?: string };
+    suspendReason?: string;
+    suspendedAt?: string;
+    supportAccessUntil?: string | null;
+    state: ClinicState;
+    usage: ClinicUsage;
+}
+
+export interface PlatformClinicAdmin {
+    _id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    isActive: boolean;
+    lastLogin?: string;
+    twoFactorEnabled: boolean;
+    locked: boolean;
+}
+
+export interface PlatformClinicDetail extends PlatformClinic {
+    address?: Address;
+    timezone?: string;
+    language?: string;
+    currency?: Currency;
+    staffByRole: Partial<Record<StaffRole, number>>;
+    admins: PlatformClinicAdmin[];
+}
+
+export interface PlatformAdmin {
+    _id: string;
+    email: string;
+    firstName?: string;
+    lastName?: string;
+    isActive: boolean;
+    lastLogin?: string;
+    twoFactorEnabled: boolean;
+    createdAt: string;
 }

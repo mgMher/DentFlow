@@ -12,8 +12,13 @@ export class Session {
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User', required: true, index: true })
     userId: Types.ObjectId;
 
-    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Clinic', required: true })
-    clinicId: Types.ObjectId;
+    /** Empty for a platform admin's own sessions (F13). */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Clinic' })
+    clinicId?: Types.ObjectId;
+
+    /** F13: a platform admin's read-only look into this clinic, which its admin allowed. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Clinic' })
+    supportClinicId?: Types.ObjectId;
 
     @Prop({ required: true })
     tokenHash: string;

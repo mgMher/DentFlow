@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { ClinicRefsService } from 'src/common/clinic-refs';
-import { errorBody, toClinicDateString } from 'src/common/utils';
+import { errorBody, isCalendarDate, toClinicDateString } from 'src/common/utils';
 import { DentalRecord, DentalRecordDocument, ToothStatus } from '../dental-records/dental-record.schema';
 import { ADULT_TEETH } from '../dental-records/tooth-numbering';
 import { PerioExam, PerioExamDocument, PerioTooth, PERIO_SITES } from './perio-exam.schema';
@@ -152,7 +152,7 @@ export class PerioService {
     private async checkDate(clinicId: Id, date?: string) {
         const today = toClinicDateString(new Date(), await this.clinicRefs.timezoneOf(clinicId));
         if (!date) return today;
-        if (Number.isNaN(Date.parse(`${date}T00:00:00Z`))) throw new BadRequestException(errorBody('invalidDate', 'Not a valid date'));
+        if (!isCalendarDate(date)) throw new BadRequestException(errorBody('invalidDate', 'Not a valid date'));
         if (date > today) throw new BadRequestException(errorBody('perioExamInFuture', 'An exam cannot be dated in the future'));
         return date;
     }

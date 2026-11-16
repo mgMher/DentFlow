@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Schema as MongooseSchema, Types } from 'mongoose';
 import { Currency } from 'src/common/utils';
 
 export type ClinicDocument = Clinic & Document;
@@ -115,6 +115,23 @@ export class Clinic {
 
     @Prop({ default: true })
     isActive: boolean;
+
+    /** F13: why and when the platform suspended the clinic. */
+    @Prop()
+    suspendedAt?: Date;
+
+    @Prop({ trim: true })
+    suspendReason?: string;
+
+    /**
+     * F13: until when DentFlow support may look at the clinic (read-only),
+     * as allowed by one of its admins; empty means no access.
+     */
+    @Prop()
+    supportAccessUntil?: Date;
+
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
+    supportAccessGrantedBy?: Types.ObjectId;
 }
 
 export const ClinicSchema = SchemaFactory.createForClass(Clinic);

@@ -1,4 +1,5 @@
 import { TFunction } from 'i18next';
+import { lastDayOf } from './platform';
 import i18n from '../locales/i18n';
 import { AuditEntry, PaymentMethod, SurfaceStatus, ToothStatus, ToothSurface } from '../types';
 import { statusKey } from './appointments';
@@ -23,6 +24,9 @@ export const AUDIT_AREAS = [
     'reminders',
     'auth',
     'commission',
+    // F13: what DentFlow did to the clinic, and what support looked at.
+    'platform',
+    'support',
 ] as const;
 
 const humanize = (key: string) => key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase();
@@ -70,6 +74,7 @@ const enumValue = (t: TFunction, area: string, field: string, v: string) => {
             billing: [`billing.${v}`],
             plans: [`plans.statuses.${v}`],
             auth: [`audit.reasons.${v}`],
+            platform: [`subscription.status.${v}`],
         };
         return first(t, [...(byArea[area] ?? []), `common.${v}`], v);
     }
@@ -99,6 +104,8 @@ export const formatValue = (t: TFunction, entry: Pick<AuditEntry, 'area'>, field
                 )
                 .join(' · ');
         }
+        // F13: the end of a subscription is stored as the moment access stops; show the last day.
+        if (field === 'expiresAt' && ISO.test(value)) return formatDate(lastDayOf(value), 'dd.MM.yyyy', i18n.language);
         if (ISO.test(value)) {
             return value.endsWith('T00:00:00.000Z') ? formatDate(value, 'dd.MM.yyyy', i18n.language) : formatDateTime(value, i18n.language);
         }
@@ -112,7 +119,7 @@ export const formatValue = (t: TFunction, entry: Pick<AuditEntry, 'area'>, field
 };
 
 /** The identifying values worth showing next to the action, in a fixed order. */
-const DETAIL_ORDER = ['relationship', 'invoiceNumber', 'title', 'firstName', 'lastName', 'email', 'amount', 'totalAmount', 'method', 'status', 'kind', 'startTime', 'reason', 'note', 'counted', 'difference', 'count'];
+const DETAIL_ORDER = ['section', 'relationship', 'invoiceNumber', 'title', 'firstName', 'lastName', 'email', 'amount', 'totalAmount', 'method', 'status', 'kind', 'startTime', 'reason', 'note', 'counted', 'difference', 'count'];
 
 export const detailItems = (t: TFunction, entry: AuditEntry): string[] => {
     const d = entry.details ?? {};
@@ -131,6 +138,9 @@ export const detailItems = (t: TFunction, entry: AuditEntry): string[] => {
         if (key === 'toothNumber' && entry.changes?.length) continue;
         if (['amount', 'totalAmount', 'counted', 'difference'].includes(key) && typeof v === 'number') {
             out.push(`${fieldName(t, key)}: ${formatCurrency(v, currency)}`);
+        } else if (key === 'section') {
+            // F13: which part of the app a support view looked at.
+            out.push(first(t, [`audit.areas.${v}`], String(v)));
         } else if (key === 'invoiceNumber' || key === 'title' || key === 'email') {
             out.push(String(v));
         } else {

@@ -1,4 +1,5 @@
 import {
+    isCalendarDate,
     addDays,
     clinicDateSpan,
     clinicDayRange,
@@ -62,5 +63,14 @@ describe('clinic-time', () => {
     it('rejects malformed input', () => {
         expect(() => clinicTimeToUtc('01.10.2026', '09:00', YEREVAN)).toThrow();
         expect(() => clinicTimeToUtc('2026-10-01', '9am', YEREVAN)).toThrow();
+    });
+
+    it('isCalendarDate: real days only', () => {
+        expect(isCalendarDate('2026-02-28')).toBe(true);
+        expect(isCalendarDate('2028-02-29')).toBe(true);
+        expect(isCalendarDate('2026-02-29')).toBe(false);
+        expect(isCalendarDate('2026-02-31')).toBe(false);
+        expect(isCalendarDate('2026-13-01')).toBe(false);
+        expect(isCalendarDate('2026-1-01')).toBe(false);
     });
 });

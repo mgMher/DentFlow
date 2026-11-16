@@ -6,7 +6,7 @@ import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { RootState } from '../store';
 import { authActions } from '../store/auth';
 import { clinicActions } from '../store/clinic';
-import { ACCESS_TOKEN_KEY } from '../api/axios';
+import { activeToken } from '../api/axios';
 
 /**
  * Gate for every signed-in page. After a reload Redux is empty but the token
@@ -17,18 +17,23 @@ import { ACCESS_TOKEN_KEY } from '../api/axios';
 const ProtectedRoute: React.FC = () => {
     const { t } = useTranslation();
     const dispatch = useDispatch();
-    const token = localStorage.getItem(ACCESS_TOKEN_KEY);
+    const token = activeToken();
     const user = useSelector((state: RootState) => state.auth.user);
     const clinic = useSelector((state: RootState) => state.clinic.clinic);
     const profileError = useSelector((state: RootState) => state.http.errors.find((e) => e.type === 'GET_PROFILE'));
 
     useEffect(() => {
-        if (!token) return;
-        if (!user) dispatch(authActions.getProfile());
-        if (!clinic) dispatch(clinicActions.getClinic());
+        if (token && !user) dispatch(authActions.getProfile());
         // Only on first mount of the signed-in area.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // A platform admin (F13) has no clinic to load.
+    const hasClinic = !!user?.clinicId;
+    useEffect(() => {
+        if (token && hasClinic && !clinic) dispatch(clinicActions.getClinic());
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [hasClinic]);
 
     if (!token) {
         return <Navigate to="/login" replace />;

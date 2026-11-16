@@ -3,6 +3,10 @@ import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import AccountBanners from './AccountBanners';
+import { useSelector } from 'react-redux';
+import { RootState } from '../../store';
+import { accountKind } from '../../utils/account';
 import { DRAWER_WIDTH, DRAWER_WIDTH_COLLAPSED, HEADER_HEIGHT } from '../../utils/constants';
 
 interface MainLayoutProps {
@@ -16,6 +20,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ themeMode, onToggleTheme }) => 
     const isMobile = useMediaQuery(theme.breakpoints.down('md'), { noSsr: true });
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const platform = accountKind(useSelector((state: RootState) => state.auth.user)) === 'platform';
     // On phones the drawer overlays the page, so nothing is offset by it.
     const sidebarWidth = isMobile ? 0 : sidebarCollapsed ? DRAWER_WIDTH_COLLAPSED : DRAWER_WIDTH;
 
@@ -29,6 +34,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ themeMode, onToggleTheme }) => 
                     mobile={isMobile}
                     mobileOpen={isMobile && mobileOpen}
                     onMobileClose={() => setMobileOpen(false)}
+                    platform={platform}
                 />
                 <Header
                     sidebarWidth={sidebarWidth}
@@ -53,6 +59,7 @@ const MainLayout: React.FC<MainLayoutProps> = ({ themeMode, onToggleTheme }) => 
                     '@media print': { mt: 0, p: 0, backgroundColor: '#fff' },
                 }}
             >
+                <AccountBanners />
                 <Outlet />
             </Box>
         </Box>

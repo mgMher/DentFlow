@@ -17,10 +17,13 @@ export class User {
     @Prop({ required: true })
     password: string;
 
+    /** Every account belongs to one clinic, except platform admins (F13), who belong to none. */
     @Prop({
         type: MongooseSchema.Types.ObjectId,
         ref: 'Clinic',
-        required: true,
+        required(this: { role?: string }) {
+            return this.role !== 'super_admin';
+        },
         index: true,
     })
     clinicId: Types.ObjectId;

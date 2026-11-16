@@ -3,11 +3,14 @@ import { HydratedDocument, Schema as MongooseSchema, Types } from 'mongoose';
 
 export type AuditLogDocument = HydratedDocument<AuditLog>;
 
-/** Who did it: a staff member, the patient (e.g. a Telegram answer) or the system. */
+/**
+ * Who did it: a staff member, the patient (e.g. a Telegram answer), the
+ * system, a platform admin (F13), or a platform admin looking in as support.
+ */
 @Schema({ _id: false })
 export class AuditActor {
-    @Prop({ enum: ['staff', 'patient', 'system'], default: 'staff' })
-    kind: 'staff' | 'patient' | 'system';
+    @Prop({ enum: ['staff', 'patient', 'system', 'platform', 'support'], default: 'staff' })
+    kind: 'staff' | 'patient' | 'system' | 'platform' | 'support';
 
     @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'User' })
     userId?: Types.ObjectId;
@@ -45,8 +48,9 @@ const AuditChangeSchema = SchemaFactory.createForClass(AuditChange);
  */
 @Schema({ collection: 'audit_logs', versionKey: false })
 export class AuditLog {
-    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Clinic', required: true })
-    clinicId: Types.ObjectId;
+    /** Empty only for platform-level entries (F13), e.g. a platform admin signing in. */
+    @Prop({ type: MongooseSchema.Types.ObjectId, ref: 'Clinic' })
+    clinicId?: Types.ObjectId;
 
     @Prop({ required: true, default: () => new Date() })
     at: Date;
@@ -97,6 +101,9 @@ AuditLogSchema.index({ clinicId: 1, _id: -1 });
 AuditLogSchema.index({ clinicId: 1, patientId: 1, _id: -1 });
 AuditLogSchema.index({ clinicId: 1, 'actor.userId': 1, _id: -1 });
 AuditLogSchema.index({ clinicId: 1, area: 1, _id: -1 });
+// F13: the platform log (platform admins' actions and sign-ins everywhere).
+AuditLogSchema.index({ 'actor.kind': 1, _id: -1 });
+AuditLogSchema.index({ area: 1, _id: -1 });
 
 // Append-only: any attempt to change or remove entries through the model fails.
 const WRITES = [

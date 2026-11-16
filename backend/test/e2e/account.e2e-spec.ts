@@ -249,7 +249,8 @@ describe('Patient account (e2e)', () => {
 
     describe('reports, roles and tenancy', () => {
         it('revenue counts money on account as collected, and says how much is on account', async () => {
-            const today = new Date().toISOString().slice(0, 10);
+            // The clinic's day (Yerevan, UTC+4), not UTC: they differ between midnight and 4 a.m.
+            const today = new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
             const r = await t.api.get(`/reports/revenue?startDate=${today}&endDate=${today}`, C.token);
             expect(r.status).toBe(200);
             expect(r.data.onAccount).toBeGreaterThan(0);

@@ -75,6 +75,7 @@ describe('Periodontal exams (e2e)', () => {
         expect((await saveTooth(first._id, 16, { mobility: 4 })).status).toBe(400);
         expect((await saveTooth(first._id, 55, { sites: six(2) })).body.code).toBe('toothNotInExam');
         expect((await create({ date: tomorrow })).body.code).toBe('perioExamInFuture');
+        expect((await create({ date: '2026-02-31' })).body.code).toBe('invalidDate');
     });
 
     it('the next exam shows the one before it, to compare', async () => {

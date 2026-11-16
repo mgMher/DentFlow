@@ -8,7 +8,8 @@ import { FieldChange } from './audit-diff';
 import { AuditPageDto, QueryAuditDto } from './dto/audit.dto';
 
 export interface AuditEntryInput {
-    clinicId: Types.ObjectId | string;
+    /** Empty only for platform-level entries (F13). */
+    clinicId?: Types.ObjectId | string;
     actor: AuditActor;
     event: string;
     method?: string;

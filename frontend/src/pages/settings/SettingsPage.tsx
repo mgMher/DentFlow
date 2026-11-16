@@ -50,6 +50,7 @@ import { Currency, WorkingHour, TreatmentRoom } from '../../types';
 import { useHttpState } from '../../hooks';
 import { isArmenianPhone } from '../../utils/validators';
 import RemindersTab from './RemindersTab';
+import SupportAccessTab from './SupportAccessTab';
 
 interface TabPanelProps {
     children?: React.ReactNode;
@@ -313,6 +314,7 @@ const SettingsPage: React.FC = () => {
                     <Tab label={t('settings.notifications')} />
                     <Tab label={t('settings.regional')} />
                     <Tab label={t('reminders.title')} />
+                    <Tab label={t('support.tab')} />
                 </Tabs>
             </Paper>
 
@@ -808,6 +810,11 @@ const SettingsPage: React.FC = () => {
             {/* ── Reminders Tab ── */}
             <TabPanel value={activeTab} index={5}>
                 <RemindersTab />
+            </TabPanel>
+
+            {/* ── Subscription and DentFlow support (F13) ── */}
+            <TabPanel value={activeTab} index={6}>
+                <SupportAccessTab />
             </TabPanel>
         </Box>
     );

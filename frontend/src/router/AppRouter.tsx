@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { MainLayout } from '../components/layout';
 import ProtectedRoute from './ProtectedRoute';
 import RequirePermission from './RequirePermission';
+import RequireAccount from './RequireAccount';
 
 // Auth pages
 import LoginPage from '../pages/auth/LoginPage';
@@ -34,6 +35,10 @@ import ForgotPasswordPage from '../pages/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/auth/ResetPasswordPage';
 import AccountSecurityPage from '../pages/account/AccountSecurityPage';
 import AuditLogPage from '../pages/audit/AuditLogPage';
+import PlatformClinicsPage from '../pages/platform/PlatformClinicsPage';
+import PlatformClinicPage from '../pages/platform/PlatformClinicPage';
+import PlatformAuditPage from '../pages/platform/PlatformAuditPage';
+import PlatformAdminsPage from '../pages/platform/PlatformAdminsPage';
 
 interface AppRouterProps {
     themeMode: 'light' | 'dark';
@@ -52,6 +57,19 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
                 <Route element={<MainLayout themeMode={themeMode} onToggleTheme={onToggleTheme} />}>
+                    {/* F13: the platform console, for platform admins only. */}
+                    <Route element={<RequireAccount platform />}>
+                        <Route path="/platform" element={<PlatformClinicsPage />} />
+                        <Route path="/platform/clinics/:id" element={<PlatformClinicPage />} />
+                        <Route path="/platform/audit" element={<PlatformAuditPage />} />
+                        <Route path="/platform/admins" element={<PlatformAdminsPage />} />
+                    </Route>
+
+                    {/* Your own account: everyone. */}
+                    <Route path="/account" element={<AccountSecurityPage />} />
+
+                    {/* A clinic's pages: its staff, and support views. */}
+                    <Route element={<RequireAccount />}>
                     <Route path="/dashboard" element={<DashboardPage />} />
 
                     <Route path="/patients" element={<PatientsListPage />} />
@@ -85,7 +103,6 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
                     </Route>
                     <Route path="/schedule" element={<SchedulePage />} />
                     <Route path="/notifications" element={<NotificationsPage />} />
-                    <Route path="/account" element={<AccountSecurityPage />} />
                     <Route element={<RequirePermission permission="manageClinic" />}>
                         <Route path="/settings" element={<SettingsPage />} />
                     </Route>
@@ -95,6 +112,7 @@ const AppRouter: React.FC<AppRouterProps> = ({ themeMode, onToggleTheme }) => {
 
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="*" element={<Navigate to="/dashboard" replace />} />
+                    </Route>
                 </Route>
             </Route>
         </Routes>

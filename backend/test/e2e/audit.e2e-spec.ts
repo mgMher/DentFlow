@@ -224,7 +224,8 @@ describe('Audit log (e2e)', () => {
             expect(byDentist.every((e) => e.actor.userId === dentist.authId)).toBe(true);
             expect((await log('area=chart&limit=200')).every((e) => e.area === 'chart')).toBe(true);
 
-            const today = new Date().toISOString().slice(0, 10);
+            // The clinic's day (Yerevan, UTC+4), not UTC: they differ between midnight and 4 a.m.
+            const today = new Date(Date.now() + 4 * 3_600_000).toISOString().slice(0, 10);
             expect((await log(`from=${today}&to=${today}&limit=200`)).length).toBeGreaterThan(5);
             expect(await log('from=2020-01-01&to=2020-01-31')).toEqual([]);
 

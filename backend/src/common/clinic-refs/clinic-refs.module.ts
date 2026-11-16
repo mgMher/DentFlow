@@ -7,6 +7,7 @@ import { Treatment, TreatmentSchema } from 'src/modules/treatments/treatment.sch
 import { Appointment, AppointmentSchema } from 'src/modules/appointments/appointment.schema';
 import { ClinicRefsService } from './clinic-refs.service';
 import { UpcomingAppointmentsService } from './upcoming-appointments.service';
+import { ClinicStatusService } from './clinic-status.service';
 import { Clinic, ClinicSchema } from 'src/modules/clinics/clinic.schema';
 import { NotificationsModule } from 'src/modules/notifications/notifications.module';
 
@@ -24,7 +25,7 @@ import { NotificationsModule } from 'src/modules/notifications/notifications.mod
         ]),
         NotificationsModule,
     ],
-    providers: [ClinicRefsService, UpcomingAppointmentsService],
-    exports: [ClinicRefsService, UpcomingAppointmentsService],
+    providers: [ClinicRefsService, UpcomingAppointmentsService, ClinicStatusService],
+    exports: [ClinicRefsService, UpcomingAppointmentsService, ClinicStatusService],
 })
 export class ClinicRefsModule {}

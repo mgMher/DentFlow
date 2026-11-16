@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Patch } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Patch, Put } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { CurrentUser, Roles, Role } from 'src/common/decorators';
+import { AllowWhenReadOnly, CurrentUser, Roles, Role } from 'src/common/decorators';
 import { ClinicsService } from './clinics.service';
 import { UpdateClinicDto, UpdateWorkingHoursDto, UpdateSettingsDto } from './dto';
+import { SupportAccessDto } from './dto/support-access.dto';
 
 @ApiTags('Clinics')
 @ApiBearerAuth()
@@ -51,5 +52,25 @@ export class ClinicsController {
         @Body() dto: UpdateSettingsDto,
     ) {
         return this.clinicsService.updateSettings(clinicId, dto);
+    }
+
+    /**
+     * F13: let DentFlow support look at the clinic, read-only, for a few
+     * hours. Also when the clinic is read-only (that is when help is needed).
+     */
+    @Put('current/support-access')
+    @Roles(Role.CLINIC_ADMIN)
+    @AllowWhenReadOnly()
+    @ApiOperation({ summary: 'Allow DentFlow support to view the clinic (read-only) for 1–72 hours' })
+    grantSupportAccess(@CurrentUser() user: { clinicId: string; userId: string }, @Body() dto: SupportAccessDto) {
+        return this.clinicsService.grantSupportAccess(user.clinicId, user.userId, dto.hours);
+    }
+
+    @Delete('current/support-access')
+    @Roles(Role.CLINIC_ADMIN)
+    @AllowWhenReadOnly()
+    @ApiOperation({ summary: 'Withdraw support access now (open support views end)' })
+    revokeSupportAccess(@CurrentUser('clinicId') clinicId: string) {
+        return this.clinicsService.revokeSupportAccess(clinicId);
     }
 }

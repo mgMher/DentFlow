@@ -129,3 +129,10 @@ export const clinicMonth = (timeZone: string, now: Date = new Date()) => {
     const next = month === 12 ? `${year + 1}-01-01` : `${year}-${pad(month + 1)}-01`;
     return { start: clinicTimeToUtc(first, '00:00', timeZone), end: clinicTimeToUtc(next, '00:00', timeZone) };
 };
+
+/** A real `YYYY-MM-DD` day: `2026-02-31` is not (Date.parse would roll it into March). */
+export const isCalendarDate = (date: string): boolean => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return false;
+    const d = new Date(`${date}T00:00:00Z`);
+    return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === date;
+};

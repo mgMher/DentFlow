@@ -6,7 +6,9 @@ import * as jwt from 'jsonwebtoken';
 import { jwtConfig } from 'src/config';
 import { User, UserDocument } from 'src/modules/auth/auth.schema';
 import { SessionsService } from 'src/modules/auth/sessions.service';
-import { IS_PUBLIC_KEY } from '../decorators';
+import { IS_PUBLIC_KEY, Role } from '../decorators';
+import { ClinicStatusService, supportAllowed } from '../clinic-refs/clinic-status.service';
+import { errorBody } from '../utils';
 
 @Injectable()
 export class AuthGuard implements CanActivate {
@@ -14,6 +16,7 @@ export class AuthGuard implements CanActivate {
         private reflector: Reflector,
         @InjectModel(User.name) private readonly userModel: Model<UserDocument>,
         private readonly sessions: SessionsService,
+        private readonly clinics: ClinicStatusService,
     ) {}
 
     async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -49,24 +52,51 @@ export class AuthGuard implements CanActivate {
             payload.sid ? this.sessions.isActive(payload.sid) : Promise.resolve(false),
         ]);
 
+        const name = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
+
+        // F13: a platform admin looking into a clinic that allowed it. Read-only
+        // (ClinicGuard); seen there as a clinic admin, logged as support.
+        if (payload.support) {
+            const allowed =
+                sessionLive &&
+                !!user &&
+                user.isActive &&
+                user.role === Role.SUPER_ADMIN &&
+                !user.clinicId &&
+                !!payload.clinicId &&
+                supportAllowed(await this.clinics.get(payload.clinicId));
+            if (!allowed) throw new UnauthorizedException(errorBody('supportEnded', 'The support view has ended'));
+            request.user = {
+                userId: payload.userId,
+                clinicId: payload.clinicId,
+                email: payload.email,
+                role: Role.CLINIC_ADMIN,
+                sessionId: payload.sid,
+                support: true,
+                name,
+            };
+            return true;
+        }
+
         if (
             !sessionLive ||
             !user ||
             !user.isActive ||
             user.role !== payload.role ||
-            user.clinicId?.toString() !== payload.clinicId
+            // Platform admins (F13) have no clinic on either side.
+            (user.clinicId?.toString() ?? null) !== (payload.clinicId ?? null)
         ) {
             throw new UnauthorizedException('Session is no longer valid');
         }
 
         request.user = {
             userId: payload.userId,
-            clinicId: payload.clinicId,
+            clinicId: payload.clinicId ?? undefined,
             email: payload.email,
             role: payload.role,
             sessionId: payload.sid,
             // For the audit log: the name at the time of the action.
-            name: [user.firstName, user.lastName].filter(Boolean).join(' '),
+            name,
         };
 
         return true;
